@@ -22,7 +22,15 @@ ZIP_YQ=$(echo ${ZIP_BASE_DIR}/yq*)
 ZIP_SUBCONVERTER=$(echo ${ZIP_BASE_DIR}/subconverter*)
 ZIP_UI="${ZIP_BASE_DIR}/yacd.tar.xz"
 
-CLASH_BASE_DIR='/opt/clash'
+# Use user's home directory for installation
+if [ -n "$SUDO_USER" ]; then
+    USER_HOME=$(eval echo ~$SUDO_USER)
+    ACTUAL_USER="$SUDO_USER"
+else
+    USER_HOME="${HOME:-$(eval echo ~$USER)}"
+    ACTUAL_USER="$USER"
+fi
+CLASH_BASE_DIR="${USER_HOME}/.local/share/clash"
 CLASH_SCRIPT_DIR="${CLASH_BASE_DIR}/$(basename $SCRIPT_BASE_DIR)"
 CLASH_CONFIG_URL="${CLASH_BASE_DIR}/url"
 CLASH_CONFIG_RAW="${CLASH_BASE_DIR}/$(basename $RESOURCES_CONFIG)"
@@ -60,10 +68,8 @@ _set_var() {
         SHELL_RC_FISH="${home}/.config/fish/conf.d/clashctl.fish"
     }
 
-    # 定时任务路径
-    local os_info=$(cat /etc/os-release)
-    echo "$os_info" | grep -iqsE "rhel|centos" && CLASH_CRON_TAB="/var/spool/cron/$user"
-    echo "$os_info" | grep -iqsE "debian|ubuntu" && CLASH_CRON_TAB="/var/spool/cron/crontabs/$user"
+    # 定时任务路径 - use user crontab
+    CLASH_CRON_TAB="${home}/.crontab"
 }
 _set_var
 
@@ -97,9 +103,10 @@ _set_rc() {
         return
     }
 
-    echo "source $CLASH_SCRIPT_DIR/common.sh && source $CLASH_SCRIPT_DIR/clashctl.sh && watch_proxy" |
+    # Add clash functions and auto-start proxy on login
+    echo "source $CLASH_SCRIPT_DIR/common.sh && source $CLASH_SCRIPT_DIR/clashctl.sh && watch_proxy && clashon 2>/dev/null" |
         tee -a "$SHELL_RC_BASH" "$SHELL_RC_ZSH" >&/dev/null
-    [ -n "$SHELL_RC_FISH" ] && /usr/bin/install $SCRIPT_FISH "$SHELL_RC_FISH"
+    [ -n "$SHELL_RC_FISH" ] && /usr/bin/install "$SCRIPT_FISH" "$SHELL_RC_FISH"
 }
 
 # 默认集成、安装mihomo内核
@@ -134,27 +141,27 @@ _get_random_port() {
 }
 
 function _get_proxy_port() {
-    local mixed_port=$(sudo "$BIN_YQ" '.mixed-port // ""' $CLASH_CONFIG_RUNTIME)
+    local mixed_port=$("$BIN_YQ" '.mixed-port // ""' $CLASH_CONFIG_RUNTIME)
     MIXED_PORT=${mixed_port:-7890}
 
     _is_already_in_use "$MIXED_PORT" "$BIN_KERNEL_NAME" && {
         local newPort=$(_get_random_port)
         local msg="端口占用：${MIXED_PORT} 🎲 随机分配：$newPort"
-        sudo "$BIN_YQ" -i ".mixed-port = $newPort" $CLASH_CONFIG_RUNTIME
+        "$BIN_YQ" -i ".mixed-port = $newPort" $CLASH_CONFIG_RUNTIME
         MIXED_PORT=$newPort
         _failcat '🎯' "$msg"
     }
 }
 
 function _get_ui_port() {
-    local ext_addr=$(sudo "$BIN_YQ" '.external-controller // ""' $CLASH_CONFIG_RUNTIME)
+    local ext_addr=$("$BIN_YQ" '.external-controller // ""' $CLASH_CONFIG_RUNTIME)
     local ext_port=${ext_addr##*:}
     UI_PORT=${ext_port:-9090}
 
     _is_already_in_use "$UI_PORT" "$BIN_KERNEL_NAME" && {
         local newPort=$(_get_random_port)
         local msg="端口占用：${UI_PORT} 🎲 随机分配：$newPort"
-        sudo "$BIN_YQ" -i ".external-controller = \"0.0.0.0:$newPort\"" $CLASH_CONFIG_RUNTIME
+        "$BIN_YQ" -i ".external-controller = \"0.0.0.0:$newPort\"" $CLASH_CONFIG_RUNTIME
         UI_PORT=$newPort
         _failcat '🎯' "$msg"
     }
@@ -191,9 +198,7 @@ function _failcat() {
 }
 
 function _quit() {
-    local user=root
-    [ -n "$SUDO_USER" ] && user=$SUDO_USER
-    exec sudo -u "$user" -- "$_SHELL" -i
+    exec "$_SHELL" -i
 }
 
 function _error_quit() {
@@ -209,7 +214,7 @@ function _error_quit() {
 
 _is_bind() {
     local port=$1
-    { sudo ss -lnptu || sudo netstat -lnptu; } | grep ":${port}\b"
+    { ss -lnptu || netstat -lnptu; } 2>/dev/null | grep ":${port}\b"
 }
 
 _is_already_in_use() {
@@ -223,9 +228,11 @@ function _is_root() {
 }
 
 function _valid_env() {
-    _is_root || _error_quit "需要 root 或 sudo 权限执行"
     [ -n "$ZSH_VERSION" ] && [ -n "$BASH_VERSION" ] && _error_quit "仅支持：bash、zsh"
     [ "$(ps -p 1 -o comm=)" != "systemd" ] && _error_quit "系统不具备 systemd"
+    # Create user systemd directory if it doesn't exist
+    mkdir -p "${USER_HOME}/.config/systemd/user"
+    mkdir -p "${USER_HOME}/.local/share"
 }
 
 function _valid_config() {
@@ -283,7 +290,7 @@ _download_raw_config() {
     local dest=$1
     local url=$2
     local agent='clash-verge/v2.0.4'
-    sudo curl \
+    curl \
         --silent \
         --show-error \
         --insecure \
@@ -292,7 +299,7 @@ _download_raw_config() {
         --user-agent "$agent" \
         --output "$dest" \
         "$url" ||
-        sudo wget \
+        wget \
             --no-verbose \
             --no-check-certificate \
             --timeout 3 \
@@ -337,14 +344,14 @@ _start_convert() {
         local newPort=$(_get_random_port)
         _failcat '🎯' "端口占用：$BIN_SUBCONVERTER_PORT 🎲 随机分配：$newPort"
         [ ! -e "$BIN_SUBCONVERTER_CONFIG" ] && {
-            sudo /bin/cp -f "$BIN_SUBCONVERTER_DIR/pref.example.yml" "$BIN_SUBCONVERTER_CONFIG"
+            /bin/cp -f "$BIN_SUBCONVERTER_DIR/pref.example.yml" "$BIN_SUBCONVERTER_CONFIG"
         }
-        sudo "$BIN_YQ" -i ".server.port = $newPort" "$BIN_SUBCONVERTER_CONFIG"
+        "$BIN_YQ" -i ".server.port = $newPort" "$BIN_SUBCONVERTER_CONFIG"
         BIN_SUBCONVERTER_PORT=$newPort
     }
     local start=$(date +%s)
     # 子shell运行，屏蔽kill时的输出
-    (sudo "$BIN_SUBCONVERTER" 2>&1 | sudo tee "$BIN_SUBCONVERTER_LOG" >/dev/null &)
+    ("$BIN_SUBCONVERTER" 2>&1 | tee "$BIN_SUBCONVERTER_LOG" >/dev/null &)
     while ! _is_bind "$BIN_SUBCONVERTER_PORT" >&/dev/null; do
         sleep 1s
         local now=$(date +%s)
