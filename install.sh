@@ -55,30 +55,16 @@ RestartSec=5
 WantedBy=default.target
 EOF
 
-# Ensure proper ownership
-if [ -n "$SUDO_USER" ]; then
-    chown -R "$SUDO_USER:$(id -gn $SUDO_USER)" "$CLASH_BASE_DIR"
-    chown -R "$SUDO_USER:$(id -gn $SUDO_USER)" "${USER_HOME}/.config/systemd"
-fi
+# Enable systemd user service
+systemctl --user daemon-reload
+systemctl --user enable "$BIN_KERNEL_NAME" >&/dev/null && _okcat '�' "已设置开机自启" || _failcat '�' "设置自启失败"
 
-# Enable systemd user service (run as the actual user)
-if [ -n "$SUDO_USER" ]; then
-    sudo -u "$SUDO_USER" systemctl --user daemon-reload
-    sudo -u "$SUDO_USER" systemctl --user enable "$BIN_KERNEL_NAME" >&/dev/null || _failcat '💥' "设置自启失败" && _okcat '🚀' "已设置开机自启"
-    # Enable lingering to allow user services to start at boot
-    loginctl enable-linger "$SUDO_USER" 2>/dev/null || _okcat '⚠️' "无法设置开机自启，可手动执行: sudo loginctl enable-linger $SUDO_USER"
-else
-    systemctl --user daemon-reload
-    systemctl --user enable "$BIN_KERNEL_NAME" >&/dev/null || _failcat '💥' "设置自启失败" && _okcat '🚀' "已设置开机自启"
-    # Enable lingering to allow user services to start at boot
-    loginctl enable-linger "$USER" 2>/dev/null || _okcat '⚠️' "无法设置开机自启，可手动执行: sudo loginctl enable-linger $USER"
-fi
+# Enable lingering to allow user services to start at boot
+loginctl enable-linger "$USER" 2>/dev/null || _okcat '⚠️' "无法设置开机自启，可手动执行: sudo loginctl enable-linger $USER"
 
 clashui
 _okcat '🎉' 'enjoy 🎉'
-_okcat '📋' "说明：已安装为用户服务，无需sudo权限。配置位于：$CLASH_BASE_DIR"
+_okcat '�' "说明：已安装为用户服务，无需sudo权限。配置位于：$CLASH_BASE_DIR"
 _okcat '🚀' "代理将在每次登录时自动启动。手动控制：clash on/off"
-clash
-_quit
 clash
 _quit

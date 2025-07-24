@@ -21,6 +21,3 @@ for fn in $fn_arr
         bash -i -c '$fn \$@;exec fish -i' -- \$argv
     end"
 end
-
-# Auto-start proxy on shell startup
-bash -i -c 'clashon 2>/dev/null'

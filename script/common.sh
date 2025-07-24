@@ -23,13 +23,7 @@ ZIP_SUBCONVERTER=$(echo ${ZIP_BASE_DIR}/subconverter*)
 ZIP_UI="${ZIP_BASE_DIR}/yacd.tar.xz"
 
 # Use user's home directory for installation
-if [ -n "$SUDO_USER" ]; then
-    USER_HOME=$(eval echo ~$SUDO_USER)
-    ACTUAL_USER="$SUDO_USER"
-else
-    USER_HOME="${HOME:-$(eval echo ~$USER)}"
-    ACTUAL_USER="$USER"
-fi
+USER_HOME="${HOME:-$(eval echo ~$USER)}"
 CLASH_BASE_DIR="${USER_HOME}/.local/share/clash"
 CLASH_SCRIPT_DIR="${CLASH_BASE_DIR}/$(basename $SCRIPT_BASE_DIR)"
 CLASH_CONFIG_URL="${CLASH_BASE_DIR}/url"
@@ -198,7 +192,9 @@ function _failcat() {
 }
 
 function _quit() {
-    exec "$_SHELL" -i
+    local user=root
+    [ -n "$SUDO_USER" ] && user=$SUDO_USER
+    exec sudo -u "$user" -- "$_SHELL" -i
 }
 
 function _error_quit() {
