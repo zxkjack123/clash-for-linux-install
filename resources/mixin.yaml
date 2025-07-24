@@ -12,9 +12,217 @@ allow-lan: false # 若开启务必设置用户验证以防暴露公网后被滥�
 authentication:
   # - "username:password" # 用户验证（clashon 会自动填充验证信息）
 
+# 自定义代理组
+proxy-groups:
+  - name: AI
+    type: select
+    proxies:
+      - V1-美国01|流媒体|GPT
+      - V1-美国02|流媒体|GPT
+      - V1-美国03|流媒体|GPT
+      - V1-美国04|流媒体|GPT
+      - V1-美国05|流媒体|GPT
+      - V1-美国06|流媒体|GPT
+      - V1-美国07|流媒体|GPT
+      - V1-美国08|流媒体|GPT
+      - V1-美国09|流媒体|GPT
+      - V1-美国10|流媒体|GPT
+
+  - name: Development
+    type: select
+    proxies:
+      - V1-香港01
+      - V1-香港02
+      - V1-香港03
+      - V1-香港04
+      - V1-新加坡01|流媒体|GPT
+      - V1-新加坡02|流媒体|GPT
+      - V1-日本01|流媒体|GPT
+      - V1-日本02|流媒体|GPT
+      - V1-美国01|流媒体|GPT
+      - V1-美国02|流媒体|GPT
+
+  - name: Streaming
+    type: select
+    proxies:
+      - V1-美国01|流媒体|GPT
+      - V1-美国02|流媒体|GPT
+      - V1-美国03|流媒体|GPT
+      - V1-香港01
+      - V1-香港02
+      - V1-新加坡01|流媒体|GPT
+      - V1-新加坡02|流媒体|GPT
+      - V1-日本01|流媒体|GPT
+      - V1-日本02|流媒体|GPT
+
+  - name: Gaming
+    type: select
+    proxies:
+      - V1-香港01
+      - V1-香港02
+      - V1-香港03
+      - V1-日本01|流媒体|GPT
+      - V1-日本02|流媒体|GPT
+      - V1-韩国01
+      - V1-韩国02
+      - V1-新加坡01|流媒体|GPT
+      - V1-新加坡02|流媒体|GPT
+
 # 自定义规则
 rules:
   - DOMAIN,api64.ipify.org,DIRECT # 用于 clashui 获取真实公网 IP
+  
+  # 高优先级规则 - 覆盖订阅中的通用规则
+  - DOMAIN-SUFFIX,youtube.com,Streaming
+  - DOMAIN-SUFFIX,youtu.be,Streaming
+  - DOMAIN-SUFFIX,googlevideo.com,Streaming
+  - DOMAIN-SUFFIX,ytimg.com,Streaming
+  - DOMAIN-SUFFIX,ggpht.com,Streaming
+  - DOMAIN-SUFFIX,googleapis.com,Streaming
+  - DOMAIN-SUFFIX,gstatic.com,Streaming
+  - DOMAIN-SUFFIX,openai.com,AI
+  - DOMAIN-SUFFIX,api.openai.com,AI
+  - DOMAIN-SUFFIX,chatgpt.com,AI
+  - DOMAIN-SUFFIX,chat.openai.com,AI
+  - DOMAIN-SUFFIX,platform.openai.com,AI
+  - DOMAIN-SUFFIX,registry.docker.io,Development
+  - DOMAIN-SUFFIX,docker.io,Development
+  - DOMAIN-SUFFIX,index.docker.io,Development
+  - DOMAIN-SUFFIX,hub.docker.com,Development
+  - DOMAIN-SUFFIX,docker.com,Development
+  - DOMAIN-SUFFIX,github.com,Development
+  - DOMAIN-SUFFIX,api.github.com,Development
+  - DOMAIN-SUFFIX,raw.githubusercontent.com,Development
+  
+  # AI 相关网站规则
+  - DOMAIN-SUFFIX,claude.ai,AI
+  - DOMAIN-SUFFIX,anthropic.com,AI
+  - DOMAIN-SUFFIX,google.ai,AI
+  - DOMAIN-SUFFIX,bard.google.com,AI
+  - DOMAIN-SUFFIX,gemini.google.com,AI
+  - DOMAIN-SUFFIX,makersuite.google.com,AI
+  - DOMAIN-SUFFIX,ai.google.dev,AI
+  - DOMAIN-SUFFIX,cohere.ai,AI
+  - DOMAIN-SUFFIX,cohere.com,AI
+  - DOMAIN-SUFFIX,huggingface.co,AI
+  - DOMAIN-SUFFIX,replicate.com,AI
+  - DOMAIN-SUFFIX,midjourney.com,AI
+  - DOMAIN-SUFFIX,stability.ai,AI
+  - DOMAIN-SUFFIX,runwayml.com,AI
+  - DOMAIN-SUFFIX,character.ai,AI
+  - DOMAIN-SUFFIX,perplexity.ai,AI
+  - DOMAIN-SUFFIX,jasper.ai,AI
+  - DOMAIN-SUFFIX,copy.ai,AI
+  - DOMAIN-SUFFIX,writesonic.com,AI
+  - DOMAIN-SUFFIX,notion.ai,AI
+  - DOMAIN-SUFFIX,beta.openai.com,AI
+  - DOMAIN-SUFFIX,labs.openai.com,AI
+  - DOMAIN-SUFFIX,dall-e.com,AI
+  - DOMAIN-SUFFIX,firefly.adobe.com,AI
+  - DOMAIN-SUFFIX,ai.meta.com,AI
+  - DOMAIN-SUFFIX,llama.meta.com,AI
+  - DOMAIN-SUFFIX,poe.com,AI
+  - DOMAIN-SUFFIX,quora.com,AI
+  - DOMAIN-SUFFIX,forefront.ai,AI
+  - DOMAIN-SUFFIX,you.com,AI
+  - DOMAIN-SUFFIX,gamma.app,AI
+  - DOMAIN-SUFFIX,tome.app,AI
+  - DOMAIN-SUFFIX,beautiful.ai,AI
+  
+  # Development & Docker 相关网站规则
+  - DOMAIN-SUFFIX,github.com,Development
+  - DOMAIN-SUFFIX,api.github.com,Development
+  - DOMAIN-SUFFIX,raw.githubusercontent.com,Development
+  - DOMAIN-SUFFIX,github.io,Development
+  - DOMAIN-SUFFIX,githubassets.com,Development
+  - DOMAIN-SUFFIX,githubapp.com,Development
+  - DOMAIN-SUFFIX,githubassets.com,Development
+  - DOMAIN-SUFFIX,gitlab.com,Development
+  - DOMAIN-SUFFIX,hub.docker.com,Development
+  - DOMAIN-SUFFIX,docker.com,Development
+  - DOMAIN-SUFFIX,docker.io,Development
+  - DOMAIN-SUFFIX,registry.docker.io,Development
+  - DOMAIN-SUFFIX,index.docker.io,Development
+  - DOMAIN-SUFFIX,registry-1.docker.io,Development
+  - DOMAIN-SUFFIX,production.cloudflare.docker.com,Development
+  - DOMAIN-SUFFIX,download.docker.com,Development
+  - DOMAIN-SUFFIX,ghcr.io,Development
+  - DOMAIN-SUFFIX,quay.io,Development
+  - DOMAIN-SUFFIX,gcr.io,Development
+  - DOMAIN-SUFFIX,k8s.gcr.io,Development
+  - DOMAIN-SUFFIX,asia.gcr.io,Development
+  - DOMAIN-SUFFIX,eu.gcr.io,Development
+  - DOMAIN-SUFFIX,us.gcr.io,Development
+  - DOMAIN-SUFFIX,mcr.microsoft.com,Development
+  - DOMAIN-SUFFIX,public.ecr.aws,Development
+  - DOMAIN-SUFFIX,gallery.ecr.aws,Development
+  - DOMAIN-SUFFIX,npmjs.org,Development
+  - DOMAIN-SUFFIX,registry.npmjs.org,Development
+  - DOMAIN-SUFFIX,pypi.org,Development
+  - DOMAIN-SUFFIX,files.pythonhosted.org,Development
+  - DOMAIN-SUFFIX,rubygems.org,Development
+  - DOMAIN-SUFFIX,packagist.org,Development
+  - DOMAIN-SUFFIX,docs.docker.com,Development
+  - DOMAIN-SUFFIX,kubernetes.io,Development
+  - DOMAIN-SUFFIX,k8s.io,Development
+  - DOMAIN-SUFFIX,stackoverflow.com,Development
+  - DOMAIN-SUFFIX,stackexchange.com,Development
+  - DOMAIN-SUFFIX,jetbrains.com,Development
+  - DOMAIN-SUFFIX,visualstudio.com,Development
+  - DOMAIN-SUFFIX,code.visualstudio.com,Development
+  - DOMAIN-KEYWORD,github,Development
+  - DOMAIN-KEYWORD,docker,Development
+  - DOMAIN-KEYWORD,gitlab,Development
+  
+  # Streaming 相关网站规则
+  - DOMAIN-SUFFIX,netflix.com,Streaming
+  - DOMAIN-SUFFIX,nflxvideo.net,Streaming
+  - DOMAIN-SUFFIX,nflximg.net,Streaming
+  - DOMAIN-SUFFIX,nflxso.net,Streaming
+  - DOMAIN-SUFFIX,twitch.tv,Streaming
+  - DOMAIN-SUFFIX,twitchcdn.net,Streaming
+  - DOMAIN-SUFFIX,jtvnw.net,Streaming
+  - DOMAIN-SUFFIX,hulu.com,Streaming
+  - DOMAIN-SUFFIX,disney.com,Streaming
+  - DOMAIN-SUFFIX,disneyplus.com,Streaming
+  - DOMAIN-SUFFIX,primevideo.com,Streaming
+  - DOMAIN-SUFFIX,hbo.com,Streaming
+  - DOMAIN-SUFFIX,hbomax.com,Streaming
+  - DOMAIN-SUFFIX,spotify.com,Streaming
+  - DOMAIN-SUFFIX,scdn.co,Streaming
+  - DOMAIN-SUFFIX,bilibili.com,Streaming
+  - DOMAIN-SUFFIX,bilivideo.com,Streaming
+  - DOMAIN-KEYWORD,netflix,Streaming
+  - DOMAIN-KEYWORD,twitch,Streaming
+  
+  # Gaming 相关网站规则
+  - DOMAIN-SUFFIX,steampowered.com,Gaming
+  - DOMAIN-SUFFIX,steamcommunity.com,Gaming
+  - DOMAIN-SUFFIX,steamstatic.com,Gaming
+  - DOMAIN-SUFFIX,epicgames.com,Gaming
+  - DOMAIN-SUFFIX,unrealengine.com,Gaming
+  - DOMAIN-SUFFIX,battle.net,Gaming
+  - DOMAIN-SUFFIX,blizzard.com,Gaming
+  - DOMAIN-SUFFIX,ea.com,Gaming
+  - DOMAIN-SUFFIX,origin.com,Gaming
+  - DOMAIN-SUFFIX,ubisoft.com,Gaming
+  - DOMAIN-SUFFIX,ubisoftconnect.com,Gaming
+  - DOMAIN-SUFFIX,riotgames.com,Gaming
+  - DOMAIN-SUFFIX,leagueoflegends.com,Gaming
+  - DOMAIN-SUFFIX,valorant.com,Gaming
+  - DOMAIN-SUFFIX,minecraft.net,Gaming
+  - DOMAIN-SUFFIX,mojang.com,Gaming
+  - DOMAIN-SUFFIX,discord.com,Gaming
+  - DOMAIN-SUFFIX,discordapp.com,Gaming
+  - DOMAIN-SUFFIX,discordapp.net,Gaming
+  - DOMAIN-KEYWORD,steam,Gaming
+  - DOMAIN-KEYWORD,epic,Gaming
+  - DOMAIN-KEYWORD,battle,Gaming
+  
+  # 特定AI关键词 (避免与google等冲突)
+  - DOMAIN-KEYWORD,chatgpt,AI
+  - DOMAIN-KEYWORD,claude,AI
+  - DOMAIN-KEYWORD,anthropic,AI
 
 # tun 配置
 tun:
