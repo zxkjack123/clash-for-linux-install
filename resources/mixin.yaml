@@ -4,7 +4,7 @@ system-proxy:
 
 # Web 控制台配置
 external-controller: "0.0.0.0:9090"
-external-ui: /home/gw/.local/share/clash/public
+external-ui: ~/.local/share/clash/public
 secret:
 
 # 代理服务器配置

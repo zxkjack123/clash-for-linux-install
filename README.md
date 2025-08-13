@@ -229,15 +229,15 @@ bash uninstall.sh
 
 1. **备份现有配置**（如有需要）：
    ```bash
-   # 如果之前是系统安装，备份配置
-   [ -f /opt/clash/mixin.yaml ] && cp /opt/clash/mixin.yaml ~/mixin_backup.yaml
-   [ -f /opt/clash/url ] && cp /opt/clash/url ~/url_backup.txt
+   # 如果之前有用户安装，备份配置
+   [ -f ~/.local/share/clash/mixin.yaml ] && cp ~/.local/share/clash/mixin.yaml ~/mixin_backup.yaml
+   [ -f ~/.local/share/clash/url ] && cp ~/.local/share/clash/url ~/url_backup.txt
    ```
 
 2. **卸载旧版本**（如有）：
    ```bash
-   # 如果之前有系统级安装，先卸载
-   cd /path/to/old/clash-for-linux-install && sudo bash uninstall.sh
+   # 如果之前有安装，先卸载
+   cd /path/to/old/clash-for-linux-install && bash uninstall.sh
    ```
 
 3. **安装新的用户空间版本**：
