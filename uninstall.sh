@@ -7,10 +7,13 @@ _valid_env
 
 clashoff >&/dev/null
 
-# Stop and disable user systemd service
+# Stop and disable user systemd services
 systemctl --user stop "$BIN_KERNEL_NAME" >&/dev/null
 systemctl --user disable "$BIN_KERNEL_NAME" >&/dev/null
+systemctl --user stop clash-proxy-env.service >&/dev/null
+systemctl --user disable clash-proxy-env.service >&/dev/null
 rm -f "${USER_HOME}/.config/systemd/user/${BIN_KERNEL_NAME}.service"
+rm -f "${USER_HOME}/.config/systemd/user/clash-proxy-env.service"
 systemctl --user daemon-reload
 
 # Disable lingering if it was enabled

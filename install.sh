@@ -57,15 +57,34 @@ After=network.target
 Type=simple
 Restart=always
 ExecStart=${BIN_KERNEL} -d ${CLASH_BASE_DIR} -f ${CLASH_CONFIG_RUNTIME}
+ExecStartPost=/bin/sh -c 'sleep 2 && systemctl --user import-environment PATH && systemctl --user restart clash-proxy-env.service 2>/dev/null || true'
 RestartSec=5
 
 [Install]
 WantedBy=default.target
 EOF
 
-# Enable systemd user service
+# Create proxy environment service
+cat <<EOF >"${USER_HOME}/.config/systemd/user/clash-proxy-env.service"
+[Unit]
+Description=Clash Proxy Environment Setup
+After=${BIN_KERNEL_NAME}.service
+Requisite=${BIN_KERNEL_NAME}.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash -c 'source ${CLASH_SCRIPT_DIR}/common.sh && source ${CLASH_SCRIPT_DIR}/clashctl.sh && _set_system_proxy'
+ExecStop=/bin/bash -c 'source ${CLASH_SCRIPT_DIR}/common.sh && source ${CLASH_SCRIPT_DIR}/clashctl.sh && _unset_system_proxy'
+
+[Install]
+WantedBy=default.target
+EOF
+
+# Enable systemd user services
 systemctl --user daemon-reload
-systemctl --user enable "$BIN_KERNEL_NAME" >&/dev/null && _okcat '�' "已设置开机自启" || _failcat '�' "设置自启失败"
+systemctl --user enable "$BIN_KERNEL_NAME" >&/dev/null && _okcat '✅' "已设置开机自启" || _failcat '❌' "设置自启失败"
+systemctl --user enable clash-proxy-env.service >&/dev/null || _okcat '⚠️' "代理环境服务设置失败，将依赖shell启动"
 
 # Enable lingering to allow user services to start at boot
 loginctl enable-linger "$USER" 2>/dev/null || _okcat '⚠️' "无法设置开机自启，可手动执行: loginctl enable-linger $USER（可能需要管理员权限）"
