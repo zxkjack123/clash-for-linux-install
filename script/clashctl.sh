@@ -9,6 +9,7 @@ _set_system_proxy() {
     local socks_proxy_addr="socks5h://${auth}127.0.0.1:${MIXED_PORT}"
     local no_proxy_addr="localhost,127.0.0.1,::1"
 
+    # Set environment variables for terminal applications
     export http_proxy=$http_proxy_addr
     export https_proxy=$http_proxy
     export HTTP_PROXY=$http_proxy
@@ -20,10 +21,44 @@ _set_system_proxy() {
     export no_proxy=$no_proxy_addr
     export NO_PROXY=$no_proxy
 
+    # Enable Clash system proxy (affects system-level settings)
     "$BIN_YQ" -i '.system-proxy.enable = true' "$CLASH_CONFIG_MIXIN"
+
+    # Set GNOME/GTK proxy settings (for GUI applications)
+    if command -v gsettings >&/dev/null; then
+        gsettings set org.gnome.system.proxy mode 'manual' 2>/dev/null || true
+        gsettings set org.gnome.system.proxy.http host '127.0.0.1' 2>/dev/null || true
+        gsettings set org.gnome.system.proxy.http port "${MIXED_PORT}" 2>/dev/null || true
+        gsettings set org.gnome.system.proxy.https host '127.0.0.1' 2>/dev/null || true
+        gsettings set org.gnome.system.proxy.https port "${MIXED_PORT}" 2>/dev/null || true
+        gsettings set org.gnome.system.proxy.socks host '127.0.0.1' 2>/dev/null || true
+        gsettings set org.gnome.system.proxy.socks port "${MIXED_PORT}" 2>/dev/null || true
+        gsettings set org.gnome.system.proxy ignore-hosts "['localhost', '127.0.0.0/8', '::1']" 2>/dev/null || true
+    fi
+
+    # Set KDE proxy settings (for KDE applications)
+    if command -v kwriteconfig5 >&/dev/null; then
+        kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key ProxyType 1 2>/dev/null || true
+        kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key httpProxy "127.0.0.1:${MIXED_PORT}" 2>/dev/null || true
+        kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key httpsProxy "127.0.0.1:${MIXED_PORT}" 2>/dev/null || true
+        kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key NoProxyFor "localhost,127.0.0.1,::1" 2>/dev/null || true
+    fi
+
+    # Configure Git proxy
+    git config --global http.proxy "$http_proxy_addr" 2>/dev/null || true
+    git config --global https.proxy "$http_proxy_addr" 2>/dev/null || true
+
+    # Configure APT proxy (create/update configuration file)
+    local apt_proxy_file="/tmp/95clash-proxy"
+    cat > "$apt_proxy_file" 2>/dev/null << EOF || true
+Acquire::http::Proxy "$http_proxy_addr";
+Acquire::https::Proxy "$http_proxy_addr";
+EOF
+    [ -f "$apt_proxy_file" ] && _okcat '📦' "APT代理配置已生成：$apt_proxy_file (需要sudo权限应用: sudo cp $apt_proxy_file /etc/apt/apt.conf.d/)"
 }
 
 _unset_system_proxy() {
+    # Unset environment variables
     unset http_proxy
     unset https_proxy
     unset HTTP_PROXY
@@ -33,7 +68,26 @@ _unset_system_proxy() {
     unset no_proxy
     unset NO_PROXY
 
+    # Disable Clash system proxy
     "$BIN_YQ" -i '.system-proxy.enable = false' "$CLASH_CONFIG_MIXIN"
+
+    # Unset GNOME/GTK proxy settings
+    if command -v gsettings >&/dev/null; then
+        gsettings set org.gnome.system.proxy mode 'none' 2>/dev/null || true
+    fi
+
+    # Unset KDE proxy settings
+    if command -v kwriteconfig5 >&/dev/null; then
+        kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key ProxyType 0 2>/dev/null || true
+    fi
+
+    # Unset Git proxy
+    git config --global --unset http.proxy 2>/dev/null || true
+    git config --global --unset https.proxy 2>/dev/null || true
+
+    # Remove APT proxy configuration
+    rm -f /tmp/95clash-proxy 2>/dev/null || true
+    [ -f /etc/apt/apt.conf.d/95clash-proxy ] && _okcat '📦' "APT代理配置需要手动删除: sudo rm /etc/apt/apt.conf.d/95clash-proxy"
 }
 
 function clashon() {
