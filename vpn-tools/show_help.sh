@@ -55,6 +55,7 @@ case "${1:-list}" in
         echo "  ./show_help.sh optimize_ai.sh           # Get help for specific script"
         echo "  ./show_help.sh ai                       # Show all AI tools"
         echo "  ./show_help.sh streaming                 # Show all streaming tools"
+        echo "  ./show_help.sh chinese                   # Show Chinese AI platform tools"
         echo "  ./show_help.sh network                   # Show all network tools"
         echo ""
         echo "📖 For detailed documentation: cat TESTING_TOOLS_GUIDE.md"
@@ -78,6 +79,15 @@ case "${1:-list}" in
         show_script_help "optimize_youtube_streaming.sh"
         show_script_help "streaming_manager.sh"
         echo "  quick_streaming_test.sh - Instant streaming verification"
+        ;;
+        
+    "chinese")
+        echo ""
+        echo "🇨🇳 CHINESE AI PLATFORMS:"
+        echo "========================="
+        show_script_help "fix_openxlab_connectivity.sh"
+        show_script_help "quick_openxlab_access.sh"  
+        show_script_help "test_chinese_ai_platforms.sh"
         ;;
         
     "network")
