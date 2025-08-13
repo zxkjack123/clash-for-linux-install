@@ -47,6 +47,7 @@ cd vpn-tools
 
 | 类别 | 工具 | 用途 | 耗时 |
 |------|------|------|------|
+| **🐳 Docker** | `test_docker_proxy.sh` | Docker 容器代理连接测试 | 2-3分钟 |
 | **AI 优化** | `optimize_ai.sh` | ChatGPT/Claude 快速优化 | 2-3分钟 |
 | **流媒体** | `select_youtube_node.sh` | YouTube 快速优化 | 3-5分钟 |
 | **网络测试** | `network_connectivity_test.sh` | 全面连通性测试 | 5-8分钟 |
@@ -337,6 +338,62 @@ bash uninstall.sh
 - 需要自动化代理环境的场景
 - 对安全性有要求的环境
 - 学习和测试环境
+
+## 🐳 Docker 容器代理支持
+
+本项目已完全支持 Docker 容器代理访问，允许容器内的应用通过 Clash 代理访问网络。
+
+### 快速验证
+```bash
+# 运行 Docker 代理测试套件
+cd vpn-tools && ./test_docker_proxy.sh
+
+# 快速测试容器代理功能
+docker run --rm curlimages/curl curl -x http://$(hostname -I | awk '{print $1}'):7890 http://httpbin.org/ip
+```
+
+### 使用方法
+
+#### 1. 环境变量方式（推荐）
+```bash
+# 单个容器
+docker run --rm -e HTTP_PROXY=http://$(hostname -I | awk '{print $1}'):7890 your-image
+
+# Docker Compose
+version: '3.8'
+services:
+  your-app:
+    image: your-image
+    environment:
+      - HTTP_PROXY=http://host.docker.internal:7890
+      - HTTPS_PROXY=http://host.docker.internal:7890
+    extra_hosts:
+      - "host.docker.internal:HOST_IP"
+```
+
+#### 2. 直接指定代理
+```bash
+# 使用 curl 示例
+docker run --rm curlimages/curl curl -x http://HOST_IP:7890 https://www.google.com
+```
+
+#### 3. 网络模式
+```bash
+# 使用 host 网络模式
+docker run --network host your-image
+```
+
+### 配置说明
+
+Docker 支持已自动配置以下内容：
+- ✅ **端口绑定**：代理服务监听所有网络接口 (`:::7890`)
+- ✅ **防火墙规则**：允许 Docker 网络访问代理端口
+- ✅ **LAN 访问**：启用 `allow-lan: true` 支持容器访问
+- ✅ **API 接口**：Web 控制台支持容器内访问 (`:::9090`)
+
+### 详细文档
+- **[DOCKER_INTEGRATION.md](DOCKER_INTEGRATION.md)** - 完整 Docker 集成指南
+- **[vpn-tools/test_docker_proxy.sh](vpn-tools/test_docker_proxy.sh)** - 完整测试套件
 
 ## 常见问题
 
