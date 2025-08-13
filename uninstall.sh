@@ -7,13 +7,19 @@ _valid_env
 
 clashoff >&/dev/null
 
-systemctl disable "$BIN_KERNEL_NAME" >&/dev/null
-rm -f "/etc/systemd/system/${BIN_KERNEL_NAME}.service"
-systemctl daemon-reload
+# Stop and disable user systemd service
+systemctl --user stop "$BIN_KERNEL_NAME" >&/dev/null
+systemctl --user disable "$BIN_KERNEL_NAME" >&/dev/null
+rm -f "${USER_HOME}/.config/systemd/user/${BIN_KERNEL_NAME}.service"
+systemctl --user daemon-reload
+
+# Disable lingering if it was enabled
+loginctl disable-linger "$USER" 2>/dev/null || true
 
 rm -rf "$CLASH_BASE_DIR"
 rm -rf "$RESOURCES_BIN_DIR"
-sed -i '/clashupdate/d' "$CLASH_CRON_TAB" >&/dev/null
+# Remove user crontab entries if they exist
+[ -f "$CLASH_CRON_TAB" ] && sed -i '/clashupdate/d' "$CLASH_CRON_TAB" >&/dev/null
 _set_rc unset
 
 _okcat '✨' '已卸载，相关配置已清除'

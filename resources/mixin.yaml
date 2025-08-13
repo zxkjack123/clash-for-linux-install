@@ -4,7 +4,7 @@ system-proxy:
 
 # Web 控制台配置
 external-controller: "0.0.0.0:9090"
-external-ui: public
+external-ui: /home/gw/.local/share/clash/public
 secret:
 
 # 代理服务器配置
@@ -15,7 +15,10 @@ authentication:
 # 自定义代理组
 proxy-groups:
   - name: AI
-    type: select
+    type: url-test
+    url: "https://www.gstatic.com/generate_204"
+    interval: 300
+    tolerance: 50
     proxies:
       - V1-美国01|流媒体|GPT
       - V1-美国02|流媒体|GPT
@@ -27,6 +30,35 @@ proxy-groups:
       - V1-美国08|流媒体|GPT
       - V1-美国09|流媒体|GPT
       - V1-美国10|流媒体|GPT
+
+  - name: AI-Manual
+    type: select
+    proxies:
+      - AI
+      - V1-美国01|流媒体|GPT
+      - V1-美国02|流媒体|GPT
+      - V1-美国03|流媒体|GPT
+      - V1-美国04|流媒体|GPT
+      - V1-美国05|流媒体|GPT
+      - V1-美国06|流媒体|GPT
+      - V1-美国07|流媒体|GPT
+      - V1-美国08|流媒体|GPT
+      - V1-美国09|流媒体|GPT
+      - V1-美国10|流媒体|GPT
+
+  - name: AI-Claude
+    type: select
+    proxies:
+      - V1-美国03|流媒体|GPT
+      - V1-美国07|流媒体|GPT
+      - V1-美国09|流媒体|GPT
+      - V1-美国01|流媒体|GPT
+      - V1-美国05|流媒体|GPT
+      - V1-美国10|流媒体|GPT
+      - V1-美国02|流媒体|GPT
+      - V1-美国04|流媒体|GPT
+      - V1-美国06|流媒体|GPT
+      - V1-美国08|流媒体|GPT
 
   - name: Development
     type: select
@@ -71,7 +103,7 @@ proxy-groups:
 # 自定义规则
 rules:
   - DOMAIN,api64.ipify.org,DIRECT # 用于 clashui 获取真实公网 IP
-  
+
   # 高优先级规则 - 覆盖订阅中的通用规则
   - DOMAIN-SUFFIX,youtube.com,Streaming
   - DOMAIN-SUFFIX,youtu.be,Streaming
@@ -80,11 +112,11 @@ rules:
   - DOMAIN-SUFFIX,ggpht.com,Streaming
   - DOMAIN-SUFFIX,googleapis.com,Streaming
   - DOMAIN-SUFFIX,gstatic.com,Streaming
-  - DOMAIN-SUFFIX,openai.com,AI
-  - DOMAIN-SUFFIX,api.openai.com,AI
-  - DOMAIN-SUFFIX,chatgpt.com,AI
-  - DOMAIN-SUFFIX,chat.openai.com,AI
-  - DOMAIN-SUFFIX,platform.openai.com,AI
+  - DOMAIN-SUFFIX,openai.com,AI-Manual
+  - DOMAIN-SUFFIX,api.openai.com,AI-Manual
+  - DOMAIN-SUFFIX,chatgpt.com,AI-Manual
+  - DOMAIN-SUFFIX,chat.openai.com,AI-Manual
+  - DOMAIN-SUFFIX,platform.openai.com,AI-Manual
   - DOMAIN-SUFFIX,registry.docker.io,Development
   - DOMAIN-SUFFIX,docker.io,Development
   - DOMAIN-SUFFIX,index.docker.io,Development
@@ -93,42 +125,42 @@ rules:
   - DOMAIN-SUFFIX,github.com,Development
   - DOMAIN-SUFFIX,api.github.com,Development
   - DOMAIN-SUFFIX,raw.githubusercontent.com,Development
-  
+
   # AI 相关网站规则
-  - DOMAIN-SUFFIX,claude.ai,AI
-  - DOMAIN-SUFFIX,anthropic.com,AI
-  - DOMAIN-SUFFIX,google.ai,AI
-  - DOMAIN-SUFFIX,bard.google.com,AI
-  - DOMAIN-SUFFIX,gemini.google.com,AI
-  - DOMAIN-SUFFIX,makersuite.google.com,AI
-  - DOMAIN-SUFFIX,ai.google.dev,AI
-  - DOMAIN-SUFFIX,cohere.ai,AI
-  - DOMAIN-SUFFIX,cohere.com,AI
-  - DOMAIN-SUFFIX,huggingface.co,AI
-  - DOMAIN-SUFFIX,replicate.com,AI
-  - DOMAIN-SUFFIX,midjourney.com,AI
-  - DOMAIN-SUFFIX,stability.ai,AI
-  - DOMAIN-SUFFIX,runwayml.com,AI
-  - DOMAIN-SUFFIX,character.ai,AI
-  - DOMAIN-SUFFIX,perplexity.ai,AI
-  - DOMAIN-SUFFIX,jasper.ai,AI
-  - DOMAIN-SUFFIX,copy.ai,AI
-  - DOMAIN-SUFFIX,writesonic.com,AI
-  - DOMAIN-SUFFIX,notion.ai,AI
-  - DOMAIN-SUFFIX,beta.openai.com,AI
-  - DOMAIN-SUFFIX,labs.openai.com,AI
-  - DOMAIN-SUFFIX,dall-e.com,AI
-  - DOMAIN-SUFFIX,firefly.adobe.com,AI
-  - DOMAIN-SUFFIX,ai.meta.com,AI
-  - DOMAIN-SUFFIX,llama.meta.com,AI
-  - DOMAIN-SUFFIX,poe.com,AI
-  - DOMAIN-SUFFIX,quora.com,AI
-  - DOMAIN-SUFFIX,forefront.ai,AI
-  - DOMAIN-SUFFIX,you.com,AI
-  - DOMAIN-SUFFIX,gamma.app,AI
-  - DOMAIN-SUFFIX,tome.app,AI
-  - DOMAIN-SUFFIX,beautiful.ai,AI
-  
+  - DOMAIN-SUFFIX,claude.ai,AI-Claude
+  - DOMAIN-SUFFIX,anthropic.com,AI-Claude
+  - DOMAIN-SUFFIX,google.ai,AI-Manual
+  - DOMAIN-SUFFIX,bard.google.com,AI-Manual
+  - DOMAIN-SUFFIX,gemini.google.com,AI-Manual
+  - DOMAIN-SUFFIX,makersuite.google.com,AI-Manual
+  - DOMAIN-SUFFIX,ai.google.dev,AI-Manual
+  - DOMAIN-SUFFIX,cohere.ai,AI-Manual
+  - DOMAIN-SUFFIX,cohere.com,AI-Manual
+  - DOMAIN-SUFFIX,huggingface.co,AI-Manual
+  - DOMAIN-SUFFIX,replicate.com,AI-Manual
+  - DOMAIN-SUFFIX,midjourney.com,AI-Manual
+  - DOMAIN-SUFFIX,stability.ai,AI-Manual
+  - DOMAIN-SUFFIX,runwayml.com,AI-Manual
+  - DOMAIN-SUFFIX,character.ai,AI-Manual
+  - DOMAIN-SUFFIX,perplexity.ai,AI-Manual
+  - DOMAIN-SUFFIX,jasper.ai,AI-Manual
+  - DOMAIN-SUFFIX,copy.ai,AI-Manual
+  - DOMAIN-SUFFIX,writesonic.com,AI-Manual
+  - DOMAIN-SUFFIX,notion.ai,AI-Manual
+  - DOMAIN-SUFFIX,beta.openai.com,AI-Manual
+  - DOMAIN-SUFFIX,labs.openai.com,AI-Manual
+  - DOMAIN-SUFFIX,dall-e.com,AI-Manual
+  - DOMAIN-SUFFIX,firefly.adobe.com,AI-Manual
+  - DOMAIN-SUFFIX,ai.meta.com,AI-Manual
+  - DOMAIN-SUFFIX,llama.meta.com,AI-Manual
+  - DOMAIN-SUFFIX,poe.com,AI-Manual
+  - DOMAIN-SUFFIX,quora.com,AI-Manual
+  - DOMAIN-SUFFIX,forefront.ai,AI-Manual
+  - DOMAIN-SUFFIX,you.com,AI-Manual
+  - DOMAIN-SUFFIX,gamma.app,AI-Manual
+  - DOMAIN-SUFFIX,tome.app,AI-Manual
+  - DOMAIN-SUFFIX,beautiful.ai,AI-Manual
+
   # Development & Docker 相关网站规则
   - DOMAIN-SUFFIX,github.com,Development
   - DOMAIN-SUFFIX,api.github.com,Development
@@ -173,7 +205,7 @@ rules:
   - DOMAIN-KEYWORD,github,Development
   - DOMAIN-KEYWORD,docker,Development
   - DOMAIN-KEYWORD,gitlab,Development
-  
+
   # Streaming 相关网站规则
   - DOMAIN-SUFFIX,netflix.com,Streaming
   - DOMAIN-SUFFIX,nflxvideo.net,Streaming
@@ -194,7 +226,7 @@ rules:
   - DOMAIN-SUFFIX,bilivideo.com,Streaming
   - DOMAIN-KEYWORD,netflix,Streaming
   - DOMAIN-KEYWORD,twitch,Streaming
-  
+
   # Gaming 相关网站规则
   - DOMAIN-SUFFIX,steampowered.com,Gaming
   - DOMAIN-SUFFIX,steamcommunity.com,Gaming
@@ -218,11 +250,11 @@ rules:
   - DOMAIN-KEYWORD,steam,Gaming
   - DOMAIN-KEYWORD,epic,Gaming
   - DOMAIN-KEYWORD,battle,Gaming
-  
+
   # 特定AI关键词 (避免与google等冲突)
-  - DOMAIN-KEYWORD,chatgpt,AI
-  - DOMAIN-KEYWORD,claude,AI
-  - DOMAIN-KEYWORD,anthropic,AI
+  - DOMAIN-KEYWORD,chatgpt,AI-Manual
+  - DOMAIN-KEYWORD,claude,AI-Claude
+  - DOMAIN-KEYWORD,anthropic,AI-Claude
 
 # tun 配置
 tun:
@@ -245,6 +277,38 @@ dns:
   enable: true
   listen: 0.0.0.0:1053
   enhanced-mode: fake-ip
+  respect-rules: true
+  fake-ip-range: 198.18.0.1/16
+  fake-ip-filter:
+    - "*.lan"
+    - "*.local"
+    - localhost.ptlogin2.qq.com
+    - dns.msftncsi.com
+    - www.msftncsi.com
+    - www.msftconnecttest.com
   nameserver:
-    - 114.114.114.114
     - 8.8.8.8
+    - 1.1.1.1
+    - 208.67.222.222
+  fallback:
+    - 8.8.4.4
+    - 1.0.0.1
+    - 208.67.220.220
+  fallback-filter:
+    geoip: true
+    geoip-code: CN
+    ipcidr:
+      - 240.0.0.0/4
+      - 0.0.0.0/32
+    domain:
+      - "+.google.com"
+      - "+.facebook.com"
+      - "+.youtube.com"
+      - "+.anthropic.com"
+      - "+.claude.ai"
+      - "+.openai.com"
+  nameserver-policy:
+    "anthropic.com": [8.8.8.8, 1.1.1.1, 208.67.222.222]
+    "claude.ai": [8.8.8.8, 1.1.1.1, 208.67.222.222]
+    "openai.com": [8.8.8.8, 1.1.1.1, 208.67.222.222]
+    "chatgpt.com": [8.8.8.8, 1.1.1.1, 208.67.222.222]
