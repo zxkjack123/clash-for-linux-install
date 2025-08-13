@@ -50,9 +50,7 @@ function clashon() {
 
 watch_proxy() {
     [ -z "$http_proxy" ] && [[ $- == *i* ]] && {
-        clashproxy status >&/dev/null && {
-            _is_root && clashon
-        }
+        clashproxy status >&/dev/null && clashon
     }
 }
 

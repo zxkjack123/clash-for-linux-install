@@ -12,7 +12,7 @@ _get_kernel
 # Create installation directory
 mkdir -p "$CLASH_BASE_DIR/bin"
 
-# Install binaries without sudo
+# Install binaries in user space
 install -D <(gzip -dc "$ZIP_KERNEL") "${CLASH_BASE_DIR}/bin/$BIN_KERNEL_NAME"
 tar -xf "$ZIP_SUBCONVERTER" -C "${CLASH_BASE_DIR}/bin"
 tar -xf "$ZIP_YQ" -C "${CLASH_BASE_DIR}/bin"
@@ -60,11 +60,11 @@ systemctl --user daemon-reload
 systemctl --user enable "$BIN_KERNEL_NAME" >&/dev/null && _okcat '�' "已设置开机自启" || _failcat '�' "设置自启失败"
 
 # Enable lingering to allow user services to start at boot
-loginctl enable-linger "$USER" 2>/dev/null || _okcat '⚠️' "无法设置开机自启，可手动执行: sudo loginctl enable-linger $USER"
+loginctl enable-linger "$USER" 2>/dev/null || _okcat '⚠️' "无法设置开机自启，可手动执行: loginctl enable-linger $USER（可能需要管理员权限）"
 
 clashui
 _okcat '🎉' 'enjoy 🎉'
-_okcat '�' "说明：已安装为用户服务，无需sudo权限。配置位于：$CLASH_BASE_DIR"
+_okcat '📂' "说明：已安装为用户服务，无需任何特殊权限。配置位于：$CLASH_BASE_DIR"
 _okcat '🚀' "代理将在每次登录时自动启动。手动控制：clash on/off"
 clash
 _quit

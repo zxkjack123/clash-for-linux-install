@@ -36,10 +36,6 @@ CLASH_UPDATE_LOG="${CLASH_BASE_DIR}/clashupdate.log"
 _set_var() {
     local user=$USER
     local home=$HOME
-    [ -n "$SUDO_USER" ] && {
-        user=$SUDO_USER
-        home=$(awk -F: -v user="$SUDO_USER" '$1==user{print $6}' /etc/passwd)
-    }
 
     [ -n "$BASH_VERSION" ] && {
         _SHELL=bash
@@ -192,9 +188,7 @@ function _failcat() {
 }
 
 function _quit() {
-    local user=root
-    [ -n "$SUDO_USER" ] && user=$SUDO_USER
-    exec sudo -u "$user" -- "$_SHELL" -i
+    exec "$_SHELL" -i
 }
 
 function _error_quit() {
@@ -217,10 +211,6 @@ _is_already_in_use() {
     local port=$1
     local progress=$2
     _is_bind "$port" | grep -qs -v "$progress"
-}
-
-function _is_root() {
-    [ "$(whoami)" = "root" ]
 }
 
 function _valid_env() {
