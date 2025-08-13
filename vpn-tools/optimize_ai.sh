@@ -11,7 +11,7 @@
 #
 # WHAT IT DOES:
 #   • Tests pre-selected high-performance AI nodes (US region)
-#   • Measures OpenAI API, ChatGPT web, and Claude connectivity
+#   • Measures OpenAI API, ChatGPT web, Claude, and Braintrust.dev connectivity
 #   • Automatically switches to best performing node
 #   • Provides verification and performance metrics
 #
@@ -104,12 +104,25 @@ test_node_performance() {
         echo "❌ FAILED"
     fi
     
+    # Test 4: Braintrust.dev
+    echo -n "  Braintrust.dev: "
+    local start=$(date +%s.%N)
+    if timeout 8 curl -s --proxy http://127.0.0.1:7890 "https://www.braintrust.dev" | grep -q -i "braintrust\|ai" 2>/dev/null; then
+        local end=$(date +%s.%N)
+        local time=$(echo "$end - $start" | bc -l)
+        echo "✅ ${time}s"
+        ((score++))
+        total_time=$(echo "$total_time + $time" | bc -l)
+    else
+        echo "❌ FAILED"
+    fi
+    
     local avg_time="0"
     if [[ $score -gt 0 ]]; then
         avg_time=$(echo "scale=2; $total_time / $score" | bc -l)
     fi
     
-    echo "  📊 Score: $score/3, Avg time: ${avg_time}s"
+    echo "  📊 Score: $score/4, Avg time: ${avg_time}s"
     
     # Return score and time for ranking
     echo "$node|$score|$avg_time|$current_ip"
@@ -138,14 +151,17 @@ rank=1
 for result in "${sorted[@]}"; do
     IFS='|' read -r node score time ip <<< "$result"
     
-    if [[ $score -eq 3 ]]; then
-        echo "🥇 $rank. $(echo "$node" | cut -d'|' -f1) - PERFECT (${score}/3, ${time}s, IP: $ip)"
+    if [[ $score -eq 4 ]]; then
+        echo "🥇 $rank. $(echo "$node" | cut -d'|' -f1) - PERFECT (${score}/4, ${time}s, IP: $ip)"
+        [[ -z "$best_node" ]] && best_node="$node"
+    elif [[ $score -eq 3 ]]; then
+        echo "🥈 $rank. $(echo "$node" | cut -d'|' -f1) - EXCELLENT (${score}/4, ${time}s, IP: $ip)"
         [[ -z "$best_node" ]] && best_node="$node"
     elif [[ $score -eq 2 ]]; then
-        echo "🥈 $rank. $(echo "$node" | cut -d'|' -f1) - GOOD (${score}/3, ${time}s, IP: $ip)"
+        echo "� $rank. $(echo "$node" | cut -d'|' -f1) - GOOD (${score}/4, ${time}s, IP: $ip)"
         [[ -z "$best_node" ]] && best_node="$node"
     else
-        echo "🥉 $rank. $(echo "$node" | cut -d'|' -f1) - POOR (${score}/3, ${time}s, IP: $ip)"
+        echo "🔧 $rank. $(echo "$node" | cut -d'|' -f1) - NEEDS WORK (${score}/4, ${time}s, IP: $ip)"
     fi
     ((rank++))
 done
@@ -176,6 +192,13 @@ if [[ -n "$best_node" ]]; then
     
     echo -n "OpenAI API test: "
     if timeout 5 curl -s --proxy http://127.0.0.1:7890 "https://api.openai.com/v1/models" | grep -q "object.*list" 2>/dev/null; then
+        echo "✅ Working"
+    else
+        echo "❌ Failed"
+    fi
+    
+    echo -n "Braintrust.dev test: "
+    if timeout 5 curl -s --proxy http://127.0.0.1:7890 "https://www.braintrust.dev" | grep -q -i "braintrust" 2>/dev/null; then
         echo "✅ Working"
     else
         echo "❌ Failed"
