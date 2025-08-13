@@ -1,5 +1,67 @@
 #!/bin/bash
 
+# 🎮 Interactive Streaming Manager Script
+# 
+# DESCRIPTION:
+#   Easy streaming group management with regional switching and performance testing
+#   One-command solution for streaming optimization across different regions
+#
+# USAGE:
+#   ./streaming_manager.sh [command]
+#
+# COMMANDS:
+#   status    - Show current streaming configuration and node
+#   test      - Test current streaming node performance
+#   auto      - Auto-select best streaming node
+#   list      - List all available streaming nodes by region
+#   us        - Switch to US streaming nodes
+#   sg        - Switch to Singapore streaming nodes  
+#   jp        - Switch to Japan streaming nodes
+#   hk        - Switch to Hong Kong streaming nodes
+#   tw        - Switch to Taiwan streaming nodes
+#   vn        - Switch to Vietnam streaming nodes
+#
+# WHAT IT DOES:
+#   • Interactive streaming group management
+#   • One-command regional switching
+#   • Performance testing and verification
+#   • Status monitoring and reporting
+#   • Regional node recommendations
+#
+# WHEN TO USE:
+#   • Need to switch streaming regions quickly
+#   • Want to test different regional nodes for content
+#   • Regular streaming performance management
+#   • Accessing region-specific content (Netflix regions, etc.)
+#   • Troubleshooting streaming performance
+#
+# DURATION: 
+#   • Status/List: Instant
+#   • Test: 30 seconds
+#   • Regional switch: 5-10 seconds
+#   • Auto-select: 2-3 minutes
+#
+# REGIONAL SPECIALTIES:
+#   🇺🇸 US: Best for Netflix US, Hulu, US content
+#   🇭🇰 HK: Best for Asian content, fastest for China users
+#   🇸🇬 SG: Best Asia-Pacific performance, good for SEA content
+#   🇯🇵 JP: Best for Japanese content, anime streaming
+#   🇹🇼 TW: Good for Chinese content, Taiwan-specific services
+#   🇻🇳 VN: Budget option, good for Southeast Asian content
+#
+# EXAMPLE OUTPUT:
+#   🎮 Streaming Manager
+#   
+#   📊 Current Status:
+#   🎬 Streaming Group: V1-香港01
+#   📍 Current Region: Hong Kong
+#   🔍 Performance: Excellent (1.2s YouTube load)
+#   
+#   💡 Quick Commands:
+#   ./streaming_manager.sh us    # Switch to US
+#   ./streaming_manager.sh test  # Test current node
+#   ./streaming_manager.sh auto  # Auto-optimize
+
 echo "🎬 Streaming Group Manager"
 echo "========================="
 

@@ -15,6 +15,61 @@
 - **🔒 安全隔离**：每个用户独立安装，互不影响。
 - 多架构支持，适配主流 `Linux` 发行版：`CentOS 7.6`、`Debian 12`、`Ubuntu 24.04.1 LTS`。
 
+## 🛠️ VPN 测试工具套件
+
+本项目包含完整的代理测试和优化工具集，帮助您获得最佳的网络性能。所有工具已整理到 `vpn-tools/` 文件夹中：
+
+### 🚀 快速启动
+```bash
+# 进入工具目录
+cd vpn-tools
+
+# 交互式工具启动器（推荐）
+./launcher.sh
+
+# 快速状态检查
+./quick_vpn_check.sh
+
+# AI 服务优化
+./optimize_ai.sh
+
+# YouTube 流媒体优化
+./select_youtube_node.sh
+```
+
+### 📚 完整文档
+- **[vpn-tools/README.md](vpn-tools/README.md)** - VPN工具包说明
+- **[vpn-tools/TESTING_TOOLS_GUIDE.md](vpn-tools/TESTING_TOOLS_GUIDE.md)** - 完整使用指南
+- **[vpn-tools/QUICK_REFERENCE.md](vpn-tools/QUICK_REFERENCE.md)** - 快速参考卡
+- **帮助系统**: `cd vpn-tools && ./show_help.sh [script_name]`
+
+### 🎯 工具分类
+
+| 类别 | 工具 | 用途 | 耗时 |
+|------|------|------|------|
+| **AI 优化** | `optimize_ai.sh` | ChatGPT/Claude 快速优化 | 2-3分钟 |
+| **流媒体** | `select_youtube_node.sh` | YouTube 快速优化 | 3-5分钟 |
+| **网络测试** | `network_connectivity_test.sh` | 全面连通性测试 | 5-8分钟 |
+| **状态检查** | `quick_vpn_check.sh` | 快速状态检查 | 30秒 |
+
+### 📁 文件结构
+```
+vpn-tools/
+├── README.md                      # VPN工具包说明
+├── launcher.sh                    # 交互式启动器
+├── optimize_ai.sh                 # AI优化工具
+├── select_youtube_node.sh         # YouTube优化工具
+├── network_connectivity_test.sh   # 网络连通性测试
+├── quick_vpn_check.sh             # 快速状态检查
+├── streaming_manager.sh           # 流媒体管理器
+├── test_ai_connectivity.sh        # 全面AI测试
+├── TESTING_TOOLS_GUIDE.md         # 完整使用指南
+├── QUICK_REFERENCE.md             # 快速参考
+└── ... (更多工具和文档)
+```
+
+详细使用说明请参考 [VPN工具包文档](vpn-tools/README.md)。
+
 ## 🆕 新版本特性
 
 ### ✅ 无密码体验

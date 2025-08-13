@@ -1,6 +1,50 @@
 #!/bin/bash
 
-echo "🎯 YouTube Node Selector"
+#!/bin/bash
+
+# 🎬 Quick YouTube Optimization Script
+# 
+# DESCRIPTION:
+#   Fast testing and optimization specifically for YouTube streaming
+#   Tests 8 pre-selected high-performance streaming nodes
+#
+# USAGE:
+#   ./select_youtube_node.sh
+#
+# WHAT IT DOES:
+#   • Tests 8 key streaming candidates for YouTube performance
+#   • Measures YouTube connectivity, video loading, and streaming quality
+#   • Automatically selects and switches to best YouTube node
+#   • Provides YouTube-specific verification
+#
+# WHEN TO USE:
+#   • Before watching YouTube videos
+#   • When YouTube is slow or videos won't load
+#   • Daily streaming setup routine
+#   • Quick streaming optimization needed
+#
+# DURATION: 3-5 minutes
+# PERFORMANCE IMPACT: Low (tests only 8 nodes)
+#
+# TESTED NODES:
+#   • V1-香港01, V1-香港02 (Hong Kong - best for Asia)
+#   • V1-美国01, V1-美国05 (US - best for global content)
+#   • V1-新加坡01, V1-新加坡02 (Singapore - Asia-Pacific)
+#   • V1-日本01, V1-台湾01 (Japan, Taiwan - regional content)
+#
+# EXAMPLE OUTPUT:
+#   🎬 YouTube Node Selection Test
+#   Testing YouTube performance on 8 streaming nodes...
+#   
+#   Testing: V1-香港01
+#     YouTube: ✅ OK (1.2s)
+#     Video streaming: ✅ Excellent
+#   
+#   🏆 BEST NODE: V1-香港01 (Score: 95/100)
+#   🎯 Setting Streaming group to: V1-香港01
+#   ✅ YouTube optimization complete!
+
+echo "� YouTube Node Selection Test"
 echo "======================="
 
 # Key streaming nodes to test (best candidates from each region)

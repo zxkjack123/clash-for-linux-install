@@ -1,5 +1,38 @@
 #!/bin/bash
 
+# 🤖 AI Service Optimization Script
+# 
+# DESCRIPTION:
+#   Fast optimization tool for AI services (OpenAI, ChatGPT, Claude, etc.)
+#   Tests 6 key AI-capable nodes and automatically selects the best performer
+#
+# USAGE:
+#   ./optimize_ai.sh
+#
+# WHAT IT DOES:
+#   • Tests pre-selected high-performance AI nodes (US region)
+#   • Measures OpenAI API, ChatGPT web, and Claude connectivity
+#   • Automatically switches to best performing node
+#   • Provides verification and performance metrics
+#
+# WHEN TO USE:
+#   • Before using AI services (ChatGPT, Claude, etc.)
+#   • When AI services are slow or not responding
+#   • Daily optimization routine
+#   • Quick AI connectivity fix
+#
+# DURATION: 2-3 minutes
+# PERFORMANCE IMPACT: Low (tests only 6 nodes)
+#
+# EXAMPLE OUTPUT:
+#   🤖 AI Service Optimization Test
+#   Testing: V1-美国01|流媒体|GPT
+#     OpenAI API: ✅ OK (2.3s)
+#     ChatGPT Web: ✅ OK
+#     Claude: ✅ OK
+#   🎯 Setting AI group to best performing node
+#   ✅ AI group updated to: V1-美国05|流媒体|GPT
+
 echo "🤖 AI Service Optimization Test"
 echo "================================"
 

@@ -1,5 +1,47 @@
 #!/bin/bash
 
+# 🔍 Comprehensive AI Connectivity Testing Script
+# 
+# DESCRIPTION:
+#   Detailed testing of all 33 AI-capable nodes across 5 regions
+#   Provides comprehensive analysis and performance ranking for AI services
+#
+# USAGE:
+#   ./test_ai_connectivity.sh
+#
+# WHAT IT DOES:
+#   • Tests all 33 AI nodes (US: 10, Singapore: 6, Japan: 4, Taiwan: 1, Vietnam: 6)
+#   • Comprehensive testing of 6 AI services (OpenAI API, ChatGPT, Claude, etc.)
+#   • Performance ranking with detailed latency analysis
+#   • Regional comparison and recommendations
+#   • Generates detailed AI_CONNECTIVITY_REPORT.md
+#
+# WHEN TO USE:
+#   • Initial setup and comprehensive configuration
+#   • Troubleshooting persistent AI connectivity issues
+#   • Finding the absolute best AI nodes for your location
+#   • Weekly optimization review and analysis
+#   • Before important AI work requiring optimal performance
+#
+# DURATION: 15-20 minutes (comprehensive testing)
+# PERFORMANCE IMPACT: High (tests all nodes extensively)
+#
+# OUTPUT FILES:
+#   • AI_CONNECTIVITY_REPORT.md (detailed analysis report)
+#   • Console output with real-time testing progress
+#
+# EXAMPLE OUTPUT:
+#   🔍 Comprehensive AI Node Connectivity Test
+#   Testing all 33 AI-capable nodes across 5 regions...
+#   
+#   🇺🇸 US Region (10 nodes):
+#     V1-美国01|流媒体|GPT: 6/6 ✅ (2.1s avg)
+#     V1-美国05|流媒体|GPT: 6/6 ✅ (1.8s avg)
+#   
+#   📊 TOP PERFORMERS:
+#   🥇 V1-美国05|流媒体|GPT (Score: 95/100)
+#   🥈 V1-美国10|流媒体|GPT (Score: 92/100)
+
 # AI Connectivity Test Script
 # Tests connectivity to major AI services through different proxy nodes
 
