@@ -18,7 +18,7 @@ RESOURCES_CONFIG_MIXIN="${RESOURCES_BASE_DIR}/mixin.yaml"
 ZIP_BASE_DIR="${RESOURCES_BASE_DIR}/zip"
 ZIP_CLASH=$(echo ${ZIP_BASE_DIR}/clash*)
 ZIP_MIHOMO=$(echo ${ZIP_BASE_DIR}/mihomo*)
-ZIP_YQ=$(echo ${ZIP_BASE_DIR}/yq*)
+ZIP_YQ="${ZIP_BASE_DIR}/yq_linux_amd64.tar.gz"
 ZIP_SUBCONVERTER=$(echo ${ZIP_BASE_DIR}/subconverter*)
 ZIP_UI="${ZIP_BASE_DIR}/yacd.tar.xz"
 

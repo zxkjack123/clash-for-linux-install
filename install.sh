@@ -57,8 +57,8 @@ After=network.target
 Type=simple
 Restart=always
 ExecStart=${BIN_KERNEL} -d ${CLASH_BASE_DIR} -f ${CLASH_CONFIG_RUNTIME}
-ExecStartPost=/bin/sh -c 'sleep 2 && systemctl --user import-environment PATH && systemctl --user restart clash-proxy-env.service 2>/dev/null || true'
 RestartSec=5
+TimeoutStartSec=30
 
 [Install]
 WantedBy=default.target
@@ -69,13 +69,14 @@ cat <<EOF >"${USER_HOME}/.config/systemd/user/clash-proxy-env.service"
 [Unit]
 Description=Clash Proxy Environment Setup
 After=${BIN_KERNEL_NAME}.service
-Requisite=${BIN_KERNEL_NAME}.service
+BindsTo=${BIN_KERNEL_NAME}.service
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
 ExecStart=/bin/bash -c 'source ${CLASH_SCRIPT_DIR}/common.sh && source ${CLASH_SCRIPT_DIR}/clashctl.sh && _set_system_proxy'
 ExecStop=/bin/bash -c 'source ${CLASH_SCRIPT_DIR}/common.sh && source ${CLASH_SCRIPT_DIR}/clashctl.sh && _unset_system_proxy'
+TimeoutStartSec=10
 
 [Install]
 WantedBy=default.target

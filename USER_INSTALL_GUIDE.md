@@ -8,6 +8,7 @@ This modified version installs Clash as a user service instead of a system servi
 2. **Service Type**: User systemd service instead of system service
 3. **No sudo required**: Most operations no longer require password input
 4. **Auto-start**: Proxy automatically starts when you open a new terminal
+5. **Service Stability** (2025-08-13): Fixed startup timeout issues and improved reliability
 
 ## Installation
 
@@ -60,10 +61,17 @@ It will properly clean up user services and configurations.
 
 ## Troubleshooting
 
+### Service Startup Issues (Fixed in Latest Version)
+If you're using an older version and experiencing service startup timeouts:
+1. Update to the latest version which fixes the circular dependency issue
+2. Or manually restart the service: `systemctl --user restart mihomo`
+
+### General Issues
 If the proxy doesn't start automatically:
 1. Check if the user service is enabled: `systemctl --user is-enabled mihomo`
 2. Check service status: `systemctl --user status mihomo`
-3. Manually start: `clash on`
+3. View service logs: `journalctl --user -u mihomo -f`
+4. Manually start: `clash on`
 
 If you need to enable boot-time startup:
 ```bash
@@ -71,3 +79,16 @@ sudo loginctl enable-linger $USER
 ```
 
 This allows your user services to start even when you're not logged in.
+
+### Service Log Analysis
+To debug service issues:
+```bash
+# Check current service status
+systemctl --user status mihomo --no-pager -l
+
+# View recent logs
+journalctl --user -u mihomo -n 50 --no-pager
+
+# Follow logs in real-time
+journalctl --user -u mihomo -f
+```
