@@ -20,6 +20,10 @@ tar -xf "$ZIP_YQ" -C "${CLASH_BASE_DIR}/bin"
 /bin/mv -f ${CLASH_BASE_DIR}/bin/yq_* "${CLASH_BASE_DIR}/bin/yq"
 
 _set_bin "${CLASH_BASE_DIR}/bin"
+
+# Initialize url variable
+url=""
+
 _valid_config "$RESOURCES_CONFIG" || {
     echo -n "$(_okcat '✈️ ' '输入订阅：')"
     read -r url
@@ -28,7 +32,11 @@ _valid_config "$RESOURCES_CONFIG" || {
     _valid_config "$RESOURCES_CONFIG" || _error_quit "配置无效，请检查配置：$RESOURCES_CONFIG，转换日志：$BIN_SUBCONVERTER_LOG"
 }
 _okcat '✅' '配置可用'
-echo "$url" >"$CLASH_CONFIG_URL"
+
+# Only save URL if it was obtained from user input
+if [ -n "$url" ]; then
+    echo "$url" >"$CLASH_CONFIG_URL"
+fi
 
 /bin/cp -rf "$SCRIPT_BASE_DIR" "$CLASH_BASE_DIR"
 /bin/ls "$RESOURCES_BASE_DIR" | grep -Ev 'zip|png' | xargs -I {} /bin/cp -rf "${RESOURCES_BASE_DIR}/{}" "$CLASH_BASE_DIR"
