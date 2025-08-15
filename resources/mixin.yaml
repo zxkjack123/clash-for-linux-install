@@ -125,7 +125,7 @@ rules:
   - DOMAIN-SUFFIX,mineru.net,DIRECT
 
   # AI API Providers - Optimized proxy routing based on performance testing
-  - DOMAIN-SUFFIX,uiuiapi.com,AI
+  - DOMAIN-SUFFIX,uiuiapi.com,AI-UIUI-Auto
 
   # 高优先级规则 - 覆盖订阅中的通用规则
   - DOMAIN-SUFFIX,youtube.com,Streaming
@@ -337,3 +337,4 @@ dns:
     "claude.ai": [8.8.8.8, 1.1.1.1, 208.67.222.222]
     "openai.com": [8.8.8.8, 1.1.1.1, 208.67.222.222]
     "chatgpt.com": [8.8.8.8, 1.1.1.1, 208.67.222.222]
+    "uiuiapi.com": [8.8.8.8, 1.1.1.1, 208.67.222.222]
