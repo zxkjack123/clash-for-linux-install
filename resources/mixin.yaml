@@ -112,6 +112,9 @@ rules:
   - DOMAIN,www.openxlab.org.cn,DIRECT
   - DOMAIN-SUFFIX,mineru.net,DIRECT
 
+  # AI API Providers - Optimized proxy routing based on performance testing
+  - DOMAIN-SUFFIX,uiuiapi.com,AI-Manual
+
   # 高优先级规则 - 覆盖订阅中的通用规则
   - DOMAIN-SUFFIX,youtube.com,Streaming
   - DOMAIN-SUFFIX,youtu.be,Streaming
