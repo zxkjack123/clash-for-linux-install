@@ -47,6 +47,18 @@ proxy-groups:
       - V1-美国09|流媒体|GPT
       - V1-美国10|流媒体|GPT
 
+  - name: AI-UIUI-Auto
+    type: url-test
+    url: "https://sg.uiuiapi.com"
+    interval: 300
+    tolerance: 100
+    proxies:
+      - V1-美国02|流媒体|GPT
+      - V1-美国05|流媒体|GPT
+      - V1-美国01|流媒体|GPT
+      - V1-美国04|流媒体|GPT
+      - V1-美国06|流媒体|GPT
+
   - name: AI-Claude
     type: select
     proxies:
@@ -113,7 +125,7 @@ rules:
   - DOMAIN-SUFFIX,mineru.net,DIRECT
 
   # AI API Providers - Optimized proxy routing based on performance testing
-  - DOMAIN-SUFFIX,uiuiapi.com,AI-Manual
+  - DOMAIN-SUFFIX,uiuiapi.com,AI
 
   # 高优先级规则 - 覆盖订阅中的通用规则
   - DOMAIN-SUFFIX,youtube.com,Streaming
