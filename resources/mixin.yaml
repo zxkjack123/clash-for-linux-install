@@ -2,10 +2,13 @@
 system-proxy:
   enable: true
 
+# 降低日志噪声
+log-level: warning
+
 # Web 控制台配置
-external-controller: "0.0.0.0:9090"
+external-controller: "127.0.0.1:9090" # bound to localhost for security
 external-ui: ~/.local/share/clash/public
-secret:
+secret: a3f2d4b7e6c9810f4d2c7b9a6e3f1d8c # added secret (change if desired)
 
 # 代理服务器配置
 allow-lan: true # Enable LAN access for Docker containers
@@ -15,11 +18,19 @@ authentication:
 
 # 自定义代理组
 proxy-groups:
+  # 覆盖订阅里的同名分组: 精简“西瓜加速”仅保留少量稳定手动节点，避免大量失效端口产生警告
+  - name: 西瓜加速
+    type: select
+    proxies:
+      - V1-香港01
+      - V1-新加坡01|流媒体|GPT
+      - V1-日本01|流媒体|GPT
+      - V1-美国01|流媒体|GPT
+      - V1-香港02
+      - DIRECT
   - name: AI
-    type: url-test
-    url: "https://www.gstatic.com/generate_204"
-    interval: 300
-    tolerance: 50
+    # converted from url-test to select to disable automatic latency probes
+    type: select
     proxies:
       - V1-美国01|流媒体|GPT
       - V1-美国02|流媒体|GPT
@@ -37,21 +48,10 @@ proxy-groups:
     proxies:
       - AI
       - V1-美国01|流媒体|GPT
-      - V1-美国02|流媒体|GPT
-      - V1-美国03|流媒体|GPT
-      - V1-美国04|流媒体|GPT
-      - V1-美国05|流媒体|GPT
-      - V1-美国06|流媒体|GPT
-      - V1-美国07|流媒体|GPT
-      - V1-美国08|流媒体|GPT
-      - V1-美国09|流媒体|GPT
-      - V1-美国10|流媒体|GPT
 
   - name: AI-UIUI-Auto
-    type: url-test
-    url: "https://sg.uiuiapi.com"
-    interval: 300
-    tolerance: 100
+    # converted from url-test to select to disable automatic latency probes
+    type: select
     proxies:
       - V1-美国02|流媒体|GPT
       - V1-美国05|流媒体|GPT
@@ -311,14 +311,15 @@ dns:
     - dns.msftncsi.com
     - www.msftncsi.com
     - www.msftconnecttest.com
+  # 国内优先: 仅使用国内 DNS 解析常见域名, 减少走代理的公共 DNS 查询
   nameserver:
-    - 8.8.8.8
-    - 1.1.1.1
-    - 208.67.222.222
+    - 223.5.5.5        # AliDNS
+    - 119.29.29.29     # DNSPod
+    - 114.114.114.114  # 114DNS
+  # 国外回退: 仅保留必要的公共递归, 失败再使用, 降低噪声
   fallback:
-    - 8.8.4.4
-    - 1.0.0.1
-    - 208.67.220.220
+    - 1.1.1.1
+    - 8.8.8.8
   fallback-filter:
     geoip: true
     geoip-code: CN
@@ -333,8 +334,8 @@ dns:
       - "+.claude.ai"
       - "+.openai.com"
   nameserver-policy:
-    "anthropic.com": [8.8.8.8, 1.1.1.1, 208.67.222.222]
-    "claude.ai": [8.8.8.8, 1.1.1.1, 208.67.222.222]
-    "openai.com": [8.8.8.8, 1.1.1.1, 208.67.222.222]
-    "chatgpt.com": [8.8.8.8, 1.1.1.1, 208.67.222.222]
-    "uiuiapi.com": [8.8.8.8, 1.1.1.1, 208.67.222.222]
+    "anthropic.com": [1.1.1.1, 8.8.8.8]
+    "claude.ai": [1.1.1.1, 8.8.8.8]
+    "openai.com": [1.1.1.1, 8.8.8.8]
+    "chatgpt.com": [1.1.1.1, 8.8.8.8]
+    "uiuiapi.com": [1.1.1.1, 8.8.8.8]

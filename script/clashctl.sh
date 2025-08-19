@@ -9,6 +9,37 @@ _set_system_proxy() {
     local socks_proxy_addr="socks5h://${auth}127.0.0.1:${MIXED_PORT}"
     local no_proxy_addr="localhost,127.0.0.1,::1"
 
+    # Idempotency / jitter reduction: avoid re-applying unchanged settings which can
+    # trigger desktop-wide NET::ERR_NETWORK_CHANGED events (especially in Electron / Chrome).
+    # Create a small state file capturing last applied port & auth.
+    local state_file="/tmp/.clash_system_proxy_state"
+    local current_state="${MIXED_PORT}|${auth}"
+    if [ -f "$state_file" ]; then
+        local previous_state shell_http shell_mode
+        previous_state=$(cat "$state_file" 2>/dev/null || echo '')
+        # Quick env check (fast path) – if environment already points to same proxy, skip heavy desktop mutations.
+        if [ "$previous_state" = "$current_state" ] && [ "${http_proxy:-}" = "$http_proxy_addr" ]; then
+            # For GNOME, verify only if mode already manual & host/port correct; else fall through.
+            if command -v gsettings >/dev/null 2>&1; then
+                shell_mode=$(gsettings get org.gnome.system.proxy mode 2>/dev/null || echo '')
+                shell_http=$(gsettings get org.gnome.system.proxy.http host 2>/dev/null || echo '')
+                if [ "$shell_mode" = "'manual'" ] && [ "$shell_http" = "'127.0.0.1'" ]; then
+                    # Nothing to change – keep env fresh (exports) and exit early.
+                    export http_proxy=$http_proxy_addr https_proxy=$http_proxy HTTP_PROXY=$http_proxy HTTPS_PROXY=$http_proxy
+                    export all_proxy=$socks_proxy_addr ALL_PROXY=$all_proxy
+                    export no_proxy=$no_proxy_addr NO_PROXY=$no_proxy
+                    return 0
+                fi
+            else
+                # Non-GNOME path, settings already applied; exit.
+                export http_proxy=$http_proxy_addr https_proxy=$http_proxy HTTP_PROXY=$http_proxy HTTPS_PROXY=$http_proxy
+                export all_proxy=$socks_proxy_addr ALL_PROXY=$all_proxy
+                export no_proxy=$no_proxy_addr NO_PROXY=$no_proxy
+                return 0
+            fi
+        fi
+    fi
+
     # Set environment variables for terminal applications
     export http_proxy=$http_proxy_addr
     export https_proxy=$http_proxy
@@ -55,6 +86,8 @@ Acquire::http::Proxy "$http_proxy_addr";
 Acquire::https::Proxy "$http_proxy_addr";
 EOF
     [ -f "$apt_proxy_file" ] && _okcat '📦' "APT代理配置已生成：$apt_proxy_file (需要sudo权限应用: sudo cp $apt_proxy_file /etc/apt/apt.conf.d/)"
+
+    echo "$current_state" >"$state_file" 2>/dev/null || true
 }
 
 _unset_system_proxy() {
@@ -88,6 +121,9 @@ _unset_system_proxy() {
     # Remove APT proxy configuration
     rm -f /tmp/95clash-proxy 2>/dev/null || true
     [ -f /etc/apt/apt.conf.d/95clash-proxy ] && _okcat '📦' "APT代理配置需要手动删除: sudo rm /etc/apt/apt.conf.d/95clash-proxy"
+
+    # Clear state file so next enable actually re-applies.
+    rm -f /tmp/.clash_system_proxy_state 2>/dev/null || true
 }
 
 function clashon() {
@@ -185,13 +221,99 @@ function clashui() {
 _merge_config_restart() {
     local backup="/tmp/rt.backup"
     cat "$CLASH_CONFIG_RUNTIME" 2>/dev/null | tee $backup >&/dev/null
-    "$BIN_YQ" eval-all '. as $item ireduce ({}; . *+ $item) | (.. | select(tag == "!!seq")) |= unique' \
-        "$CLASH_CONFIG_MIXIN" "$CLASH_CONFIG_RAW" "$CLASH_CONFIG_MIXIN" | tee "$CLASH_CONFIG_RUNTIME" >&/dev/null
+    # 合并策略: 多级回退 (eval-all -> slurp -s -> 简单三向覆盖) 确保不同发行版的 yq 构建兼容。
+    local merge_err="/tmp/.clash_merge_err"; : > "$merge_err"
+    if ! "$BIN_YQ" eval-all '
+        (select(fileIndex==0)."proxy-groups" // []) as $m1 |
+        (select(fileIndex==1)."proxy-groups" // []) as $raw |
+        (select(fileIndex==2)."proxy-groups" // []) as $m2 |
+        (select(fileIndex==0) *+ select(fileIndex==1) *+ select(fileIndex==2)) as $base |
+        $base |
+        ."proxy-groups" = ($m1 + $raw + $m2
+            | sort_by(.name)
+            | group_by(.name)
+            | map(.[-1] | if .type=="select" then del(.url,.interval,.tolerance) else . end))
+    ' "$CLASH_CONFIG_MIXIN" "$CLASH_CONFIG_RAW" "$CLASH_CONFIG_MIXIN" >"$CLASH_CONFIG_RUNTIME.tmp" 2>>"$merge_err"; then
+        # 回退 1: slurp 模式
+        if ! "$BIN_YQ" -s '
+            . as $d |
+            ($d[0] *+ $d[1] *+ $d[2]) as $base |
+            $base |
+            ."proxy-groups" = ([ ($d[0]."proxy-groups" // [])[], ($d[1]."proxy-groups" // [])[], ($d[2]."proxy-groups" // [])[] ]
+               | sort_by(.name)
+               | group_by(.name)
+               | map(.[-1] | if .type=="select" then del(.url,.interval,.tolerance) else . end))
+        ' "$CLASH_CONFIG_MIXIN" "$CLASH_CONFIG_RAW" "$CLASH_CONFIG_MIXIN" >"$CLASH_CONFIG_RUNTIME.tmp" 2>>"$merge_err"; then
+            # 回退 2: 简单覆盖 (丢弃订阅中分组再加精简): 先 raw 写入, 再用 mixin 覆盖标量并替换 proxy-groups
+            cp "$CLASH_CONFIG_RAW" "$CLASH_CONFIG_RUNTIME.tmp" 2>>"$merge_err" || true
+            # 覆盖标量 (mixin 优先)
+            "$BIN_YQ" eval-all 'select(fileIndex==0) *+ select(fileIndex==1)' \
+                "$CLASH_CONFIG_RUNTIME.tmp" "$CLASH_CONFIG_MIXIN" > "$CLASH_CONFIG_RUNTIME.tmp.m" 2>>"$merge_err" || true
+            mv "$CLASH_CONFIG_RUNTIME.tmp.m" "$CLASH_CONFIG_RUNTIME.tmp" 2>/dev/null || true
+            # 强制采用 mixin 的 proxy-groups (精简分组)
+            "$BIN_YQ" -i '."proxy-groups" = (input."proxy-groups")' "$CLASH_CONFIG_RUNTIME.tmp" "$CLASH_CONFIG_MIXIN" 2>>"$merge_err" || true
+            # 清理 select 探测
+            "$BIN_YQ" -i '.proxy-groups |= map( if .type=="select" then del(.url,.interval,.tolerance) else . end )' "$CLASH_CONFIG_RUNTIME.tmp" 2>>"$merge_err" || true
+            if [ ! -s "$CLASH_CONFIG_RUNTIME.tmp" ]; then
+                cat $backup | tee "$CLASH_CONFIG_RUNTIME" >&/dev/null
+                _error_quit "合并失败：所有策略失败 -> $(head -n 3 "$merge_err" | tr '\n' ' ')"
+            fi
+        fi
+    fi
+    mv "$CLASH_CONFIG_RUNTIME.tmp" "$CLASH_CONFIG_RUNTIME" 2>/dev/null || true
+    # 运行时再保险：去重同名 proxy-groups（保持最后一个定义）
+    "$BIN_YQ" -i '.proxy-groups |= ( . // [] | group_by(.name) | map(.[-1]) )' "$CLASH_CONFIG_RUNTIME" 2>/dev/null || true
     _valid_config "$CLASH_CONFIG_RUNTIME" || {
         cat $backup | tee "$CLASH_CONFIG_RUNTIME" >&/dev/null
-        _error_quit "验证失败：请检查 Mixin 配置"
+        _error_quit "验证失败：请检查 Mixin 配置 (运行时回滚)"
     }
+
+        # 强制二次清理（保险）：去除所有 select 组里残留的 url / interval / tolerance 字段（无论是否上面已删除）。
+        # 某些 yq 版本在 flow style map 上的 del 可能未生效；此处再执行一次确保 runtime.yaml 干净，避免内核继续探测。
+        "$BIN_YQ" -i '
+            .proxy-groups |= map(
+                if .type == "select" then with_entries(select(.key != "url" and .key != "interval" and .key != "tolerance")) else . end
+            )
+        ' "$CLASH_CONFIG_RUNTIME" 2>/dev/null || true
+
+        # 再次校验（失败也不回滚，只提示）。
+        _valid_config "$CLASH_CONFIG_RUNTIME" || _failcat '清理后验证警告：请手动检查 runtime.yaml'
+    # 合并后自动清理残留探测字段再重启
+    _cleanup_probe_fields >/dev/null 2>&1 || true
     clashrestart
+}
+
+# 手动触发一次运行时配置清理，不做合并，只移除 select 组探测字段。
+_cleanup_probe_fields() {
+    [ -f "$CLASH_CONFIG_RUNTIME" ] || { _failcat '缺少 runtime.yaml'; return 1; }
+    # 第一次尝试：原地删除
+    "$BIN_YQ" -i '.proxy-groups |= map( if .type=="select" then del(.url,.interval,.tolerance) else . end )' "$CLASH_CONFIG_RUNTIME" 2>/dev/null || true
+    if grep -qE '^\s*- \{name: .*type: select.*(url:|interval:|tolerance:)' "$CLASH_CONFIG_RUNTIME"; then
+        # Fallback：重新构建文件（非 inline flow style），保证 yq 能序列化正确
+        local tmp_file="${CLASH_CONFIG_RUNTIME}.clean"
+        "$BIN_YQ" '.proxy-groups = (.proxy-groups | map( if .type=="select" then del(.url,.interval,.tolerance) else . end ))' \
+            "$CLASH_CONFIG_RUNTIME" > "$tmp_file" 2>/dev/null && {
+            mv "$tmp_file" "$CLASH_CONFIG_RUNTIME"
+        }
+    fi
+    # 如果仍然检测到残留（多为 flow style 行内映射 yq 未清除），用 sed 兜底删除文本片段。
+    if grep -qE 'url:|interval:|tolerance:' "$CLASH_CONFIG_RUNTIME"; then
+        sed -E -i \
+            -e "s/, *url: *'[^']*'//g" \
+            -e 's/, *interval: *[0-9]+//g' \
+            -e 's/, *tolerance: *[0-9]+//g' \
+            -e 's/, *}/}/g' \
+            "$CLASH_CONFIG_RUNTIME" 2>/dev/null || true
+    fi
+    if grep -qE 'url:|interval:|tolerance:' "$CLASH_CONFIG_RUNTIME"; then
+        # 深度检测：用 yq 再判定 select 组内部是否仍残留
+        local remain=$("$BIN_YQ" '.proxy-groups[] | select(.type=="select" and (has("url") or has("interval") or has("tolerance"))) | .name' "$CLASH_CONFIG_RUNTIME" 2>/dev/null | wc -l || echo 0)
+        [ "$remain" -gt 0 ] && {
+            _failcat "仍有 ${remain} 个 select 分组残留探测字段（请手工检查）"
+            return 1
+        }
+    fi
+    _okcat '🧹 已清理 select 组探测字段'
 }
 
 function clashsecret() {
@@ -353,6 +475,13 @@ function clashctl() {
         shift
         clashupdate "$@"
         ;;
+    cleanup)
+        _cleanup_probe_fields || return 1
+        ;;
+    failnodes)
+        shift
+        _fail_nodes "$@"
+        ;;
     *)
         cat <<EOF
 
@@ -369,6 +498,8 @@ Commands:
     mixin    [-e|-r]        Mixin 配置
     secret   [SECRET]       Web 密钥
     update   [auto|log]     更新订阅
+    cleanup                清理 select 组残留探测字段
+    failnodes [MIN]        统计最近(默认2)分钟失败上游节点
 
 说明:
     - clashon: 启动代理程序，并开启系统代理
@@ -389,4 +520,19 @@ function clash() {
 
 function mihomo() {
     clashctl "$@"
+}
+
+# 统计最近失败上游节点 (默认2分钟, 可传分钟值) 并列出前10个目标 (host:port)
+_fail_nodes() {
+        local since_min=${1:-2}
+        local limit=10
+        [[ $since_min =~ ^[0-9]+$ ]] || { _failcat '分钟参数需为整数'; return 1; }
+        local raw
+        raw=$(journalctl --user -u "$BIN_KERNEL_NAME" --since "${since_min} min ago" --no-pager 2>/dev/null | grep 'connect error' || true)
+        [ -z "$raw" ] && { _okcat "最近 ${since_min} 分钟无失败记录"; return 0; }
+        echo "$raw" \
+            | sed -E 's/.*error: ([^ ]+) connect error.*/\1/' \
+            | sort | uniq -c | sort -nr | head -n "$limit" \
+            | awk 'BEGIN{printf "  次数  上游(主机:端口)\n"}{printf "%6s  %s\n", $1,$2}'
+        _okcat '可考虑在 mixin 中重定义分组剔除高失败节点或面板手动切换。'
 }
