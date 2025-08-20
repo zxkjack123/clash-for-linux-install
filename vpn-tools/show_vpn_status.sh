@@ -1,5 +1,49 @@
 #!/bin/bash
 
+# DESCRIPTION:
+#   Show aggregated status of Clash/Mihomo environment: controller version, active
+#   AI/YOUTUBE groups current node, quick connectivity probes, exit IP geolocation.
+#
+# USAGE:
+#   ./show_vpn_status.sh
+#
+set -euo pipefail
+API=${CLASH_API:-http://127.0.0.1:9090}
+PROXY=${PROXY:-http://127.0.0.1:7890}
+
+have() { command -v "$1" >/dev/null 2>&1; }
+fetch_json() { curl -fsS "$1" 2>/dev/null || echo '{}'; }
+get_now() { curl -fsS "$API/proxies/$1" 2>/dev/null | sed -n 's/.*"now":"\([^"]*\)".*/\1/p'; }
+
+echo "=== VPN Status ($(date '+%F %T')) ==="
+if curl -fsS "$API/version" >/dev/null 2>&1; then
+    ver=$(curl -fsS "$API/version" | sed -n 's/.*"version":"\([^"]*\)".*/\1/p')
+    echo "Controller: UP (version=$ver)"
+else
+    echo "Controller: DOWN ($API)"; exit 1
+fi
+
+for g in AI YOUTUBE STREAM MEDIA; do now=$(get_now "$g"); [[ -n $now ]] && printf '%-8s current: %s\n' "$g" "$now"; done
+
+echo
+echo "-- Quick Probes (proxy) --"
+probe() { local url="$1" label="$2" out code t; out=$(curl -s -o /dev/null -w '%{http_code},%{time_total}' --connect-timeout 5 --max-time 8 --proxy "$PROXY" "$url" 2>/dev/null || echo "000,5"); code=${out%%,*}; t=${out##*,}; printf '%-10s %s %ss\n' "$label" "$code" "$t"; }
+probe https://api.openai.com/v1/models openai
+probe https://www.youtube.com/ youtube
+probe https://i.ytimg.com/generate_204 yt_pixel
+probe https://www.netflix.com/ netflix
+
+echo
+geo=$(curl -s --proxy "$PROXY" https://ipapi.co/json 2>/dev/null || echo '{}')
+ip=$(echo "$geo" | sed -n 's/.*"ip":"\([^"]*\)".*/\1/p')
+country=$(echo "$geo" | sed -n 's/.*"country_name":"\([^"]*\)".*/\1/p')
+echo "Exit IP: ${ip:-unknown} (${country:-N/A})"
+
+echo
+echo "Tip: run ./quick_vpn_check.sh or ./quick_ai_test.sh for deeper checks"
+
+#!/bin/bash
+
 # 📋 VPN Configuration Summary
 # 
 # DESCRIPTION:

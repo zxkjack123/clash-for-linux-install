@@ -1,5 +1,58 @@
 #!/bin/bash
 
+# DESCRIPTION:
+#   Generate a markdown report summarizing proxy connectivity across AI, streaming,
+#   and general endpoints. Includes timestamps, raw metrics and simple grading.
+#
+# USAGE:
+#   ./proxy_connectivity_report.sh > AI_CONNECTIVITY_REPORT.md
+#   PROXY=http://127.0.0.1:7890 ./proxy_connectivity_report.sh
+#
+set -euo pipefail
+PROXY=${PROXY:-http://127.0.0.1:7890}
+TIMEOUT=6
+curl_t() { curl -s -o /dev/null -w '%{http_code},%{time_total}' --connect-timeout "$TIMEOUT" --max-time "$((TIMEOUT+4))" --proxy "$PROXY" "$1" 2>/dev/null || echo "000,$TIMEOUT"; }
+
+declare -A groups
+groups[AI_openai]=https://api.openai.com/v1/models
+groups[AI_chatgpt]=https://chat.openai.com/
+groups[AI_claude]=https://claude.ai/
+groups[AI_braintrust]=https://www.braintrust.dev/
+groups[STREAM_yt_home]=https://www.youtube.com/
+groups[STREAM_yt_pixel]=https://i.ytimg.com/generate_204
+groups[STREAM_basejs]=https://www.youtube.com/s/player/230b3f4e/player_ias.vflset/en_US/base.js
+groups[GEN_google]=https://www.google.com/
+groups[GEN_cloudflare]=https://www.cloudflare.com/
+groups[GEN_bing]=https://www.bing.com/
+
+echo "# Proxy Connectivity Report"
+echo "Generated: $(date '+%F %T')"
+echo "Proxy: $PROXY"
+echo
+echo "| Category | Target | Code | Time(s) | Grade |"
+echo "|----------|--------|------|---------|-------|"
+
+grade() { # time code
+    local t="$1" c="$2"
+    if ! [[ $c =~ ^2|3 ]]; then echo F; return; fi
+    if (( $(echo "$t <= 1.5" | bc -l 2>/dev/null || echo 0) )); then echo A
+    elif (( $(echo "$t <= 3" | bc -l 2>/dev/null || echo 0) )); then echo B
+    elif (( $(echo "$t <= 5" | bc -l 2>/dev/null || echo 0) )); then echo C
+    else echo D; fi
+}
+
+for key in "${!groups[@]}"; do
+    url=${groups[$key]}; catg=${key%%_*}; target=${key#*_}
+    out=$(curl_t "$url"); code=${out%%,*}; t=${out##*,}; g=$(grade "$t" "$code")
+    printf '| %s | %s | %s | %s | %s |\n' "$catg" "$target" "$code" "$t" "$g"
+done | sort
+
+echo
+echo "## Legend"
+echo "A: <=1.5s  B: <=3s  C: <=5s  D: >5s  F: Fail/Timeout"
+
+#!/bin/bash
+
 # 📊 Comprehensive Proxy Connectivity Report
 # 
 # DESCRIPTION:
