@@ -4,3 +4,13 @@ config.yaml
 resources/bin/**
 resources/backup/**
 !.gitkeep
+# Transient diagnostic artifacts
+vpn-tools/_tmp_ai.*
+vpn-tools/batch_*.md
+vpn-tools/network-change-log.tsv
+vpn-tools/*.json
+cache.db
+.tmp/
+# Local runtime & merged artifacts (kept in user home, not repo)
+*.runtime.yaml
+runtime.yaml

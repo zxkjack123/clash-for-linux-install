@@ -94,6 +94,28 @@ vpn-tools/
 - **快速启动**：服务启动时间显著缩短，避免90秒超时
 - **自动重启**：改进服务重启机制，确保高可用性
 
+### ✅ 订阅智能合并与慢节点筛选 (2025-08-20)
+新增 `vpn-tools/merge_subscription.sh`：
+* 仅替换 `proxies` 块，保留本地自定义 `proxy-groups` / `rules`
+* 输出新增 / 删除 / 变更节点 diff 概要
+* 可选 `--auto-append-new` 将新节点自动追加到指定分组
+* 新增高延迟/超时节点筛选：
+  - `--screen-timeout tag|drop` 选择为慢节点打标或直接剔除
+  - `--timeout-threshold <毫秒>` 建连耗时阈值 (默认 1500ms)
+  - `--slow-suffix [SLOW]` 自定义标记后缀 (tag 模式)
+  - 并发 `/dev/tcp` + `timeout` 测试 TCP connect 时间；失败或超阈值即判定慢节点
+示例：
+```bash
+# 下载订阅并剔除慢节点后直接应用
+./vpn-tools/merge_subscription.sh --url "https://example/sub" \
+  --screen-timeout drop --timeout-threshold 1800 --apply
+
+# 本地文件并为慢节点加标签
+./vpn-tools/merge_subscription.sh --new sub.yaml \
+  --screen-timeout tag --timeout-threshold 1500 --slow-suffix "[SLOW]" > merged.yaml
+```
+> 建议在执行节点优化脚本前先剔除明显超时/失效节点，减少噪声。
+
 ## 快速开始
 
 ### 环境要求
