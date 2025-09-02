@@ -32,6 +32,12 @@ CLASH_CONFIG_RAW_BAK="${CLASH_CONFIG_RAW}.bak"
 CLASH_CONFIG_MIXIN="${CLASH_BASE_DIR}/$(basename $RESOURCES_CONFIG_MIXIN)"
 CLASH_CONFIG_RUNTIME="${CLASH_BASE_DIR}/runtime.yaml"
 CLASH_UPDATE_LOG="${CLASH_BASE_DIR}/clashupdate.log"
+CLASH_DIFF_DIR="${CLASH_BASE_DIR}/diff-history"
+CLASH_FINGERPRINT_FILE="${CLASH_BASE_DIR}/subscription_fingerprints.tsv"
+CLASH_EXPECTED_FINGERPRINT_FILE="${CLASH_BASE_DIR}/subscription_expected_fingerprints.tsv"
+CLASH_DIFF_INDEX_FILE="${CLASH_DIFF_DIR}/index.tsv"
+CLASH_HEALTH_JSON="${CLASH_BASE_DIR}/health.json"
+CLASH_METRICS_FILE="${CLASH_BASE_DIR}/metrics.prom"
 
 _set_var() {
     local user=$USER

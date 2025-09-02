@@ -45,13 +45,13 @@ cd vpn-tools
 
 ### 🎯 工具分类
 
-| 类别 | 工具 | 用途 | 耗时 |
-|------|------|------|------|
-| **🐳 Docker** | `test_docker_proxy.sh` | Docker 容器代理连接测试 | 2-3分钟 |
-| **AI 优化** | `optimize_ai.sh` | ChatGPT/Claude 快速优化 | 2-3分钟 |
-| **流媒体** | `select_youtube_node.sh` | YouTube 快速优化 | 3-5分钟 |
-| **网络测试** | `network_connectivity_test.sh` | 全面连通性测试 | 5-8分钟 |
-| **状态检查** | `quick_vpn_check.sh` | 快速状态检查 | 30秒 |
+| 类别         | 工具                           | 用途                    | 耗时    |
+| ------------ | ------------------------------ | ----------------------- | ------- |
+| **🐳 Docker** | `test_docker_proxy.sh`         | Docker 容器代理连接测试 | 2-3分钟 |
+| **AI 优化**  | `optimize_ai.sh`               | ChatGPT/Claude 快速优化 | 2-3分钟 |
+| **流媒体**   | `select_youtube_node.sh`       | YouTube 快速优化        | 3-5分钟 |
+| **网络测试** | `network_connectivity_test.sh` | 全面连通性测试          | 5-8分钟 |
+| **状态检查** | `quick_vpn_check.sh`           | 快速状态检查            | 30秒    |
 
 ### 📁 文件结构
 ```
@@ -339,15 +339,15 @@ bash uninstall.sh
 
 ## 🚀 用户空间版本特性
 
-| 特性         | 此版本                  | 其他版本对比     |
-| ------------ | ----------------------- | ---------------- |
-| **安装权限** | ✅ 普通用户即可          | ⚠️ 通常需要 sudo  |
-| **日常操作** | ✅ 无需密码              | ⚠️ 可能需要密码   |
-| **安装位置** | `~/.local/share/clash/` | 通常在系统目录    |
-| **服务管理** | `systemctl --user`      | `sudo systemctl` |
-| **自动启动** | ✅ 登录自动启用代理      | ⚠️ 通常需手动启用 |
-| **用户隔离** | ✅ 每用户独立            | ⚠️ 可能系统共享   |
-| **安全性**   | ✅ 用户权限隔离          | ⚠️ 可能需系统权限 |
+| 特性         | 此版本                  | 其他版本对比       |
+| ------------ | ----------------------- | ------------------ |
+| **安装权限** | ✅ 普通用户即可          | ⚠️ 通常需要 sudo    |
+| **日常操作** | ✅ 无需密码              | ⚠️ 可能需要密码     |
+| **安装位置** | `~/.local/share/clash/` | 通常在系统目录     |
+| **服务管理** | `systemctl --user`      | `sudo systemctl`   |
+| **自动启动** | ✅ 登录自动启用代理      | ⚠️ 通常需手动启用   |
+| **用户隔离** | ✅ 每用户独立            | ⚠️ 可能系统共享     |
+| **安全性**   | ✅ 用户权限隔离          | ⚠️ 可能需系统权限   |
 | **配置管理** | ✅ 用户可完全控制        | ⚠️ 可能需管理员权限 |
 | **卸载清理** | ✅ 只影响当前用户        | ⚠️ 可能影响整个系统 |
 
@@ -398,6 +398,106 @@ services:
 # 使用 curl 示例
 docker run --rm curlimages/curl curl -x http://HOST_IP:7890 https://www.google.com
 ```
+
+## � 运行时健康 & 指标 (Metrics)
+
+新增 Prometheus 指标文件 (默认路径参考脚本变量 `CLASH_METRICS_FILE`)，可通过 `clash metrics` 立即生成，或 `clash metrics --cron-install 5` 安装每 5 分钟自动刷新任务。
+
+当前输出的指标包括：
+- `clash_health_score` / `clash_health_grade` 综合健康得分与等级 (A/B/C/D → 3/2/1/0)
+- `clash_direct_rule_present{ip="1.1.1.1"|"8.8.8.8"}` 关键 DNS IP DIRECT 规则存在性
+- `clash_dns_hijack_detected` 关键 DNS 是否被代理劫持 (1=是)
+- `clash_upstream_failures_5m` 最近 5 分钟连接失败计数
+- `clash_traffic_upload_bytes_total` / `clash_traffic_download_bytes_total` 核心接口上报累计上下行字节
+- `clash_active_connections` 当前活跃连接数
+- `clash_selector_groups_on_fail` 当前选择的节点含 `[FAIL]` 标签的 selector 分组数量
+- `clash_metrics_timestamp_seconds` 指标生成时间戳
+
+解析逻辑优先使用 `jq`，若系统未安装 `jq` 则自动回退到 `grep/sed`，可选安装：
+```bash
+sudo apt install -y jq   # 或其它发行版等价命令
+```
+
+## 🔻 节点降权 & 自动切换
+
+命令：
+```bash
+clash downgrade [--since <分钟> --threshold <次数> --mode tag|drop --no-switch]
+```
+
+说明：
+- 扫描最近 `--since` 分钟 (`默认10`) 的内核日志中 `connect error`，统计同一上游失败次数 ≥ `--threshold` (`默认5`) 的节点
+- `--mode tag` 为分组引用添加后缀 `[FAIL]`；`--mode drop` 直接移除分组引用（保留节点定义）
+- 变更后会执行一次原子合并+清洗+重启，确保 runtime 同步
+- 默认随后自动对所有 selector 分组尝试切换到第一个非 `[FAIL]` 节点；使用 `--no-switch` 可禁止自动切换
+- 操作被写入更新日志 (标记 `[DOWNGRADE-<timestamp>]`)
+
+清理标签：
+```bash
+clash cleanfail   # 去除所有分组引用中的 [FAIL] 后缀并自动重新合并
+```
+
+并发安全：`downgrade` 与 `cleanfail` 在写入 `mixin.yaml` 前都会获取与主合并流程相同的文件锁，避免与订阅更新/其它合并并发冲突。
+
+## 🧪 示例监控集成
+
+Prometheus `file_sd` 示例 (prometheus.yml)：
+```yaml
+scrape_configs:
+  - job_name: clash
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['localhost']
+        labels:
+          __metrics_path__: /absolute/path/to/metrics.prom
+```
+
+Grafana 可直接基于上述指标绘制：失败趋势、活跃连接、上传/下载速率（对 bytes 总量做 rate()）。
+
+
+## �🔐 高级稳定性强化 (P0→P2)
+
+| 等级 | 内容                                                         | 状态            |
+| ---- | ------------------------------------------------------------ | --------------- |
+| P0   | 原子合并 + 清洗 + 单次重启；强制关键 DIRECT 规则；运行时注解 | ✅ 已实现        |
+| P1   | 订阅更新差异报告 (rules / fallback / 分组名)                 | ✅ 已实现        |
+| P1   | runtime 守护自愈脚本 (自动检查+修复+可通知)                  | ✅ 已实现        |
+| P2   | 可插入定时巡检 (cron) 与集中健康日志                         | ✅ 已实现 (示例) |
+
+### 差异报告
+执行 `clash update` 后若 runtime 发生变化会生成 `/tmp/runtime_diff_YYYYmmdd_HHMMSS.log`，并在更新日志里追加 `DIFF-时间戳` 标记，内容聚焦：
+1. 规则增删 (常见风险触发点)
+2. dns.fallback 变更 (防止裸 IP 回流)
+3. proxy-groups 名称变更 (识别订阅分组漂移)
+
+### runtime_guard.sh 自愈
+脚本位置：`script/runtime_guard.sh`
+
+用途：持续确保以下安全基线：
+- 1.1.1.1 / 8.8.8.8 仅存在 DIRECT 规则
+- 无代理劫持规则 (避免 DNS 递归抖动)
+- YAML 结构可解析
+
+示例：
+```bash
+# 单次巡检
+bash script/runtime_guard.sh --check
+
+# 巡检并自愈 + 报告 + 通知
+bash script/runtime_guard.sh --auto-fix --report --alert-cmd 'notify-send "Clash runtime 修复"'
+
+# 每 10 分钟巡检 (添加到 crontab)
+*/10 * * * * bash /absolute/path/script/runtime_guard.sh --auto-fix --cron >> /tmp/runtime_guard_status.log 2>&1
+```
+退出码语义：0=健康或已修复；1=检测到问题但未修复 (缺少 --auto-fix)。
+
+### 推荐巡检策略
+1. cron 每 10 分钟运行一次 `--auto-fix --cron`
+2. 订阅更新后人工快速浏览 diff 报告 (出现大量异常规则及时人工审计)
+3. 将 `/tmp/runtime_guard_status.log` 接入你自己的监控或日志收集体系
+
+> 若想进一步扩展 (P3+): 可增加“异常规则白名单文件”“历史 diff 留存归档”“节点质量基线”等。
+
 
 #### 3. 网络模式
 ```bash
