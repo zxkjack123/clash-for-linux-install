@@ -45,6 +45,9 @@ _acquire_lock() {
   # AUTO_FIX 使用独占锁; 否则使用共享锁
   local mode="shared"
   $AUTO_FIX && mode="exclusive"
+  LOCK_MODE="$mode"
+  # 记录开始等待时间 (毫秒)
+  START_LOCK_ATTEMPT_MS=$(date +%s%3N 2>/dev/null || date +%s000)
   # shellcheck disable=SC3028
   eval "exec {LOCK_FD}>\"$LOCK_FILE\""
   if [ "$mode" = "exclusive" ]; then
@@ -52,6 +55,10 @@ _acquire_lock() {
   else
     flock -w 10 -s "$LOCK_FD" || fail "获取共享锁超时: $LOCK_FILE"
   fi
+  END_LOCK_ACQUIRE_MS=$(date +%s%3N 2>/dev/null || date +%s000)
+  local delta=$((END_LOCK_ACQUIRE_MS-START_LOCK_ATTEMPT_MS))
+  # 计算秒 (保留 3 位)
+  LOCK_WAIT_SECONDS=$(awk -v d=$delta 'BEGIN{ printf "%.3f", d/1000 }')
 }
 
 _upgrade_to_exclusive() {
@@ -61,6 +68,7 @@ _upgrade_to_exclusive() {
   # 释放并重新获取独占锁 (窗口很小)
   flock -u "$LOCK_FD" 2>/dev/null || true
   flock -w 10 -x "$LOCK_FD" || fail "升级独占锁失败: $LOCK_FILE"
+  LOCK_MODE="exclusive"
 }
 
 _release_lock() { [ "$LOCK_FD" -gt 0 ] && flock -u "$LOCK_FD" 2>/dev/null || true; }
@@ -148,7 +156,7 @@ fi
 if [ $STATUS -eq 0 ]; then
   $CRON_MODE && health_line "GUARD OK $TS" || ok "健康 (无异常)"
   if $JSON_OUT; then
-    printf '{"timestamp":"%s","status":"OK","issues":[],"fails_5m":0}' "$TS"
+    printf '{"timestamp":"%s","status":"OK","issues":[],"fails_5m":0,"lockMode":"%s","lockWaitSeconds":%s}' "$TS" "$LOCK_MODE" "${LOCK_WAIT_SECONDS:-0}"
     echo
   fi
   if $BASELINE_REPORT; then
@@ -160,7 +168,7 @@ if [ $STATUS -eq 0 ]; then
     [ $fails -gt 30 ] && grade=D
     ok "节点失败(5m):$fails 等级:$grade"
     if $JSON_OUT; then
-      printf '{"timestamp":"%s","status":"OK","fails_5m":%s,"grade":"%s"}' "$TS" "$fails" "$grade"
+      printf '{"timestamp":"%s","status":"OK","fails_5m":%s,"grade":"%s","lockMode":"%s","lockWaitSeconds":%s}' "$TS" "$fails" "$grade" "$LOCK_MODE" "${LOCK_WAIT_SECONDS:-0}"
       echo
     fi
   fi
@@ -172,7 +180,7 @@ $CRON_MODE && health_line "GUARD ISSUE $TS ${ISSUES[*]}" || warn "发现问题: 
 
 if ! $AUTO_FIX; then
   if $JSON_OUT; then
-    printf '{"timestamp":"%s","status":"ISSUE","issues":["%s"],"autoFix":false}' "$TS" "${ISSUES[*]}"
+  printf '{"timestamp":"%s","status":"ISSUE","issues":["%s"],"autoFix":false,"lockMode":"%s","lockWaitSeconds":%s}' "$TS" "${ISSUES[*]}" "$LOCK_MODE" "${LOCK_WAIT_SECONDS:-0}"
     echo
   fi
   exit 1
@@ -211,10 +219,18 @@ mv "$TMP_FIX" "$RUNTIME" || fail "替换 runtime 失败"
 systemctl --user restart "$SERVICE" >/dev/null 2>&1 && ok "已自愈并重启" || warn "重启失败, 请手动检查"
 [ -n "$ALERT_CMD" ] && eval "$ALERT_CMD" >/dev/null 2>&1 || true
 
+# 写入 metrics: guard_last_fix_timestamp & guard_lock_wait_seconds
+if [ -n "${CLASH_METRICS_FILE:-}" ]; then
+  mkdir -p "$(dirname "$CLASH_METRICS_FILE")" 2>/dev/null || true
+  { sed -i '/^clash_guard_last_fix_timestamp /d;/^clash_guard_lock_wait_seconds /d' "$CLASH_METRICS_FILE" 2>/dev/null || true; } && true
+  echo "clash_guard_last_fix_timestamp $(date +%s)" >>"$CLASH_METRICS_FILE"
+  echo "clash_guard_lock_wait_seconds ${LOCK_WAIT_SECONDS:-0}" >>"$CLASH_METRICS_FILE"
+fi
+
 $CRON_MODE && health_line "GUARD FIXED $TS" || ok "完成自愈"
 [ -n "$REPORT_FILE" ] && ok "报告: $REPORT_FILE"
 if $JSON_OUT; then
-  printf '{"timestamp":"%s","status":"FIXED","issues":["%s"],"autoFix":true}' "$TS" "${ISSUES[*]}"
+  printf '{"timestamp":"%s","status":"FIXED","issues":["%s"],"autoFix":true,"lockMode":"%s","lockWaitSeconds":%s}' "$TS" "${ISSUES[*]}" "$LOCK_MODE" "${LOCK_WAIT_SECONDS:-0}"
   echo
 fi
 exit 0
