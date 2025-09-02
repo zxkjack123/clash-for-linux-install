@@ -13,6 +13,11 @@ if [ -z "$CLASH_ENV_INITIALIZED" ]; then
     fi
 fi
 
+# 安全辅助: sed 正则转义 (用于节点名可能包含特殊字符)
+_escape_sed() {
+    printf '%s' "$1" | sed -e 's/[\/\\&.*$^[]/\\&/g' -e 's/]/\\]/g' -e 's/(/\\(/g' -e 's/)/\\)/g' -e 's/+\\?/+/g'
+}
+
 _set_system_proxy() {
     local auth=$("$BIN_YQ" '.authentication[0] // ""' "$CLASH_CONFIG_RUNTIME")
     [ -n "$auth" ] && auth=$auth@
@@ -76,7 +81,8 @@ _set_system_proxy() {
         gsettings set org.gnome.system.proxy.https port "${MIXED_PORT}" 2>/dev/null || true
         gsettings set org.gnome.system.proxy.socks host '127.0.0.1' 2>/dev/null || true
         gsettings set org.gnome.system.proxy.socks port "${MIXED_PORT}" 2>/dev/null || true
-        gsettings set org.gnome.system.proxy ignore-hosts "['localhost', '127.0.0.0/8', '::1']" 2>/dev/null || true
+        # 扩展内网免代理列表，避免本地/局域网走代理
+        gsettings set org.gnome.system.proxy ignore-hosts "['localhost', '127.0.0.0/8', '::1', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16']" 2>/dev/null || true
     fi
 
     # Set KDE proxy settings (for KDE applications)
@@ -307,6 +313,8 @@ _merge_sanitize_restart() {
         "$BIN_YQ" -i '.rules += ["IP-CIDR,1.1.1.1/32,DIRECT,no-resolve"]' "$tmp_out" 2>/dev/null || true
     grep -q 'IP-CIDR,8.8.8.8/32,DIRECT' "$tmp_out" 2>/dev/null || \
         "$BIN_YQ" -i '.rules += ["IP-CIDR,8.8.8.8/32,DIRECT,no-resolve"]' "$tmp_out" 2>/dev/null || true
+    # 去重 DIRECT 规则 (及所有规则防膨胀)
+    "$BIN_YQ" -i '.rules |= ( . // [] | unique )' "$tmp_out" 2>/dev/null || true
     _valid_config "$tmp_out" || _error_quit '合并后验证失败(含清洗)'
     _annotate_runtime "$tmp_out"
     mv "$tmp_out" "$CLASH_CONFIG_RUNTIME" 2>/dev/null || _error_quit '替换 runtime 失败'
@@ -749,14 +757,51 @@ _clash_metrics() {
     fi
     proxies_json=$(curl -s --max-time 1 "${api_base}/proxies" "${auth_header[@]}" || echo '{}')
     if [ $have_jq -eq 1 ]; then
-        # selector groups where current now contains [FAIL]
-        groups_on_fail=$(echo "$proxies_json" | jq '[.proxies | to_entries[] | select(.value.type=="Selector") | select(.value.now|test("\\[FAIL\\]"))] | length' 2>/dev/null || echo 0)
+        groups_on_fail=$(echo "$proxies_json" | jq '[.proxies | to_entries[] | select(.value.type=="Selector" and (.value.now|test("\\[FAIL\\]"))) ] | length' 2>/dev/null || echo 0)
     else
-        groups_on_fail=$(echo "$proxies_json" | grep -E '"type":"Selector"' -n | wc -l | awk '{print $1}')
+        # 非 jq 模式：仅统计 now 中含 [FAIL] 的 selector
         if echo "$proxies_json" | grep -q '\[FAIL\]'; then
             groups_on_fail=$(echo "$proxies_json" | tr '\n' ' ' | sed 's/},/\n/g' | grep '"type":"Selector"' | grep '\[FAIL\]' | wc -l | awk '{print $1}')
+        else
+            groups_on_fail=0
         fi
     fi
+    # 直接调用 guard 获取 JSON, 采样 lockWaitSeconds (即使返回非 0 也继续)
+    local guard_script="$CLASH_SCRIPT_DIR/runtime_guard.sh" guard_json guard_lock_wait=0 guard_last_fix=0 have_jq
+    command -v jq >/dev/null 2>&1 && have_jq=1 || have_jq=0
+    if [ -x "$guard_script" ]; then
+        guard_json=$(bash "$guard_script" --check --json 2>/dev/null || true)
+        if [ -n "$guard_json" ]; then
+            if [ $have_jq -eq 1 ]; then
+                guard_lock_wait=$(echo "$guard_json" | jq -r '.lockWaitSeconds // 0' 2>/dev/null || echo 0)
+                # 若 status=FIXED, 用当前 runtime mtime 作为 last_fix_timestamp (一并输出指标)
+                if echo "$guard_json" | jq -e '.status=="FIXED"' >/dev/null 2>&1; then
+                    guard_last_fix=$(stat -c %Y "$CLASH_CONFIG_RUNTIME" 2>/dev/null || echo 0)
+                fi
+            else
+                guard_lock_wait=$(echo "$guard_json" | grep -Eo '"lockWaitSeconds":[0-9.]+' | head -n1 | cut -d: -f2 || echo 0)
+            fi
+        fi
+    fi
+    # 若本次未捕获 FIXED 状态, 尝试从独立 guard metrics 文件读取上次自愈时间
+    if [ "${guard_last_fix:-0}" -eq 0 ]; then
+        guard_metrics_file="${CLASH_GUARD_METRICS_FILE:-$CLASH_BASE_DIR/metrics_guard.prom}"
+        if [ -f "$guard_metrics_file" ]; then
+            guard_last_fix=$(grep -E '^clash_guard_last_fix_timestamp ' "$guard_metrics_file" | awk '{print $2}' | tail -n1 || echo 0)
+        fi
+    fi
+    GUARD_EXTRA_METRICS=$(cat <<EOF
+# HELP clash_guard_lock_wait_seconds Last observed lock wait seconds from guard check
+# TYPE clash_guard_lock_wait_seconds gauge
+clash_guard_lock_wait_seconds ${guard_lock_wait:-0}
+$( if [ "${guard_last_fix:-0}" -gt 0 ]; then cat <<EOFIX
+# HELP clash_guard_last_fix_timestamp Unix timestamp of last guard auto-fix (runtime mtime)
+# TYPE clash_guard_last_fix_timestamp gauge
+clash_guard_last_fix_timestamp ${guard_last_fix}
+EOFIX
+fi )
+EOF
+    )
     cat > "$CLASH_METRICS_FILE" 2>/dev/null <<EOFPM
 # HELP clash_health_score Composite health score
 # TYPE clash_health_score gauge
@@ -789,6 +834,7 @@ clash_selector_groups_on_fail $groups_on_fail
 # HELP clash_metrics_timestamp_seconds Unix time metrics generated
 # TYPE clash_metrics_timestamp_seconds gauge
 clash_metrics_timestamp_seconds $now_epoch
+${GUARD_EXTRA_METRICS}
 EOFPM
     _okcat "Metrics 写入: $CLASH_METRICS_FILE"
 }
@@ -809,28 +855,34 @@ _downgrade_failed_nodes() {
             *) break;;
         esac
     done
-    local raw bad tmp_yaml changed=false
+    local raw bad tmp_yaml changed=0
     raw=$(journalctl --user -u "$BIN_KERNEL_NAME" --since "${since_min} min ago" --no-pager 2>/dev/null | grep 'connect error' || true)
     [ -z "$raw" ] && { _okcat "无失败记录 (since=${since_min}m)"; return 0; }
     bad=$(echo "$raw" | sed -E 's/.*error: ([^ ]+) connect error.*/\1/' | sort | uniq -c | awk -v t=$threshold '$1>=t {print $2}')
+    # 回退解析：若为空，再尝试 grep -Eo
+    if [ -z "$bad" ]; then
+        bad=$(echo "$raw" | grep -Eo 'error: [^ ]+ connect error' | awk '{print $2}' | sort | uniq -c | awk -v t=$threshold '$1>=t {print $2}')
+    fi
     [ -z "$bad" ] && { _okcat "无达到阈值节点 (阈值=${threshold})"; return 0; }
     tmp_yaml="${CLASH_CONFIG_MIXIN}.failtag.$$"
     cp -f "$CLASH_CONFIG_MIXIN" "$tmp_yaml" || return 0
     while read -r node; do
         [ -z "$node" ] && continue
+        local node_esc
+        node_esc=$(_escape_sed "$node")
         if [ "$mode" = tag ]; then
-            sed -i -E "/- name: /! s/([[:space:]]+- $node)([[:space:]]|$)/\1${tag_suffix} /" "$tmp_yaml" 2>/dev/null || true
+            sed -i -E "/- name: /! s/([[:space:]]+- $node_esc)([[:space:]]|$)/\1${tag_suffix} /" "$tmp_yaml" 2>/dev/null || true
         else
-            sed -i -E "/- name: /! {/^[[:space:]]+- $node([[:space:]]|$)/d}" "$tmp_yaml" 2>/dev/null || true
+            sed -i -E "/- name: /! {/^[[:space:]]+- $node_esc([[:space:]]|$)/d}" "$tmp_yaml" 2>/dev/null || true
         fi
     done <<< "$bad"
     if ! diff -q "$CLASH_CONFIG_MIXIN" "$tmp_yaml" >/dev/null 2>&1; then
         mv "$tmp_yaml" "$CLASH_CONFIG_MIXIN"
-        changed=true
+        changed=1
     else
         rm -f "$tmp_yaml"
     fi
-    if $changed; then
+    if [ $changed -eq 1 ]; then
         local ts_dg action
         ts_dg=$(date +%Y%m%d_%H%M%S)
         action=$([ "$mode" = tag ] && echo TAG || echo DROP)
@@ -892,7 +944,8 @@ _cleanup_fail_tags() {
     [ -f "$CLASH_CONFIG_MIXIN" ] || { _failcat '缺少 mixin'; return 1; }
     grep '\[FAIL\]' "$CLASH_CONFIG_MIXIN" >/dev/null 2>&1 || { _okcat '无 [FAIL] 标签'; return 0; }
     local tmp="${CLASH_CONFIG_MIXIN}.cleanfail.$$"
-    sed -E 's/\[FAIL\] ?//g' "$CLASH_CONFIG_MIXIN" > "$tmp" 2>/dev/null || return 1
+    # 仅对 proxy-groups 段列表项移除标签，避免误伤其它注释/上下文
+    awk 'BEGIN{inpg=0} /^proxy-groups:/ {inpg=1; print; next} /^[^ \t-]/ {inpg=0; print; next} { if(inpg && $0 ~ /^ *-/){ gsub(/\[FAIL\] ?/,"",$0); print; next } print }' "$CLASH_CONFIG_MIXIN" > "$tmp" 2>/dev/null || return 1
     if ! diff -q "$CLASH_CONFIG_MIXIN" "$tmp" >/dev/null 2>&1; then
     mv "$tmp" "$CLASH_CONFIG_MIXIN"
         local ts_cf

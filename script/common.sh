@@ -2,7 +2,10 @@
 # shellcheck disable=SC2034
 # shellcheck disable=SC2155
 [ -n "$BASH_VERSION" ] && set +o noglob
-[ -n "$ZSH_VERSION" ] && setopt glob no_nomatch
+[ -n "${ZSH_VERSION:-}" ] && setopt glob no_nomatch || true
+
+# 如果作为库被严格模式脚本引用 (set -u), 且未显式设置变量, 暂时关闭 -u 以避免未绑定变量终止
+[ "${CLASH_LIB_MODE:-0}" = 1 ] && set +u || true
 
 URL_GH_PROXY='https://gh-proxy.com/'
 URL_CLASH_UI="http://board.zash.run.place"
@@ -43,13 +46,13 @@ _set_var() {
     local user=$USER
     local home=$HOME
 
-    [ -n "$BASH_VERSION" ] && {
+    [ -n "${BASH_VERSION:-}" ] && {
         _SHELL=bash
     }
-    [ -n "$ZSH_VERSION" ] && {
+    [ -n "${ZSH_VERSION:-}" ] && {
         _SHELL=zsh
     }
-    [ -n "$fish_version" ] && {
+    [ -n "${fish_version:-}" ] && {
         _SHELL=fish
     }
 
@@ -198,6 +201,7 @@ function _quit() {
 }
 
 function _error_quit() {
+    # 当作为库被其它脚本 (如 runtime_guard.sh) 调用时, 通过设置 CLASH_LIB_MODE=1 避免 exec 交互壳导致主逻辑中断
     [ $# -gt 0 ] && {
         local color=#f92f60
         local emoji=📢
@@ -205,6 +209,9 @@ function _error_quit() {
         local msg="${emoji} $1"
         _get_color_msg "$color" "$msg"
     }
+    if [ "${CLASH_LIB_MODE:-0}" = 1 ]; then
+        return 1
+    fi
     exec $_SHELL -i
 }
 
@@ -220,7 +227,7 @@ _is_already_in_use() {
 }
 
 function _valid_env() {
-    [ -n "$ZSH_VERSION" ] && [ -n "$BASH_VERSION" ] && _error_quit "仅支持：bash、zsh"
+    [ -n "${ZSH_VERSION:-}" ] && [ -n "${BASH_VERSION:-}" ] && _error_quit "仅支持：bash、zsh"
     [ "$(ps -p 1 -o comm=)" != "systemd" ] && _error_quit "系统不具备 systemd"
     # Create user systemd directory if it doesn't exist
     mkdir -p "${USER_HOME}/.config/systemd/user"
