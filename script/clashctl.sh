@@ -621,6 +621,9 @@ function clashctl() {
     cleanfail)
         _cleanup_fail_tags
         ;;
+    diag|doctor)
+        bash "$(dirname "$CLASH_SCRIPT_DIR")/script/clash_diagnose.sh" "${@:2}" || true
+        ;;
     metrics)
         # metrics [--cron-install <interval-min>]  (写入 metrics 文件)
         if [ "$1" = "--cron-install" ]; then
@@ -652,6 +655,7 @@ Commands:
     failnodes [MIN]        统计最近(默认2)分钟失败上游节点
         downgrade              标记/删除最近失败次数高的节点 (默认10min>=5) 支持: --since --threshold --mode drop|tag --no-switch
     cleanfail              移除分组引用中的 [FAIL] 标签
+    diag | doctor          一键诊断 (脚本: clash_diagnose.sh) 支持 --fast --json
     metrics                生成 Prometheus metrics 文件
     - metrics --cron-install 5   安装每5分钟自动刷新
     - downgrade --since 15 --threshold 8 --mode drop
