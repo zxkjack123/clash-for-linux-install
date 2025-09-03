@@ -37,15 +37,17 @@ if [[ $MODE == text ]]; then
 	echo "Score $score/$max (${percent}%)"
 	if (( percent>=75 )); then echo "Status: ✅ STREAMING READY"; elif (( percent>=50 )); then echo "Status: ⚠️ PARTIAL"; else echo "Status: ❌ ISSUE"; fi
 else
-	echo '{'
-	echo '  "score":'"$score",'"max":'"$max",'"percent":'"$percent",'
-	echo '  "results": {'
+	# JSON 输出
+	printf '{\n'
+	printf '  "score": %s, "max": %s, "percent": %s,\n' "$score" "$max" "$percent"
+	printf '  "results": {\n'
 	first=1
 	for k in youtube yt_pixel netflix dash; do
-		v=${res[$k]}; [[ $first -eq 0 ]] && echo ','; printf '    "%s": "%s"' "$k" "$v"; first=0
+		v=${res[$k]}
+		if [[ $first -eq 0 ]]; then printf ',\n'; fi
+		printf '    "%s": "%s"' "$k" "$v"
+		first=0
 	done
-	echo '
-	}
-}'
+	printf '\n  }\n}\n'
 fi
 
