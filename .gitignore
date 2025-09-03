@@ -14,3 +14,8 @@ cache.db
 # Local runtime & merged artifacts (kept in user home, not repo)
 *.runtime.yaml
 runtime.yaml
+.tmp
+trace*.txt
+guard_*.txt
+resources/mixin.yaml.bak-*
+/tmp/.clash_latency.*

@@ -1,0 +1,27 @@
+proxies:
+  - {
+      name: "A-测试节点1",
+      type: trojan,
+      server: a.example.com,
+      port: 12345,
+      password: 1111,
+      udp: true,
+    }
+  - {
+      name: "B-测试节点2",
+      type: trojan,
+      server: b.example.com,
+      port: 22345,
+      password: 2222,
+      udp: true,
+    }
+  - {
+      name: "V1-日本01|流媒体|GPT",
+      type: trojan,
+      server: jp.changed.example.com,
+      port: 41001,
+      password: d8838e53-b1a4-42ce-9a79-dec2f268808d,
+      udp: true,
+      sni: jp001.yijiasu.xyz,
+      skip-cert-verify: true,
+    }

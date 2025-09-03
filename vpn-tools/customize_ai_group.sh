@@ -56,4 +56,93 @@ current_node() { get_group_json | ( have_jq && jq -r '.now' || sed -n 's/.*"now"
 apply_node() {
 	local node="$1"
 	if [[ -z $node ]]; then err "Empty node"; exit 2; fi
-	curl -fsS -X PUT "$API/proxies/$GROUP" -H 'Content-Type: application/json' -d '{"name":"'
+	# Verify node is in list
+	if ! list_nodes | grep -Fx -- "$node" >/dev/null 2>&1; then
+		err "Node '$node' not in group list"; exit 2; fi
+	if [[ $node == "$(current_node)" ]]; then
+		info "Node '$node' already active (no change)"; return 0; fi
+	if curl -fsS -X PUT "$API/proxies/$GROUP" -H 'Content-Type: application/json' -d '{"name":"'"$node"'"}' >/dev/null; then
+		info "Applied node: $node"; return 0
+	else
+		err "Failed to apply node $node"; return 2
+	fi
+
+}
+
+
+# Test latency via controller delay API (if supported)
+test_latency() {
+	local node="$1" timeout_ms="${LATENCY_TIMEOUT_MS:-3000}" url="${TEST_URL:-https://www.gstatic.com/generate_204}" r
+	# Try delay endpoint; some forks require url & timeout params
+	r=$(curl -fsS --max-time $(( (timeout_ms/1000)+2 )) "$API/proxies/$node/delay?timeout=$timeout_ms&url=$url" 2>/dev/null || true)
+	if [[ $r =~ ([0-9]{1,5})ms ]]; then
+		printf '%s' "${BASH_REMATCH[1]}"
+	else
+		printf 'N/A'
+	fi
+}
+
+print_menu() {
+	local current="$(current_node)" filter="${FILTER:-}"; local i=0
+	mapfile -t nodes < <(list_nodes)
+	if [[ -n $filter ]]; then info "Filter: $filter (matched ${#nodes[@]})"; fi
+	printf '\nCurrent: %s\n' "$current"
+	printf 'Idx  %-50s  %6s\n' "Node" "RTT"
+	printf '---- %-50s  %6s\n' "--------------------------------------------------" "------"
+	for n in "${nodes[@]}"; do
+		[[ -z $n ]] && continue
+		lat=$(test_latency "$n")
+		mark=" "; [[ $n == "$current" ]] && mark="*"
+		printf '%3d%s %-50s %6s\n' "$i" "$mark" "$n" "$lat"
+		((i++))
+	done
+	printf '\nActions: [number]=switch  r=refresh  f=filter  q=quit\n'
+}
+
+interactive_loop() {
+	print_menu
+	while true; do
+		read -rp '> ' ans || break
+		case $ans in
+			q|quit) exit 0;;
+			r) print_menu;;
+			f) read -rp 'New filter: ' FILTER; print_menu;;
+			'' ) continue;;
+			*[!0-9]*) echo 'Enter index, r, f or q';;
+			*)
+				mapfile -t nodes < <(list_nodes)
+				idx=$ans
+				if (( idx<0 || idx>=${#nodes[@]} )); then echo 'Index out of range'; continue; fi
+				sel=${nodes[$idx]}
+				apply_node "$sel" && print_menu || true
+			;;
+		esac
+	done
+}
+
+usage() {
+	grep -E '^# ' "$0" | sed 's/^# \?//' | sed -n '1,60p'
+}
+
+main() {
+	SET_NODE=""; SHOW_ONLY=0
+	while [[ $# -gt 0 ]]; do
+		case $1 in
+			--set) SET_NODE="$2"; shift 2;;
+			-h|--help) usage; exit 0;;
+			*) echo "Unknown arg: $1" >&2; exit 1;;
+		esac
+	done
+	check_controller
+	if [[ -n $SET_NODE ]]; then
+		# pattern support: pick first matching node (case-insensitive substring)
+		cand=$(list_nodes | grep -i -- "$SET_NODE" | head -n1 || true)
+		if [[ -z $cand ]]; then err "No node matches pattern: $SET_NODE"; exit 2; fi
+		apply_node "$cand"
+		return
+	fi
+	# interactive default
+	interactive_loop
+}
+
+main "$@"
