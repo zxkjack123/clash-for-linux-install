@@ -27,7 +27,28 @@ _set_system_proxy() {
     # 基础直连免代理列表 (扩展 Tailscale / Funnel 域 & 100.64.0.0/10 内网网段，避免干扰 tailnet 访问)
     # 说明: curl / 浏览器 在设置 http_proxy 后，会对所有域名走代理；加入 *.ts.net 可确保 tailnet 解析 / 访问直接走 Tailscale 接口
     #      100.64.0.0/10 属于 Tailscale CGNAT 地址空间；tailscale.io 及 ts.net 控制面 / funnel 子域避免代理分层导致握手异常。
-    local no_proxy_addr="localhost,127.0.0.1,::1,ts.net,.ts.net,*.ts.net,tailscale.io,.tailscale.io,100.64.0.0/10"
+    local no_proxy_addr="localhost,127.0.0.1,::1,ts.net,.ts.net,tailscale.io,.tailscale.io,100.64.0.0/10"
+    # 动态探测 tailnet MagicDNSSuffix (tailscale status --json) 例: tail69c12a.ts.net
+    if command -v tailscale >/dev/null 2>&1; then
+        local ts_suffix
+        ts_suffix=$(tailscale status --json 2>/dev/null | grep -o '"MagicDNSSuffix"[^"]*"[^"]*"' | sed -E 's/.*"MagicDNSSuffix" *: *"([^"]+)"/\1/' | head -n1 || true)
+        if [ -z "$ts_suffix" ]; then
+            ts_suffix=$(tailscale status 2>/dev/null | grep -o 'tail[0-9a-f]*\.ts\.net' | head -n1 || true)
+        fi
+        if [ -n "$ts_suffix" ]; then
+            case ",$no_proxy_addr," in
+                *",$ts_suffix,"*) :;;
+                *) no_proxy_addr="$no_proxy_addr,$ts_suffix" ;;
+            esac
+        fi
+    fi
+    # 若内核未运行且上一次系统代理仍残留，避免设置一个不可达 127.0.0.1:PORT 导致 curl 直接报错
+    systemctl --user is-active "$BIN_KERNEL_NAME" >/dev/null 2>&1 || {
+        # 不直接退出函数，先清除遗留变量以便后续 clashon 再次设定
+        unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY all_proxy ALL_PROXY
+        export no_proxy=$no_proxy_addr NO_PROXY=$no_proxy_addr
+        return 0
+    }
 
     # Idempotency / jitter reduction: avoid re-applying unchanged settings which can
     # trigger desktop-wide NET::ERR_NETWORK_CHANGED events (especially in Electron / Chrome).
@@ -86,7 +107,10 @@ _set_system_proxy() {
         gsettings set org.gnome.system.proxy.socks port "${MIXED_PORT}" 2>/dev/null || true
         # 扩展内网免代理列表，避免本地/局域网走代理
     # 追加 tailscale 相关直连域 / 网段
-    gsettings set org.gnome.system.proxy ignore-hosts "['localhost', '127.0.0.0/8', '::1', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '*.ts.net', 'ts.net', '*.tailscale.io', 'tailscale.io', '100.64.0.0/10']" 2>/dev/null || true
+    # 追加 tailscale 相关直连域 / 网段; GNOME 不支持 * 通配符，这里使用基础域 /8 ~ /16 & 具体后缀
+    local g_ignore="['localhost', '127.0.0.0/8', '::1', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', 'ts.net', 'tailscale.io', '100.64.0.0/10'"; \
+    if [ -n "${ts_suffix:-}" ]; then g_ignore="$g_ignore, '$ts_suffix'"; fi; g_ignore="$g_ignore]"; \
+    gsettings set org.gnome.system.proxy ignore-hosts "$g_ignore" 2>/dev/null || true
     fi
 
     # Set KDE proxy settings (for KDE applications)
