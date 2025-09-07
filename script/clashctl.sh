@@ -27,7 +27,12 @@ _set_system_proxy() {
     # 基础直连免代理列表 (扩展 Tailscale / Funnel 域 & 100.64.0.0/10 内网网段，避免干扰 tailnet 访问)
     # 说明: curl / 浏览器 在设置 http_proxy 后，会对所有域名走代理；加入 *.ts.net 可确保 tailnet 解析 / 访问直接走 Tailscale 接口
     #      100.64.0.0/10 属于 Tailscale CGNAT 地址空间；tailscale.io 及 ts.net 控制面 / funnel 子域避免代理分层导致握手异常。
-    local no_proxy_addr="localhost,127.0.0.1,::1,ts.net,.ts.net,tailscale.io,.tailscale.io,100.64.0.0/10"
+    # 初始 no_proxy 列表
+    # 说明:
+    #  1) 同时包含 "ts.net" 与 ".ts.net" 以兼容不同实现对前导点匹配语义 (某些实现只有前导点才匹配子域)
+    #  2) tailscale MagicDNS 解析 & Funnel 域 统一走直连, 避免被 http_proxy 劫持到本地 127.0.0.1:PORT 造成连接失败
+    #  3) 加入 100.100.100.100 (Tailscale 内部 DNS) 及 100.64.0.0/10 CGNAT 地址空间; 虽然多数工具不支持 CIDR 匹配, 但保留不影响
+    local no_proxy_addr="localhost,127.0.0.1,::1,ts.net,.ts.net,tailscale.io,.tailscale.io,100.100.100.100,100.64.0.0/10"
     # 动态探测 tailnet MagicDNSSuffix (tailscale status --json) 例: tail69c12a.ts.net
     if command -v tailscale >/dev/null 2>&1; then
         local ts_suffix
@@ -36,10 +41,13 @@ _set_system_proxy() {
             ts_suffix=$(tailscale status 2>/dev/null | grep -o 'tail[0-9a-f]*\.ts\.net' | head -n1 || true)
         fi
         if [ -n "$ts_suffix" ]; then
-            case ",$no_proxy_addr," in
-                *",$ts_suffix,"*) :;;
-                *) no_proxy_addr="$no_proxy_addr,$ts_suffix" ;;
-            esac
+            # 为确保 synologynas923.${ts_suffix} 等多级子域在不同实现下都能匹配, 同时追加裸后缀与点前缀版本
+            for _p in "$ts_suffix" ".$ts_suffix"; do
+                case ",$no_proxy_addr," in
+                    *",$_p,"*) :;;
+                    *) no_proxy_addr="$no_proxy_addr,$_p" ;;
+                esac
+            done
         fi
     fi
     # 若内核未运行且上一次系统代理仍残留，避免设置一个不可达 127.0.0.1:PORT 导致 curl 直接报错
@@ -108,8 +116,8 @@ _set_system_proxy() {
         # 扩展内网免代理列表，避免本地/局域网走代理
     # 追加 tailscale 相关直连域 / 网段
     # 追加 tailscale 相关直连域 / 网段; GNOME 不支持 * 通配符，这里使用基础域 /8 ~ /16 & 具体后缀
-    local g_ignore="['localhost', '127.0.0.0/8', '::1', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', 'ts.net', 'tailscale.io', '100.64.0.0/10'"; \
-    if [ -n "${ts_suffix:-}" ]; then g_ignore="$g_ignore, '$ts_suffix'"; fi; g_ignore="$g_ignore]"; \
+    local g_ignore="['localhost', '127.0.0.0/8', '::1', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', 'ts.net', '.ts.net', 'tailscale.io', '.tailscale.io', '100.100.100.100', '100.64.0.0/10'"; \
+    if [ -n "${ts_suffix:-}" ]; then g_ignore="$g_ignore, '$ts_suffix', '.${ts_suffix}'"; fi; g_ignore="$g_ignore]"; \
     gsettings set org.gnome.system.proxy ignore-hosts "$g_ignore" 2>/dev/null || true
     fi
 

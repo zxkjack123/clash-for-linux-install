@@ -109,6 +109,7 @@ rules:
   # Tailscale / Funnel / Tailnet 优先直连，避免走代理导致 127.0.0.1:7890 回环失败或出口劫持
   - DOMAIN-SUFFIX,ts.net,DIRECT
   - DOMAIN-SUFFIX,tailscale.io,DIRECT
+  - IP-CIDR,100.100.100.100/32,DIRECT,no-resolve # Tailscale 内部 DNS 服务器直连
   - IP-CIDR,100.64.0.0/10,DIRECT,no-resolve
   # 基础 DNS 公共递归直连，避免走失效代理节点产生循环
   - IP-CIDR,1.1.1.1/32,DIRECT,no-resolve
