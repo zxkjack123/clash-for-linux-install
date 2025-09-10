@@ -45,13 +45,13 @@ cd vpn-tools
 
 ### 🎯 工具分类
 
-| 类别         | 工具                           | 用途                    | 耗时    |
-| ------------ | ------------------------------ | ----------------------- | ------- |
-| **🐳 Docker** | `test_docker_proxy.sh`         | Docker 容器代理连接测试 | 2-3分钟 |
-| **AI 优化**  | `optimize_ai.sh`               | ChatGPT/Claude 快速优化 | 2-3分钟 |
-| **流媒体**   | `select_youtube_node.sh` / `fix_zoom_connectivity.sh` | YouTube/Zoom 诊断优化 | 3-5分钟 |
-| **网络测试** | `network_connectivity_test.sh` | 全面连通性测试          | 5-8分钟 |
-| **状态检查** | `quick_vpn_check.sh`           | 快速状态检查            | 30秒    |
+| 类别         | 工具                                                  | 用途                    | 耗时    |
+| ------------ | ----------------------------------------------------- | ----------------------- | ------- |
+| **🐳 Docker** | `test_docker_proxy.sh`                                | Docker 容器代理连接测试 | 2-3分钟 |
+| **AI 优化**  | `optimize_ai.sh`                                      | ChatGPT/Claude 快速优化 | 2-3分钟 |
+| **流媒体**   | `select_youtube_node.sh` / `fix_zoom_connectivity.sh` | YouTube/Zoom 诊断优化   | 3-5分钟 |
+| **网络测试** | `network_connectivity_test.sh`                        | 全面连通性测试          | 5-8分钟 |
+| **状态检查** | `quick_vpn_check.sh`                                  | 快速状态检查            | 30秒    |
 
 ### 📁 文件结构
 ```

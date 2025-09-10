@@ -106,12 +106,12 @@ cd vpn-tools
 
 ## 📊 Performance Expectations
 
-| Category | Excellent | Good | Needs Fix |
-|----------|-----------|------|-----------|
-| **Chinese Sites** | 100%, <200ms | 100%, <500ms | <100%, >500ms |
+| Category          | Excellent      | Good           | Needs Fix      |
+| ----------------- | -------------- | -------------- | -------------- |
+| **Chinese Sites** | 100%, <200ms   | 100%, <500ms   | <100%, >500ms  |
 | **International** | >90% via proxy | >80% via proxy | <80% via proxy |
-| **AI Services** | >90%, <5s | >70%, <10s | <70%, >10s |
-| **Streaming** | YouTube <3s | YouTube <6s | YouTube >6s |
+| **AI Services**   | >90%, <5s      | >70%, <10s     | <70%, >10s     |
+| **Streaming**     | YouTube <3s    | YouTube <6s    | YouTube >6s    |
 
 ## 🛡️ Important Notes
 
