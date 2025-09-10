@@ -86,7 +86,7 @@ dns:
     geoip-code: CN
     geosite: [gfw]
     ipcidr: [240.0.0.0/4]
-    domain: [+.google.com, +.facebook.com, +.youtube.com]
+  domain: [+.google.com, +.facebook.com, +.youtube.com, +.zoom.us]
   fake-ip-filter:
     - api.individual.githubcopilot.com
     - "*.github.com"
@@ -101,6 +101,11 @@ dns:
     - "*.openai.com"
     - "claude.ai"
     - "*.claude.ai"
+  # Zoom Web/Client 对 Fake-IP 敏感，强制真实 IP 解析
+  - "*.zoom.us"
+  - "zoom.us"
+  - "*.zoomcdn.net"
+  - "zoomcdn.net"
 # 规则删除/替换策略: 若后续需要移除订阅里对 1.1.1.1 / 8.8.8.8 的 IP-CIDR 强制代理, 可追加 rules:
 # rules: （下方已增加部分高优先级规则）
 #   - 'DOMAIN-SUFFIX,example.com,DIRECT'
@@ -125,6 +130,9 @@ rules:
   # 面板公网 IP 检测
   - DOMAIN,api64.ipify.org,DIRECT
   # Streaming 专组
+  - DOMAIN-SUFFIX,zoom.us,Streaming
+  - DOMAIN-KEYWORD,zoom,Streaming
+  - DOMAIN-SUFFIX,zoomcdn.net,Streaming
   - DOMAIN-SUFFIX,youtube.com,Streaming
   - DOMAIN-SUFFIX,youtu.be,Streaming
   - DOMAIN-SUFFIX,googlevideo.com,Streaming
