@@ -38,11 +38,12 @@ cd vpn-tools
 - **`customize_ai_group.sh`** - Interactive AI management
 - **`quick_ai_test.sh`** - Instant AI verification (30s)
 
-### 🎬 Streaming Optimization (4 tools)
+### 🎬 Streaming Optimization (5 tools)
 - **`select_youtube_node.sh`** - Quick YouTube optimization (3-5 min)
 - **`optimize_youtube_streaming.sh`** - Full streaming optimization (10-15 min)
 - **`streaming_manager.sh`** - Interactive streaming management
 - **`quick_streaming_test.sh`** - Instant streaming verification (30s)
+ - **`fix_zoom_connectivity.sh`** - One-click Zoom diagnose/repair (auto DNS check, node switch)
 
 ### 🌐 Network Testing (3 tools)
 - **`network_connectivity_test.sh`** - Comprehensive network test (5-8 min)
@@ -81,7 +82,8 @@ cd vpn-tools
 ./quick_vpn_check.sh                    # 1. Quick diagnosis
 ./network_connectivity_test.sh quick    # 2. Detailed check
 ./optimize_ai.sh                        # 3. Fix AI issues
-./select_youtube_node.sh                # 4. Fix streaming
+./select_youtube_node.sh                # 4. Fix YouTube streaming
+./fix_zoom_connectivity.sh              # 5. Fix Zoom connectivity
 ./network_connectivity_test.sh full     # 5. Final verification
 ```
 
@@ -99,6 +101,7 @@ cd vpn-tools
 ./streaming_manager.sh us      # US content (Netflix US)
 ./streaming_manager.sh hk      # Asian content (faster for China)
 ./streaming_manager.sh jp      # Japanese content (anime)
+./fix_zoom_connectivity.sh https://us05web.zoom.us/j/xxxxxxxx   # direct meeting check
 ```
 
 ## 📊 Performance Expectations

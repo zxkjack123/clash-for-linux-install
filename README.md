@@ -49,7 +49,7 @@ cd vpn-tools
 | ------------ | ------------------------------ | ----------------------- | ------- |
 | **🐳 Docker** | `test_docker_proxy.sh`         | Docker 容器代理连接测试 | 2-3分钟 |
 | **AI 优化**  | `optimize_ai.sh`               | ChatGPT/Claude 快速优化 | 2-3分钟 |
-| **流媒体**   | `select_youtube_node.sh`       | YouTube 快速优化        | 3-5分钟 |
+| **流媒体**   | `select_youtube_node.sh` / `fix_zoom_connectivity.sh` | YouTube/Zoom 诊断优化 | 3-5分钟 |
 | **网络测试** | `network_connectivity_test.sh` | 全面连通性测试          | 5-8分钟 |
 | **状态检查** | `quick_vpn_check.sh`           | 快速状态检查            | 30秒    |
 
@@ -63,6 +63,7 @@ vpn-tools/
 ├── network_connectivity_test.sh   # 网络连通性测试
 ├── quick_vpn_check.sh             # 快速状态检查
 ├── streaming_manager.sh           # 流媒体管理器
+├── fix_zoom_connectivity.sh       # Zoom 诊断/修复
 ├── test_ai_connectivity.sh        # 全面AI测试
 ├── TESTING_TOOLS_GUIDE.md         # 完整使用指南
 ├── QUICK_REFERENCE.md             # 快速参考
