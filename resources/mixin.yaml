@@ -127,6 +127,67 @@ rules:
   - DOMAIN-KEYWORD,github,Development
   - DOMAIN-SUFFIX,vscode-cdn.net,Development
   - DOMAIN-SUFFIX,trafficmanager.net,Development
+  # 开发者常用代码托管与资源
+  - DOMAIN-SUFFIX,gitlab.com,Development
+  - DOMAIN-SUFFIX,stackoverflow.com,Development
+  - DOMAIN-SUFFIX,stackexchange.com,Development
+  - DOMAIN-SUFFIX,npmjs.com,Development
+  - DOMAIN-SUFFIX,registry.npmjs.org,Development
+  - DOMAIN-SUFFIX,pypi.org,Development
+  - DOMAIN-SUFFIX,files.pythonhosted.org,Development
+  - DOMAIN-SUFFIX,crates.io,Development
+  - DOMAIN-SUFFIX,static.crates.io,Development
+  - DOMAIN-SUFFIX,rustup.rs,Development
+  - DOMAIN-SUFFIX,go.dev,Development
+  - DOMAIN-SUFFIX,golang.org,Development
+  - DOMAIN-SUFFIX,proxy.golang.org,Development
+  - DOMAIN-SUFFIX,registry-1.docker.io,Development
+  - DOMAIN-SUFFIX,auth.docker.io,Development
+  - DOMAIN-SUFFIX,production.cloudflare.docker.com,Development
+  - DOMAIN-SUFFIX,ghcr.io,Development
+  - DOMAIN-SUFFIX,quay.io,Development
+  - DOMAIN-SUFFIX,registry.k8s.io,Development
+  # 国内镜像与代码托管直连
+  - DOMAIN-SUFFIX,gitee.com,DIRECT
+  - DOMAIN-SUFFIX,goproxy.cn,DIRECT
+  - DOMAIN-SUFFIX,mirrors.tuna.tsinghua.edu.cn,DIRECT
+  - DOMAIN-SUFFIX,mirrors.ustc.edu.cn,DIRECT
+  - DOMAIN-SUFFIX,mirrors.aliyun.com,DIRECT
+  - DOMAIN-SUFFIX,developer.aliyun.com,DIRECT
+  - DOMAIN-SUFFIX,aliyun.com,DIRECT
+  - DOMAIN-SUFFIX,cloud.tencent.com,DIRECT
+  - DOMAIN-SUFFIX,huaweicloud.com,DIRECT
+  # 会议与协作类
+  - DOMAIN-SUFFIX,zoom.us,Streaming
+  - DOMAIN-KEYWORD,zoom,Streaming
+  - DOMAIN-SUFFIX,zoomcdn.net,Streaming
+  - DOMAIN-SUFFIX,teams.microsoft.com,Development
+  - DOMAIN-SUFFIX,meet.google.com,Development
+  # 学术/科研国际站点（经常需代理）
+  - DOMAIN-SUFFIX,arxiv.org,Development
+  - DOMAIN-SUFFIX,semanticscholar.org,Development
+  - DOMAIN-SUFFIX,sciencedirect.com,Development
+  - DOMAIN-SUFFIX,springer.com,Development
+  - DOMAIN-SUFFIX,nature.com,Development
+  - DOMAIN-SUFFIX,science.org,Development
+  - DOMAIN-SUFFIX,ieee.org,Development
+  - DOMAIN-SUFFIX,acm.org,Development
+  # 学术/科研国内站点直连
+  - DOMAIN-SUFFIX,cnki.net,DIRECT
+  - DOMAIN-SUFFIX,wanfangdata.com.cn,DIRECT
+  - DOMAIN-SUFFIX,cqvip.com,DIRECT
+  - DOMAIN-SUFFIX,aminer.cn,DIRECT
+  # 常用中文站直连
+  - DOMAIN-SUFFIX,baidu.com,DIRECT
+  - DOMAIN-SUFFIX,zhihu.com,DIRECT
+  - DOMAIN-SUFFIX,bilibili.com,DIRECT
+  - DOMAIN-SUFFIX,csdn.net,DIRECT
+  # AI/模型站点
+  - DOMAIN-SUFFIX,huggingface.co,AI
+  - DOMAIN-SUFFIX,hf.co,AI
+  - DOMAIN-SUFFIX,modelscope.cn,DIRECT
+  - DOMAIN-SUFFIX,openxlab.org.cn,DIRECT
+  - DOMAIN-SUFFIX,kaggle.com,Development
   # 面板公网 IP 检测
   - DOMAIN,api64.ipify.org,DIRECT
   # Streaming 专组

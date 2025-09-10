@@ -29,7 +29,7 @@ check_basics() {
 
 scripts_ai=(optimize_ai.sh optimize_ai_enhanced.sh test_ai_connectivity.sh test_braintrust_connectivity.sh customize_ai_group.sh quick_ai_test.sh test_ai_nodes.sh test_ai_simple.sh)
 scripts_stream=(select_youtube_node.sh optimize_youtube_streaming.sh streaming_manager.sh quick_streaming_test.sh fix_zoom_connectivity.sh)
-scripts_net=(quick_vpn_check.sh network_connectivity_test.sh proxy_connectivity_report.sh show_vpn_status.sh test_docker_proxy.sh restart_clash_service.sh)
+scripts_net=(quick_vpn_check.sh network_connectivity_test.sh proxy_connectivity_report.sh show_vpn_status.sh test_docker_proxy.sh restart_clash_service.sh quick_dev_research_test.sh)
 scripts_cn=(fix_openxlab_connectivity.sh quick_openxlab_access.sh test_chinese_ai_platforms.sh test_openxlab_direct_rules.sh)
 
 run_script() {
