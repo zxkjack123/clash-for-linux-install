@@ -193,9 +193,23 @@ function clashon() {
 }
 
 watch_proxy() {
-    [ -z "$http_proxy" ] && [[ $- == *i* ]] && {
-        clashproxy status >&/dev/null && clashon
-    }
+    # Auto-heal proxy env in new interactive shells. If http_proxy is missing or
+    # points to a stale port (e.g., old 6209), refresh to current MIXED_PORT.
+    [[ $- == *i* ]] || return 0
+    # Ensure kernel is up (optional best-effort) and get current expected port
+    _get_proxy_port
+    local auth=$("$BIN_YQ" '.authentication[0] // ""' "$CLASH_CONFIG_RUNTIME")
+    [ -n "$auth" ] && auth=$auth@
+    local expect_http="http://${auth}127.0.0.1:${MIXED_PORT}"
+    # If no kernel yet, defer to clashon path later
+    if [ -z "$http_proxy" ] || [ "${http_proxy#*@}" != "${expect_http#*@}" ]; then
+        # Only attempt if service running; else start it.
+        if systemctl --user is-active "$BIN_KERNEL_NAME" >/dev/null 2>&1; then
+            _set_system_proxy
+        else
+            clashon >/dev/null 2>&1 || true
+        fi
+    fi
 }
 
 function clashoff() {
