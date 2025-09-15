@@ -1,22 +1,19 @@
 #############################################
-# mixin.yaml (re-written clean structure)
+# mixin.yaml (clean structure)
 # 目的:
-#  1. 仅覆盖需要的 proxy-groups 与精简 DNS, 避免原文件多次 "name:" 顶级键导致 YAML 失效
-#  2. 不自动测速; 由脚本 auto_optimize_clash.sh 注入 / 维护 AUTO-SMART 列表
-#  3. 避免 1.1.1.1 / 8.8.8.8 在网络受限场景造成循环失败; 后续稳定后可再加入
-# 使用: 修改后执行(人工): clashon 或 clashctl mixin -e 保存后自动合并
+#  1. 仅覆盖需要的 proxy-groups 与精简 DNS
+#  2. 保持手动选择, 避免启动并发测速
+#  3. 新增 qdai.scnet.cn 解析与路由修复
 #############################################
 
 proxy-groups:
   - name: 自动选择
-    # 覆盖订阅里的同名 url-test 分组，改为 select 避免启动并发测速
     type: select
     proxies:
       - AUTO-SMART
       - V1-香港01
       - DIRECT
   - name: 故障转移
-    # 覆盖订阅里的同名 fallback 分组，改为 select 手动控制
     type: select
     proxies:
       - AUTO-SMART
@@ -28,23 +25,39 @@ proxy-groups:
       - AUTO-SMART
       - V1-香港01
   - name: AUTO-SMART
-    # 初始保持 select, 避免 mihomo 启动时并发测速; 脚本可在确认列表后改为 url-test
-    type: select
+    type: url-test
     proxies:
-      - V1-越南05|GPT
-      - V1-越南03|GPT
-      - V1-印尼01
-      - V1-越南06|GPT
+      - V1-日本01|流媒体|GPT
       - V1-日本02|流媒体|GPT
-      - V2-香港07
-      - V1-越南01|GPT
       - V1-日本03|流媒体|GPT
+      - V1-日本04|流媒体|GPT
+      - V1-香港01
+      - V1-香港02
+      - V1-香港03
+      - V1-香港04
+      - V2-香港07
+      - V1-新加坡01|流媒体|GPT
+      - V1-新加坡02|流媒体|GPT
+      - V1-新加坡03|流媒体|GPT
+      - V1-新加坡04|流媒体|GPT
+      - V2-新加坡05|流媒体|GPT
+      - V2-新加坡06|流媒体|GPT
+      - V1-韩国01
+      - V1-韩国02
+      - V2-韩国03
+      - V2-韩国04
+      - "V1-台湾省01|流媒体|GPT"
+    url: https://www.gstatic.com/generate_204
+    interval: 300
+    tolerance: 50
   - name: AI
     type: select
     proxies:
       - V1-美国01|流媒体|GPT
       - V1-美国02|流媒体|GPT
       - V1-美国03|流媒体|GPT
+      - V1-新加坡01|流媒体|GPT
+      - V1-日本01|流媒体|GPT
   - name: Development
     type: select
     proxies:
@@ -69,8 +82,8 @@ proxy-groups:
       - V1-香港02
       - V1-日本01|流媒体|GPT
       - V1-韩国01
+
 dns:
-  # 仅在需要覆盖的字段写入; 其余保持订阅原值(merge 后存在则按 mixin 优先)
   enable: true
   ipv6: false
   nameserver:
@@ -78,7 +91,6 @@ dns:
     - 119.29.29.29
     - 114.114.114.114
   fallback:
-    # 仅使用国内可达 DoH 作为补充, 强制移除 1.1.1.1 / 8.8.8.8 避免循环
     - https://223.5.5.5/dns-query
     - https://120.53.53.53/dns-query
   fallback-filter:
@@ -87,6 +99,10 @@ dns:
     geosite: [gfw]
     ipcidr: [240.0.0.0/4]
   domain: [+.google.com, +.facebook.com, +.youtube.com, +.zoom.us]
+  nameserver-policy:
+    "+.qdai.scnet.cn":
+      - https://1.1.1.1/dns-query
+      - https://dns.google/dns-query
   fake-ip-filter:
     - api.individual.githubcopilot.com
     - "*.github.com"
@@ -101,25 +117,25 @@ dns:
     - "*.openai.com"
     - "claude.ai"
     - "*.claude.ai"
-  # Zoom Web/Client 对 Fake-IP 敏感，强制真实 IP 解析
-  - "*.zoom.us"
-  - "zoom.us"
-  - "*.zoomcdn.net"
-  - "zoomcdn.net"
-# 规则删除/替换策略: 若后续需要移除订阅里对 1.1.1.1 / 8.8.8.8 的 IP-CIDR 强制代理, 可追加 rules:
-# rules: （下方已增加部分高优先级规则）
-#   - 'DOMAIN-SUFFIX,example.com,DIRECT'
+    - "*.qdai.scnet.cn"
+    - "*.zoom.us"
+    - "zoom.us"
+    - "*.zoomcdn.net"
+    - "zoomcdn.net"
 
+# 如需额外规则覆盖可继续添加 rules: 键; 这里新增 QDAI 修复与常用开发/AI/会议规则
 rules:
-  # Tailscale / Funnel / Tailnet 优先直连，避免走代理导致 127.0.0.1:7890 回环失败或出口劫持
+  # QDAI 临时子域解析 / 访问修复 (必须放在 DOMAIN-SUFFIX,cn,DIRECT 之前)
+  - DOMAIN,c-1966322474660876290.qdai.scnet.cn,AI
+  - DOMAIN-SUFFIX,qdai.scnet.cn,AI
+  # Tailscale / Funnel
   - DOMAIN-SUFFIX,ts.net,DIRECT
   - DOMAIN-SUFFIX,tailscale.io,DIRECT
-  - IP-CIDR,100.100.100.100/32,DIRECT,no-resolve # Tailscale 内部 DNS 服务器直连
+  - IP-CIDR,100.100.100.100/32,DIRECT,no-resolve
   - IP-CIDR,100.64.0.0/10,DIRECT,no-resolve
-  # 基础 DNS 公共递归直连，避免走失效代理节点产生循环
   - IP-CIDR,1.1.1.1/32,DIRECT,no-resolve
   - IP-CIDR,8.8.8.8/32,DIRECT,no-resolve
-  # GitHub / Copilot / VSCode 相关流量指向 Development (含 AUTO-SMART)
+  # GitHub / Dev
   - DOMAIN,api.individual.githubcopilot.com,Development
   - DOMAIN-SUFFIX,githubcopilot.com,Development
   - DOMAIN-SUFFIX,githubusercontent.com,Development
@@ -127,7 +143,6 @@ rules:
   - DOMAIN-KEYWORD,github,Development
   - DOMAIN-SUFFIX,vscode-cdn.net,Development
   - DOMAIN-SUFFIX,trafficmanager.net,Development
-  # 开发者常用代码托管与资源
   - DOMAIN-SUFFIX,gitlab.com,Development
   - DOMAIN-SUFFIX,stackoverflow.com,Development
   - DOMAIN-SUFFIX,stackexchange.com,Development
@@ -147,7 +162,7 @@ rules:
   - DOMAIN-SUFFIX,ghcr.io,Development
   - DOMAIN-SUFFIX,quay.io,Development
   - DOMAIN-SUFFIX,registry.k8s.io,Development
-  # 国内镜像与代码托管直连
+  # 国内镜像直连
   - DOMAIN-SUFFIX,gitee.com,DIRECT
   - DOMAIN-SUFFIX,goproxy.cn,DIRECT
   - DOMAIN-SUFFIX,mirrors.tuna.tsinghua.edu.cn,DIRECT
@@ -157,44 +172,18 @@ rules:
   - DOMAIN-SUFFIX,aliyun.com,DIRECT
   - DOMAIN-SUFFIX,cloud.tencent.com,DIRECT
   - DOMAIN-SUFFIX,huaweicloud.com,DIRECT
-  # 会议与协作类
-  - DOMAIN-SUFFIX,zoom.us,Streaming
-  - DOMAIN-KEYWORD,zoom,Streaming
-  - DOMAIN-SUFFIX,zoomcdn.net,Streaming
-  - DOMAIN-SUFFIX,teams.microsoft.com,Development
-  - DOMAIN-SUFFIX,meet.google.com,Development
-  # 学术/科研国际站点（经常需代理）
-  - DOMAIN-SUFFIX,arxiv.org,Development
-  - DOMAIN-SUFFIX,semanticscholar.org,Development
-  - DOMAIN-SUFFIX,sciencedirect.com,Development
-  - DOMAIN-SUFFIX,springer.com,Development
-  - DOMAIN-SUFFIX,nature.com,Development
-  - DOMAIN-SUFFIX,science.org,Development
-  - DOMAIN-SUFFIX,ieee.org,Development
-  - DOMAIN-SUFFIX,acm.org,Development
-  # 学术/科研国内站点直连
-  - DOMAIN-SUFFIX,cnki.net,DIRECT
-  - DOMAIN-SUFFIX,wanfangdata.com.cn,DIRECT
-  - DOMAIN-SUFFIX,cqvip.com,DIRECT
-  - DOMAIN-SUFFIX,aminer.cn,DIRECT
-  # 常用中文站直连
-  - DOMAIN-SUFFIX,baidu.com,DIRECT
-  - DOMAIN-SUFFIX,zhihu.com,DIRECT
-  - DOMAIN-SUFFIX,bilibili.com,DIRECT
-  - DOMAIN-SUFFIX,csdn.net,DIRECT
-  # AI/模型站点
-  - DOMAIN-SUFFIX,huggingface.co,AI
-  - DOMAIN-SUFFIX,hf.co,AI
-  - DOMAIN-SUFFIX,modelscope.cn,DIRECT
-  - DOMAIN-SUFFIX,openxlab.org.cn,DIRECT
-  - DOMAIN-SUFFIX,kaggle.com,Development
-  # 面板公网 IP 检测
-  - DOMAIN,api64.ipify.org,DIRECT
-  # Streaming 专组
+  # 会议/Streaming
   - DOMAIN-SUFFIX,zoom.us,Streaming
   - DOMAIN-KEYWORD,zoom,Streaming
   - DOMAIN-SUFFIX,zoomcdn.net,Streaming
   - DOMAIN-SUFFIX,youtube.com,Streaming
   - DOMAIN-SUFFIX,youtu.be,Streaming
   - DOMAIN-SUFFIX,googlevideo.com,Streaming
-  # 其余规则保持订阅原逻辑
+  # AI / 模型
+  - DOMAIN-SUFFIX,huggingface.co,AI
+  - DOMAIN-SUFFIX,hf.co,AI
+  - DOMAIN-SUFFIX,modelscope.cn,DIRECT
+  - DOMAIN-SUFFIX,openxlab.org.cn,DIRECT
+  - DOMAIN-SUFFIX,kaggle.com,Development
+  # 公网 IP 检测
+  - DOMAIN,api64.ipify.org,DIRECT
