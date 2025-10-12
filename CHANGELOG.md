@@ -2,6 +2,51 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.0] - 2025-10-13
+
+### 🔒 Security & Configuration Enhancement
+
+#### ✨ 新增功能
+- **环境变量配置系统** - 实现统一的 `.env` 配置管理
+  - 创建 `vpn-tools/load_env.sh` - 自动加载环境变量模块
+  - 支持递归查找 `.env` 文件，自动导出配置
+  - 包含错误处理和详细日志功能
+
+- **API Key 安全管理**
+  - 创建 `.env.example` 配置模板（包含详细注释）
+  - 新增 `ENV_CONFIG_GUIDE.md` - 完整的环境变量配置指南
+  - 更新 `SECURITY.md` - API key 安全管理最佳实践
+
+#### 🔧 优化改进
+- **脚本配置加载升级**
+  - `network_health_monitor.sh` - 集成 `.env` 自动加载
+  - `network_dashboard.sh` - 集成 `.env` 自动加载
+  - `optimize_all_network.sh` - 集成 `.env` 自动加载
+  - 所有监控脚本现在从环境变量读取配置，不再硬编码
+
+- **Git 安全保护增强**
+  - 更新 `.gitignore` 忽略所有敏感配置文件
+  - 添加 `.env`, `*_api_keys.conf`, `*_secrets.conf`, `*.key`, `*.pem` 等
+  - `.env` 文件权限自动设置为 600（仅所有者可读写）
+
+#### 🐛 Bug 修复
+- 移除 `AI_SERVICES_UPDATE.md` 中硬编码的 API key
+- 改为从环境变量 `SILICONFLOW_API_KEY` 读取
+- 清理历史代码中的敏感信息泄露
+
+#### 📚 文档更新
+- 新增 `ENV_CONFIG_GUIDE.md` - 环境变量配置完整指南
+- 更新 `.env.example` - 详细的配置模板和使用说明
+- 优化表格格式，提升文档可读性
+
+#### 🔐 安全提升
+- API keys 不再硬编码在代码中
+- 敏感配置文件受 `.gitignore` 保护
+- 完整的安全配置文档和最佳实践
+- 支持多种配置方式（.env文件、环境变量、系统配置）
+
+---
+
 ## [2.0.0] - 2025-10-13
 
 ### 🎉 Major Release - 网络监控系统全面升级

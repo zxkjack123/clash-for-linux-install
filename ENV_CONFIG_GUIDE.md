@@ -38,10 +38,10 @@ echo "API Key: ${SILICONFLOW_API_KEY:0:20}..."
 
 ### API Keys
 
-| 配置项 | 说明 | 是否必需 | 获取地址 |
-|--------|------|----------|----------|
-| `SILICONFLOW_API_KEY` | 硅基流动 API 密钥 | 可选 | https://cloud.siliconflow.cn/account/ak |
-| `UIUI_API_KEY` | UIUI API 密钥 | 可选 | https://sg.uiuiapi.com |
+| 配置项                | 说明              | 是否必需 | 获取地址                                |
+| --------------------- | ----------------- | -------- | --------------------------------------- |
+| `SILICONFLOW_API_KEY` | 硅基流动 API 密钥 | 可选     | https://cloud.siliconflow.cn/account/ak |
+| `UIUI_API_KEY`        | UIUI API 密钥     | 可选     | https://sg.uiuiapi.com                  |
 
 **注意**: 
 - 这些 API keys 仅用于测试服务连接性
@@ -49,23 +49,23 @@ echo "API Key: ${SILICONFLOW_API_KEY:0:20}..."
 
 ### Clash 配置
 
-| 配置项 | 默认值 | 说明 |
-|--------|--------|------|
-| `CLASH_API` | `http://127.0.0.1:9090` | Clash API 地址 |
-| `API_SECRET` | (空) | Clash API 认证密钥 |
-| `PROXY` | `http://127.0.0.1:7890` | HTTP 代理地址 |
+| 配置项       | 默认值                  | 说明               |
+| ------------ | ----------------------- | ------------------ |
+| `CLASH_API`  | `http://127.0.0.1:9090` | Clash API 地址     |
+| `API_SECRET` | (空)                    | Clash API 认证密钥 |
+| `PROXY`      | `http://127.0.0.1:7890` | HTTP 代理地址      |
 
 ### 通知配置
 
-| 配置项 | 说明 |
-|--------|------|
-| `WEBHOOK_URL` | Webhook 通知地址（网络异常时发送） |
-| `EMAIL_TO` | 告警邮件接收地址 |
-| `EMAIL_FROM` | 告警邮件发件地址 |
-| `SMTP_SERVER` | SMTP 服务器地址 |
-| `SMTP_PORT` | SMTP 服务器端口 |
-| `SMTP_USER` | SMTP 用户名 |
-| `SMTP_PASSWORD` | SMTP 密码 |
+| 配置项          | 说明                               |
+| --------------- | ---------------------------------- |
+| `WEBHOOK_URL`   | Webhook 通知地址（网络异常时发送） |
+| `EMAIL_TO`      | 告警邮件接收地址                   |
+| `EMAIL_FROM`    | 告警邮件发件地址                   |
+| `SMTP_SERVER`   | SMTP 服务器地址                    |
+| `SMTP_PORT`     | SMTP 服务器端口                    |
+| `SMTP_USER`     | SMTP 用户名                        |
+| `SMTP_PASSWORD` | SMTP 密码                          |
 
 ---
 
