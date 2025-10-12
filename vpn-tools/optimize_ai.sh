@@ -1,17 +1,20 @@
 #!/bin/bash
 
+#!/bin/bash
+
 # DESCRIPTION:
-#   Lightweight AI optimization: evaluates a shortlist of candidate nodes for the AI
-#   group using latency + success to OpenAI/Claude endpoints, selects best node.
+#   Lightweight AI optimization: evaluates a shortlist of candidate nodes for an AI-like
+#   selector group using latency + success to OpenAI/Claude endpoints, selects best node.
+#   Auto-detects a valid selector group when 'AI' is missing (prefers: 西瓜加速, GLOBAL, 自动选择).
 #   Faster (≈2-3 min) than full enhanced script.
 #
 # USAGE:
 #   ./optimize_ai.sh
 #   NODES="nodeA,nodeB" ./optimize_ai.sh   # custom candidate list
-#
+
 set -euo pipefail
 API=${CLASH_API:-http://127.0.0.1:9090}
-GROUP=AI
+PREF_GROUPS=("AI" "西瓜加速" "GLOBAL" "自动选择")
 have() { command -v "$1" >/dev/null 2>&1; }
 
 default_nodes=(
@@ -22,11 +25,64 @@ default_nodes=(
 	"V1-日本01|流媒体|GPT"
 )
 
-IFS=',' read -r -a candidates <<< "${NODES:-${default_nodes[*]}}"
-
 echo "=== Quick AI Optimization ($(date '+%F %T')) ==="
 if ! curl -fsS "$API/version" >/dev/null 2>&1; then
 	echo "Controller unreachable at $API" >&2; exit 1; fi
+
+# Select a valid selector group
+pick_group() {
+	local plist json have_jq=0 g
+	command -v jq >/dev/null 2>&1 && have_jq=1
+	json=$(curl -fsS "$API/proxies" 2>/dev/null || echo '{}')
+	if (( have_jq )); then
+		for g in "${PREF_GROUPS[@]}"; do
+			if echo "$json" | jq -e --arg k "$g" '.proxies[$k].type == "Selector"' >/dev/null 2>&1; then
+				echo "$g"; return 0; fi
+		done
+		# fallback: first selector key
+		echo "$json" | jq -r '.proxies | to_entries[] | select(.value.type=="Selector") | .key' | head -n1
+	else
+		# poor-man detection
+		for g in "${PREF_GROUPS[@]}"; do
+			echo "$json" | grep -q '"'"$g"'":{[^}]*"type":"Selector"' && { echo "$g"; return 0; }
+		done
+		echo "$json" | tr '\n' ' ' | sed 's/},/}\n/g' | grep '"type":"Selector"' | sed -n 's/.*"\([^"]\+\)":{.*"type":"Selector".*/\1/p' | head -n1
+	fi
+}
+
+GROUP=${GROUP:-}
+if [[ -z ${GROUP} ]]; then
+	GROUP=$(pick_group)
+fi
+if [[ -z ${GROUP} ]]; then echo "No selector group found via API; abort." >&2; exit 1; fi
+echo "Using group: $GROUP"
+
+# Build candidates list
+declare -a candidates
+if [[ -n ${NODES:-} ]]; then
+	IFS=',' read -r -a candidates <<< "$NODES"
+else
+	candidates=("${default_nodes[@]}")
+fi
+
+# Intersect candidates with group's available nodes
+group_json=$(curl -fsS "$API/proxies/$GROUP" 2>/dev/null || true)
+if [[ -z $group_json ]]; then echo "Cannot fetch group $GROUP" >&2; exit 1; fi
+available=()
+if have jq; then
+	mapfile -t available < <(echo "$group_json" | jq -r '.all[]' 2>/dev/null)
+else
+	available=($(echo "$group_json" | sed -n 's/.*"all":\[\(.*\)\].*/\1/p' | tr '"' '\n' | sed '/^$/d'))
+fi
+
+# Filter candidates to those present in available; if none match, fall back to first 8 available
+filtered=()
+for n in "${candidates[@]}"; do
+	printf '%s\n' "${available[@]}" | grep -Fxq "$n" && filtered+=("$n") || true
+done
+if (( ${#filtered[@]} == 0 )); then
+	filtered=(${available[@]:0:8})
+fi
 
 switch_node() { curl -s -X PUT "$API/proxies/$GROUP" -H 'Content-Type: application/json' -d '{"name":"'"$1"'"}' >/dev/null; }
 
@@ -46,7 +102,8 @@ test_platform() {
 
 best_node=""; best_score=-1
 
-for node in "${candidates[@]}"; do
+for node in "${filtered[@]}"; do
+	[[ -z "$node" ]] && continue
 	echo "\n🧪 Testing node: $node"
 	switch_node "$node"; sleep 2
 	mapfile -t results < <(
@@ -63,7 +120,7 @@ echo "\n🏆 Best node: $best_node (score $best_score)"
 if [[ -n $best_node ]]; then
 	switch_node "$best_node"; sleep 1
 	now=$(curl -s "$API/proxies/$GROUP" | sed -n 's/.*"now":"\([^"]*\)".*/\1/p')
-	echo "✅ Applied AI group node: $now"
+	echo "✅ Applied $GROUP group node: $now"
 else
 	echo "No suitable node found." >&2
 fi
