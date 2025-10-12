@@ -176,7 +176,13 @@ AI服务: 成功率 100% | 平均延迟 1651ms  ✅ 完美！
 
 ```bash
 check_siliconflow_api() {
-    local api_key="sk-avdenocgxjqjdpuqraipuoqhwnrevydosnprqtflabcxhkrj"
+    # 从环境变量或配置文件读取 API key
+    local api_key="${SILICONFLOW_API_KEY:-}"
+    if [[ -z "$api_key" ]]; then
+        echo "警告: 未配置 SILICONFLOW_API_KEY 环境变量"
+        return 1
+    fi
+    
     local url="https://api.siliconflow.cn/v1/models"
     
     local http_code=$(curl -s -o /dev/null -w '%{http_code}' \

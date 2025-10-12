@@ -19,3 +19,13 @@ trace*.txt
 guard_*.txt
 resources/mixin.yaml.bak-*
 /tmp/.clash_latency.*
+
+# 敏感信息配置文件
+.env
+.env.local
+.env.*.local
+*_api_keys.conf
+*_secrets.conf
+*.key
+*.pem
+*.p12
