@@ -9,6 +9,11 @@ BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PARENT_DIR="$(dirname "$BASE_DIR")"
 LOG_FILE="$HOME/.local/share/clash/logs/optimize_all_$(date +%Y%m%d_%H%M%S).log"
 
+# 加载环境变量配置（.env文件）
+if [[ -f "$BASE_DIR/load_env.sh" ]]; then
+    source "$BASE_DIR/load_env.sh"
+fi
+
 # 颜色输出
 RED='\033[0;31m'
 GREEN='\033[0;32m'

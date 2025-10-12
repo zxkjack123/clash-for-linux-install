@@ -25,6 +25,11 @@ ALERT_LOG="$LOG_DIR/health_alerts.log"
 HISTORY_LOG="$LOG_DIR/health_history.log"
 HEALTH_METRICS="$METRICS_DIR/health_metrics.json"
 
+# 加载环境变量配置（.env文件）
+if [[ -f "$BASE_DIR/load_env.sh" ]]; then
+    source "$BASE_DIR/load_env.sh"
+fi
+
 API=${CLASH_API:-http://127.0.0.1:9090}
 PROXY=${PROXY:-http://127.0.0.1:7890}
 CHECK_INTERVAL=600  # 10分钟

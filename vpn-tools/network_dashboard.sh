@@ -19,6 +19,11 @@ METRICS_FILE="$HOME/.local/share/clash/metrics/health_metrics.json"
 ALERT_LOG="$HOME/.local/share/clash/logs/health_alerts.log"
 HISTORY_LOG="$HOME/.local/share/clash/logs/health_history.log"
 
+# 加载环境变量配置（.env文件）
+if [[ -f "$BASE_DIR/load_env.sh" ]]; then
+    source "$BASE_DIR/load_env.sh"
+fi
+
 API=${CLASH_API:-http://127.0.0.1:9090}
 WATCH_MODE=false
 REFRESH_INTERVAL=10
