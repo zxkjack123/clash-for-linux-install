@@ -4,7 +4,7 @@ Welcome to the comprehensive VPN testing and optimization toolkit for Clash/Miho
 
 ## 📁 Folder Contents
 
-This folder contains **14 testing scripts** and **5 documentation files** designed to optimize and monitor your VPN/proxy performance.
+This folder contains a curated set of testing scripts and documentation designed to optimize and monitor your VPN/proxy performance.
 
 ## 🎯 Quick Start
 
@@ -33,28 +33,26 @@ cd vpn-tools
 
 ## 📋 Tool Categories
 
-### 🤖 AI Optimization (4 tools)
+### � AI Optimization
 - **`optimize_ai.sh`** - Quick AI optimization (2-3 min)
 - **`test_ai_connectivity.sh`** - Comprehensive AI testing (15-20 min)
 - **`customize_ai_group.sh`** - Interactive AI management
 - **`quick_ai_test.sh`** - Instant AI verification (30s)
 
-### 🎬 Streaming Optimization (5 tools)
+### 🎬 Streaming Optimization
 - **`select_youtube_node.sh`** - Quick YouTube optimization (3-5 min)
 - **`optimize_youtube_streaming.sh`** - Full streaming optimization (10-15 min)
 - **`streaming_manager.sh`** - Interactive streaming management
 - **`quick_streaming_test.sh`** - Instant streaming verification (30s)
- - **`fix_zoom_connectivity.sh`** - One-click Zoom diagnose/repair (auto DNS check, node switch)
+- **`fix_zoom_connectivity.sh`** - One-click Zoom diagnose/repair (auto DNS check, node switch)
 
-### 🌐 Network Testing (3 tools)
+### 🌐 Network Testing
 - **`network_connectivity_test.sh`** - Comprehensive network test (5-8 min)
 - **`quick_vpn_check.sh`** - Instant VPN status (15-30s)
-- **`test_ai_nodes.sh`** - Node-specific testing
 
-### 🛠️ Management & Utilities (3 tools)
+### 🛠️ Management & Utilities
 - **`launcher.sh`** - Interactive tool launcher
 - **`show_help.sh`** - Help and documentation system
-- **`test_ai_simple.sh`** - Simple AI testing
 
 ## 📚 Documentation
 

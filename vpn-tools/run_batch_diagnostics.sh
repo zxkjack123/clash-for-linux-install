@@ -63,7 +63,6 @@ collect_full(){
 	log "Running full tier scripts"
 	./network_connectivity_test.sh full > "$tmpdir/net_full.txt" 2>&1 || true
 	./proxy_connectivity_report.sh > "$tmpdir/proxy_report.md" 2>&1 || true
-	./test_ai_simple.sh --limit "$AI_LIMIT" > "$tmpdir/ai_simple.txt" 2>&1 || true
 	./optimize_ai_enhanced.sh --limit "$AI_LIMIT" > "$tmpdir/ai_enhanced.txt" 2>&1 || true
 	./optimize_youtube_streaming.sh > "$tmpdir/yt_opt.txt" 2>&1 || true
 	# MinerU / OpenXLab specialized optimization (limit nodes for speed)

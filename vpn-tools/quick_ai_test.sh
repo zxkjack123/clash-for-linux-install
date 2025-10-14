@@ -13,8 +13,11 @@
 set -uo pipefail  # no -e so partial failures don't abort early
 MODE=${1:-text}
 PROXY=${PROXY:-http://127.0.0.1:7890}
-TIMEOUT=6
-test() { curl -s -o /dev/null -w '%{http_code},%{time_total}' --connect-timeout "$TIMEOUT" --max-time "$((TIMEOUT+2))" --proxy "$PROXY" "$1" 2>/dev/null || echo "000,$TIMEOUT"; }
+TIMEOUT=${TIMEOUT:-6}
+SCRIPT_DIR="$(cd "${BASH_SOURCE[0]%/*}" && pwd)"
+. "$SCRIPT_DIR/lib/net_helpers.sh" 2>/dev/null || true
+nh_init_symbols
+test() { nh_curl_t "$1" "$PROXY" "$TIMEOUT"; }
 declare -A targets=(
 	[chatgpt]="https://chat.openai.com/"
 	[braintrust]="https://www.braintrust.dev/"
@@ -34,15 +37,15 @@ for k in chatgpt braintrust github_web github_api copilot_edge; do
 	out=$(test "${targets[$k]}") || true
 	code=${out%%,*}; t=${out##*,}; status=FAIL
 	pattern=${allow_codes[$k]:-${allow_codes[default]}}
-	if [[ $code =~ $pattern ]]; then status=OK; ((score++)); fi
+	if [[ $code =~ $pattern ]]; then status="$NH_OK"; ((score++)); else status="$NH_FAIL"; fi
 	res[$k]="$status($code,$t)"
 	[[ $MODE == text ]] && printf "%-12s %s\n" "$k" "${res[$k]}"
 done
-percent=$((score*100/max))
+percent=$(nh_percent "$score" "$max")
 if [[ $MODE == text ]]; then
 	echo "------------------------"
 	echo "Score $score/$max (${percent}%)"
-	if (( percent>=75 )); then echo "Status: ✅ READY"; status_exit=0; elif (( percent>=50 )); then echo "Status: ⚠️ PARTIAL"; status_exit=1; else echo "Status: ❌ ISSUE"; status_exit=2; fi
+	if (( percent>=75 )); then echo "Status: $NH_READY"; status_exit=0; elif (( percent>=50 )); then echo "Status: $NH_PARTIAL"; status_exit=1; else echo "Status: $NH_ISSUE"; status_exit=2; fi
 else
 	printf '{\n'
 	printf '  "score": %s, "max": %s, "percent": %s,\n' "$score" "$max" "$percent"

@@ -11,9 +11,12 @@
 #
 set -euo pipefail
 MODE=${1:-text}
-TIMEOUT=6
+TIMEOUT=${TIMEOUT:-6}
 PROXY=${PROXY:-http://127.0.0.1:7890}
-test_curl() { curl -s -o /dev/null -w '%{http_code},%{time_total}' --connect-timeout "$TIMEOUT" --max-time "$((TIMEOUT+2))" --proxy "$PROXY" "$1" 2>/dev/null || echo "000,$TIMEOUT"; }
+SCRIPT_DIR="$(cd "${BASH_SOURCE[0]%/*}" && pwd)"
+. "$SCRIPT_DIR/lib/net_helpers.sh" 2>/dev/null || true
+nh_init_symbols
+test_curl() { nh_curl_t "$1" "$PROXY" "$TIMEOUT"; }
 
 declare -A sites=(
 	[youtube]="https://www.youtube.com/"
@@ -26,16 +29,16 @@ declare -A res
 score=0; max=4
 for k in "${!sites[@]}"; do
 	out=$(test_curl "${sites[$k]}"); code=${out%%,*}; t=${out##*,}; status=FAIL
-	if [[ $code =~ ^2|3 ]]; then status=OK; ((score++)); fi
+	if [[ $code =~ ^[23][0-9][0-9]$ ]]; then status="$NH_OK"; ((score++)); else status="$NH_FAIL"; fi
 	res[$k]="$status($code,$t)"
 	[[ $MODE == text ]] && printf "%-10s %s\n" "$k" "${res[$k]}"
 done
 
-percent=$((score*100/max))
+percent=$(nh_percent "$score" "$max")
 if [[ $MODE == text ]]; then
 	echo "-----------------------"
 	echo "Score $score/$max (${percent}%)"
-	if (( percent>=75 )); then echo "Status: ✅ STREAMING READY"; elif (( percent>=50 )); then echo "Status: ⚠️ PARTIAL"; else echo "Status: ❌ ISSUE"; fi
+	if (( percent>=75 )); then echo "Status: $NH_READY"; elif (( percent>=50 )); then echo "Status: $NH_PARTIAL"; else echo "Status: $NH_ISSUE"; fi
 else
 	# JSON 输出
 	printf '{\n'

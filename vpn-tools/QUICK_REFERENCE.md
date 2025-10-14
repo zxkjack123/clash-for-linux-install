@@ -15,12 +15,10 @@ Fast cheat‑sheet for the diagnostic / optimization scripts. All scripts assume
 ## AI Connectivity & Optimization
 | Command | Purpose | Duration |
 |---------|---------|----------|
-| ./quick_ai_test.sh | Smoke test OpenAI/ChatGPT/Claude/Braintrust | 6–12s |
+| ./quick_ai_test.sh | Smoke test ChatGPT/Braintrust/GitHub/Copilot | 6–12s |
 | ./optimize_ai.sh | Score AI nodes (few endpoints) & optionally apply | 15–30s |
 | ./optimize_ai_enhanced.sh | Deeper AI scoring (advanced) | 1–3m |
-| ./test_ai_simple.sh | Iterate all AI nodes (basic metrics, no apply) | 1–2m |
-| ./test_ai_connectivity.sh --rounds 5 --apply | Comprehensive multi‑round stability & selection | 8–15m |
-| ./test_ai_nodes.sh | Targeted AI node list test (existing) | varies |
+| ./test_ai_connectivity.sh --rounds 5 --apply | Comprehensive multi–round stability & selection | 8–15m |
 | ./customize_ai_group.sh | Interactive manual AI node selection | user driven |
 
 Useful switches:

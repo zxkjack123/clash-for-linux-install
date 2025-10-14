@@ -50,8 +50,7 @@ Targets core AI endpoints to confirm reachability. Provides success counts and b
 ### optimize_ai.sh / optimize_ai_enhanced.sh
 Both perform node scoring for AI usage; enhanced variant uses more endpoints and possibly parallel probing (if configured). Standard version favors speed (under 30s). Result: best node optionally applied with `--apply`.
 
-### test_ai_simple.sh
-Iterates all nodes, one pass per endpoint set, no multi-round stability. Useful for a broad first scan across large groups.
+ 
 
 ### test_ai_connectivity.sh (Comprehensive)
 Multi-round methodology:
