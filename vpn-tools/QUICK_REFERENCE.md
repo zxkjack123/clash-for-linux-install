@@ -6,20 +6,20 @@ Fast cheat‑sheet for the diagnostic / optimization scripts. All scripts assume
 	* Default AI group name: AI (override with --group)
 
 ## Core Status & Overview
-| Command | Purpose | Duration |
-|---------|---------|----------|
-| ./show_vpn_status.sh | One‑shot controller + key endpoint probes + exit IP | 2–5s |
-| ./quick_vpn_check.sh | Lightweight multi-endpoint health score | 8–15s |
-| ./proxy_connectivity_report.sh | Markdown connectivity grading report | 20–40s |
+| Command                        | Purpose                                             | Duration |
+| ------------------------------ | --------------------------------------------------- | -------- |
+| ./show_vpn_status.sh           | One‑shot controller + key endpoint probes + exit IP | 2–5s     |
+| ./quick_vpn_check.sh           | Lightweight multi-endpoint health score             | 8–15s    |
+| ./proxy_connectivity_report.sh | Markdown connectivity grading report                | 20–40s   |
 
 ## AI Connectivity & Optimization
-| Command | Purpose | Duration |
-|---------|---------|----------|
-| ./quick_ai_test.sh | Smoke test ChatGPT/Braintrust/GitHub/Copilot | 6–12s |
-| ./optimize_ai.sh | Score AI nodes (few endpoints) & optionally apply | 15–30s |
-| ./optimize_ai_enhanced.sh | Deeper AI scoring (advanced) | 1–3m |
-| ./test_ai_connectivity.sh --rounds 5 --apply | Comprehensive multi–round stability & selection | 8–15m |
-| ./customize_ai_group.sh | Interactive manual AI node selection | user driven |
+| Command                                      | Purpose                                           | Duration    |
+| -------------------------------------------- | ------------------------------------------------- | ----------- |
+| ./quick_ai_test.sh                           | Smoke test ChatGPT/Braintrust/GitHub/Copilot      | 6–12s       |
+| ./optimize_ai.sh                             | Score AI nodes (few endpoints) & optionally apply | 15–30s      |
+| ./optimize_ai_enhanced.sh                    | Deeper AI scoring (advanced)                      | 1–3m        |
+| ./test_ai_connectivity.sh --rounds 5 --apply | Comprehensive multi–round stability & selection   | 8–15m       |
+| ./customize_ai_group.sh                      | Interactive manual AI node selection              | user driven |
 
 Useful switches:
 	--group NAME   Use alternate proxy group
@@ -30,34 +30,34 @@ Useful switches:
 	--md file      Write markdown summary
 
 ## Streaming / YouTube
-| Command | Purpose | Duration |
-|---------|---------|----------|
-| ./quick_streaming_test.sh | Smoke test YouTube + Netflix endpoints | 6–12s |
-| ./select_youtube_node.sh | Basic YouTube node selection | 15–30s |
-| ./optimize_youtube_streaming.sh --apply | Comprehensive YT stability + selection | 1–2m |
-| ./streaming_manager.sh | Interactive streaming node manager | user driven |
+| Command                                 | Purpose                                | Duration    |
+| --------------------------------------- | -------------------------------------- | ----------- |
+| ./quick_streaming_test.sh               | Smoke test YouTube + Netflix endpoints | 6–12s       |
+| ./select_youtube_node.sh                | Basic YouTube node selection           | 15–30s      |
+| ./optimize_youtube_streaming.sh --apply | Comprehensive YT stability + selection | 1–2m        |
+| ./streaming_manager.sh                  | Interactive streaming node manager     | user driven |
 
 ## Network Diagnostics
-| Command | Purpose | Duration |
-|---------|---------|----------|
-| ./network_connectivity_test.sh quick | Direct vs proxy latency/DNS quick view | 10–20s |
-| ./network_connectivity_test.sh full | Extended endpoint latency + DNS checks | 40–90s |
-| ./network_change_probe.sh | Correlate network change events & log churn | bg/continuous |
-| ./system_network_audit.sh | Point-in-time audit: routes, DNS, proxy env | 4–8s |
-| ./quick_vpn_check.sh | General proxy health (also in status) | 8–15s |
-| ./run_batch_diagnostics.sh | Batch run key quick diagnostics & summarize | 20–40s |
+| Command                              | Purpose                                     | Duration      |
+| ------------------------------------ | ------------------------------------------- | ------------- |
+| ./network_connectivity_test.sh quick | Direct vs proxy latency/DNS quick view      | 10–20s        |
+| ./network_connectivity_test.sh full  | Extended endpoint latency + DNS checks      | 40–90s        |
+| ./network_change_probe.sh            | Correlate network change events & log churn | bg/continuous |
+| ./system_network_audit.sh            | Point-in-time audit: routes, DNS, proxy env | 4–8s          |
+| ./quick_vpn_check.sh                 | General proxy health (also in status)       | 8–15s         |
+| ./run_batch_diagnostics.sh           | Batch run key quick diagnostics & summarize | 20–40s        |
 
 ## Specialized / Regional / Misc
-| Command | Purpose |
-|---------|---------|
-| ./test_chinese_ai_platforms.sh | Regional AI platforms reachability |
-| ./quick_openxlab_access.sh | OpenXLab quick access test |
-| ./fix_openxlab_connectivity.sh | Attempt to remediate OpenXLab issues |
-| ./test_braintrust_connectivity.sh | Braintrust connectivity deep test |
-| ./test_docker_proxy.sh | Docker traffic proxy verification |
-| ./launcher.sh | Unified interactive menu for categories |
-| ./show_help.sh | Extended help / catalog |
-| ./merge_subscription.sh | Merge new subscription & (optional) screen slow nodes |
+| Command                           | Purpose                                               |
+| --------------------------------- | ----------------------------------------------------- |
+| ./test_chinese_ai_platforms.sh    | Regional AI platforms reachability                    |
+| ./quick_openxlab_access.sh        | OpenXLab quick access test                            |
+| ./fix_openxlab_connectivity.sh    | Attempt to remediate OpenXLab issues                  |
+| ./test_braintrust_connectivity.sh | Braintrust connectivity deep test                     |
+| ./test_docker_proxy.sh            | Docker traffic proxy verification                     |
+| ./launcher.sh                     | Unified interactive menu for categories               |
+| ./show_help.sh                    | Extended help / catalog                               |
+| ./merge_subscription.sh           | Merge new subscription & (optional) screen slow nodes |
 
 ## Typical Workflows
 1. Quick health: ./show_vpn_status.sh then ./quick_ai_test.sh
@@ -69,10 +69,10 @@ Useful switches:
 7. Cleanup slow nodes on subscription merge: ./merge_subscription.sh --url <SUB> --screen-timeout drop --timeout-threshold 1800 --apply
 
 ## Environment Variables
-| Var | Meaning | Default |
-|-----|---------|---------|
+| Var       | Meaning             | Default               |
+| --------- | ------------------- | --------------------- |
 | CLASH_API | Controller base URL | http://127.0.0.1:9090 |
-| PROXY | HTTP proxy URL | http://127.0.0.1:7890 |
+| PROXY     | HTTP proxy URL      | http://127.0.0.1:7890 |
 
 ## Exit Codes (General Convention)
 0 success / results produced

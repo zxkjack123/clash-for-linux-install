@@ -13,23 +13,23 @@ philosophy for the restored VPN diagnostic & optimization scripts under
 
 ## Common Environment
 Environment variables you may override:
-| Var | Meaning | Default |
-|-----|---------|---------|
+| Var       | Meaning                          | Default               |
+| --------- | -------------------------------- | --------------------- |
 | CLASH_API | Clash/Mihomo external controller | http://127.0.0.1:9090 |
-| PROXY | HTTP proxy URL for tests | http://127.0.0.1:7890 |
+| PROXY     | HTTP proxy URL for tests         | http://127.0.0.1:7890 |
 
 All scripts assume the proxy is working locally; direct vs proxy comparisons appear in `network_connectivity_test.sh`.
 
 ## Metrics Glossary
-| Metric | Definition |
-|--------|-----------|
-| success_ratio | successes / attempts across endpoints per node |
-| latency_med | 50th percentile (median) successful request time_total |
-| latency_p95 | 95th percentile latency for tail performance |
-| jitter | Standard deviation of successful request latencies |
-| score | Composite weighting of success, latency, stability (details inline) |
-| rounds | Rounds completed (may be fewer due to early abort) |
-| errors | Aggregated non‑success HTTP codes (or timeout) counts |
+| Metric        | Definition                                                          |
+| ------------- | ------------------------------------------------------------------- |
+| success_ratio | successes / attempts across endpoints per node                      |
+| latency_med   | 50th percentile (median) successful request time_total              |
+| latency_p95   | 95th percentile latency for tail performance                        |
+| jitter        | Standard deviation of successful request latencies                  |
+| score         | Composite weighting of success, latency, stability (details inline) |
+| rounds        | Rounds completed (may be fewer due to early abort)                  |
+| errors        | Aggregated non‑success HTTP codes (or timeout) counts               |
 
 ## Script Deep Dives
 
@@ -97,12 +97,12 @@ jq -r '.nodes[] | "\(.name),\(.score),\(.success_ratio)"' ai.json | sort -t',' -
 * Avoid running heavy tests concurrently; saturation may skew latency.
 
 ## Troubleshooting
-| Symptom | Possible Cause | Mitigation |
-|---------|----------------|-----------|
-| All nodes low success_ratio | Upstream API blocking / global outage | Verify endpoints manually with curl + different network |
-| High jitter on best latency node | Route instability / congestion | Re-run test; consider alternate region |
-| Scripts fail: controller unreachable | Clash/Mihomo service down or port changed | Check systemd unit, confirm external-controller port |
-| jq not found warnings | jq not installed | Install jq for richer JSON: `sudo apt install jq` |
+| Symptom                              | Possible Cause                            | Mitigation                                              |
+| ------------------------------------ | ----------------------------------------- | ------------------------------------------------------- |
+| All nodes low success_ratio          | Upstream API blocking / global outage     | Verify endpoints manually with curl + different network |
+| High jitter on best latency node     | Route instability / congestion            | Re-run test; consider alternate region                  |
+| Scripts fail: controller unreachable | Clash/Mihomo service down or port changed | Check systemd unit, confirm external-controller port    |
+| jq not found warnings                | jq not installed                          | Install jq for richer JSON: `sudo apt install jq`       |
 
 ## Extending the Toolkit
 1. Add new endpoint: choose representative, stable, low-side-effect URL returning 200/204.
