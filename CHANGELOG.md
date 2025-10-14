@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.4.0] - 2025-10-15
+
+### 🧹 Cleanup & Standardization
+
+#### Removed (Deprecated)
+- Removed latency-only AI scripts: `vpn-tools/test_ai_simple.sh`, `vpn-tools/test_ai_nodes.sh`.
+- Cleaned duplicated content in `vpn-tools/proxy_connectivity_report.sh`.
+- Removed generated latency reports from version control; reports are now on-demand only.
+
+#### Added
+- Shared helper: `vpn-tools/lib/net_helpers.sh` consolidating curl/timeout, grading, percent, and symbol handling (emoji/ASCII fallback via `NH_ASCII=1`).
+
+#### Updated
+- Refactored quick scripts to use the helper and standardized symbols:
+  - `vpn-tools/quick_ai_test.sh`
+  - `vpn-tools/quick_streaming_test.sh`
+  - `vpn-tools/proxy_connectivity_report.sh`
+- `vpn-tools/README.md`: Documentation reflects on-demand reports.
+
+#### Notes
+- Executable bits ensured for diagnostics scripts.
+- Summary-only full diagnostics run validated successful operation.
+
 ## [2.3.0] - 2025-10-14
 
 ### 📁 文档结构重组
