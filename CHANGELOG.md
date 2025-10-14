@@ -2,6 +2,51 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.2.0] - 2025-10-14
+
+### 🔧 VSCode Copilot 网络诊断与优化
+
+#### ✨ 新增功能
+- **VSCode Copilot 专用优化工具** (`vpn-tools/optimize_vscode_copilot.sh`)
+  - 自动检测 Clash 服务状态
+  - 优化 AI 服务节点选择
+  - 测试关键服务连接（GitHub API、Copilot API、OpenAI）
+  - 检查代理环境变量和 VSCode 进程配置
+  - 提供详细的诊断报告和建议
+
+- **完整的诊断和解决方案文档** (`VSCODE_COPILOT_FIX.md`)
+  - 网络问题深度分析（SSL 连接不稳定根因）
+  - 5 种解决方案（从简单到高级）
+  - 预防措施和定期优化建议
+  - 常见问题 Q&A
+  - 快速命令参考手册
+
+#### 🐛 问题修复
+- **诊断 GitHub Copilot API 连接不稳定问题**
+  - 识别出新加坡节点到 Copilot API 的路由质量问题（80% 成功率）
+  - SSL 握手偶尔超时，响应时间波动（1-6秒）
+  - 网络健康分数 65/100 (等级 D)
+
+#### 🔧 优化改进
+- 自动选择最佳 AI 节点（V1-新加坡01 或 V1-美国10）
+- 运行全网络优化，提升整体连接质量
+- 增加 VSCode 进程代理配置检测
+- 对比直连和代理连接性能
+
+#### 📚 文档增强
+- 详细的问题归属分析（客户端 vs 服务器端）
+- 节点质量测试方法和工具
+- VSCode 代理配置最佳实践
+- 长期网络维护建议
+
+#### 💡 使用建议
+- 重启 VSCode 以应用新的网络配置
+- 如问题持续，切换到美国节点（距离 GitHub 更近）
+- 定期运行 `optimize_vscode_copilot.sh` 保持最佳性能
+- 考虑增加 VSCode 超时设置降低敏感度
+
+---
+
 ## [2.1.0] - 2025-10-13
 
 ### 🔒 Security & Configuration Enhancement
