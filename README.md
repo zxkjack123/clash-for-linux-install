@@ -72,6 +72,23 @@ vpn-tools/
 
 详细使用说明请参考 [VPN工具包文档](vpn-tools/README.md)。
 
+## 📚 完整文档
+
+所有文档已按功能分类整理到 `docs/` 目录：
+
+### 📖 文档导航
+
+| 分类 | 文档 | 说明 |
+|------|------|------|
+| **🚀 快速开始** | [QUICK_START.md](QUICK_START.md) | 5分钟快速上手 |
+| **📦 安装配置** | [docs/installation/](docs/installation/) | 安装指南、环境配置、安全设置 |
+| **🌐 网络优化** | [docs/network/](docs/network/) | 网络优化指南、系统审查 |
+| **🔌 功能集成** | [docs/integrations/](docs/integrations/) | Docker、AI服务、VSCode Copilot |
+| **🛠️ 开发调试** | [docs/development/](docs/development/) | Bug修复、技术文档、更新说明 |
+| **📝 变更日志** | [CHANGELOG.md](CHANGELOG.md) | 版本历史和更新记录 |
+
+**详细文档目录**: 查看 [docs/README.md](docs/README.md)
+
 ## 🆕 新版本特性
 
 ### ✅ 无密码体验

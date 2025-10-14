@@ -2,6 +2,42 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.3.0] - 2025-10-14
+
+### 📁 文档结构重组
+
+#### ✨ 新增功能
+- **创建结构化文档目录** (`docs/`)
+  - `docs/installation/` - 安装和配置文档
+  - `docs/network/` - 网络优化文档
+  - `docs/integrations/` - 功能集成文档
+  - `docs/development/` - 开发和调试文档
+  - `docs/README.md` - 完整的文档导航和目录
+
+#### 🔧 优化改进
+- **主目录清理**：从 17 个文档减少到 5 个核心文档
+  - 保留：README.md, CHANGELOG.md, QUICK_START.md, LICENSE, VERSION
+  - 其他文档按功能分类移动到 docs/ 子目录
+
+- **文档重新组织**：
+  - 安装配置 (3个): USER_INSTALL_GUIDE, ENV_CONFIG_GUIDE, SECURITY
+  - 网络优化 (2个): NETWORK_OPTIMIZATION_GUIDE, NETWORK_SYSTEM_REVIEW
+  - 功能集成 (4个): AI_SERVICES, DOCKER_INTEGRATION, VSCODE_COPILOT_FIX
+  - 开发调试 (5个): BUG_FIX_REPORT, UPDATE_NOTES, 等
+
+#### 📚 文档增强
+- README.md 新增文档导航表格
+- 创建 docs/README.md 作为文档中心索引
+- 所有文档保持完整历史记录（使用 git mv）
+
+#### 🎯 改进效果
+- ✅ 主目录更清晰，只保留核心文档
+- ✅ 文档分类清晰，易于查找
+- ✅ 新用户更容易理解项目结构
+- ✅ 维护更方便，相关文档集中管理
+
+---
+
 ## [2.2.0] - 2025-10-14
 
 ### 🔧 VSCode Copilot 网络诊断与优化
