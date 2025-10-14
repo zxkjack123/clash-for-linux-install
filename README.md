@@ -27,6 +27,9 @@ cd vpn-tools
 # 交互式工具启动器（推荐）
 ./launcher.sh
 
+# 3-5分钟一键稳定化（自愈+AI优化+验证）
+./optimize_all_network_fast.sh
+
 # 快速状态检查
 ./quick_vpn_check.sh
 

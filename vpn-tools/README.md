@@ -17,6 +17,7 @@ cd vpn-tools
 ### Method 2: Direct Commands
 ```bash
 cd vpn-tools
+./optimize_all_network_fast.sh  # 3–5 min one-click stabilization (guard+AI+verify)
 ./quick_vpn_check.sh             # 30-second status check
 ./optimize_ai.sh                 # AI optimization (ChatGPT, Claude)
 ./select_youtube_node.sh         # YouTube optimization
