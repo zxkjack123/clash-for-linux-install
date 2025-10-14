@@ -21,7 +21,8 @@ API_SECRET="${CLASH_API_SECRET:-}"
 if [[ -z $API_SECRET ]]; then
 	for f in "$(dirname "$0")/../resources/mixin.yaml" "$(dirname "$0")/../resources/config.yaml" "$(dirname "$0")/../config.yaml"; do
 		if [[ -z $API_SECRET && -f $f ]]; then
-			s=$(grep -E '^secret:' "$f" 2>/dev/null | head -n1 | awk '{print $2}')
+			# Use awk so missing secret lines do not trip set -e
+			s=$(awk '/^secret:/ {print $2; exit}' "$f" 2>/dev/null || true)
 			[[ -n $s ]] && API_SECRET="$s"
 		fi
 	done
@@ -103,7 +104,17 @@ for p in $HTTP_PORT $SOCKS_PORT; do
 	[[ $MODE == text ]] && printf "%-28s %s\n" "Port $p" "${RESULTS[port_$p]}"
 done
 
-test_step proxy_http "Proxy HTTP (httpbin)" --proxy http://$PROXY_HOST:$HTTP_PORT https://httpbin.org/ip
+# Proxy basic reachability (with fallback matrix to avoid transient 503 from httpbin)
+proxy_ok=0
+for url in \
+	https://cloudflare.com/cdn-cgi/trace \
+	https://httpbin.org/ip \
+	https://ipapi.co/ip; do
+	out=$(timed_curl --proxy http://$PROXY_HOST:$HTTP_PORT "$url"); code=${out%%,*}; t=${out##*,}
+	if [[ $code =~ ^[23][0-9][0-9]$ ]]; then proxy_ok=1; proxy_code=$code; proxy_t=$t; break; fi
+done
+if (( proxy_ok )); then RESULTS[proxy_http]="OK($proxy_code,$proxy_t)"; ((++score)); else RESULTS[proxy_http]="FAIL(${code:-noresp},${t:-$TIMEOUT})"; fi
+[[ $MODE == text ]] && printf "%-28s %s\n" "Proxy HTTP" "${RESULTS[proxy_http]}"
 
 # AI endpoints (lightweight HEAD via -I still counts a GET sometimes; keep GET)
 # (Removed OpenAI / Claude by request) Add GitHub & Copilot tests
@@ -123,7 +134,21 @@ RESULTS[copilot_edge]="$status($code,$t)"
 geo_json=$(curl -s --proxy http://$PROXY_HOST:$HTTP_PORT https://ipapi.co/json 2>/dev/null || true)
 country=$(echo "$geo_json" | sed -n 's/.*"country_name":"\([^"]*\)".*/\1/p')
 ip=$(echo "$geo_json" | sed -n 's/.*"ip":"\([^"]*\)".*/\1/p')
-[[ -n $ip ]] && RESULTS[geo]="$ip/$country" || RESULTS[geo]=unknown
+if [[ -z $ip ]]; then
+	# Fallback to ipinfo.io
+	alt=$(curl -s --proxy http://$PROXY_HOST:$HTTP_PORT https://ipinfo.io/json 2>/dev/null || true)
+	ip=$(echo "$alt" | sed -n 's/.*"ip":"\([^"]*\)".*/\1/p')
+	cc=$(echo "$alt" | sed -n 's/.*"country":"\([^"]*\)".*/\1/p')
+	[[ -z $country && -n $cc ]] && country=$cc
+fi
+if [[ -z $ip ]]; then
+	# Final fallback to Cloudflare trace
+	cf=$(curl -s --proxy http://$PROXY_HOST:$HTTP_PORT https://cloudflare.com/cdn-cgi/trace 2>/dev/null || true)
+	ip=$(echo "$cf" | awk -F= '/^ip=/{print $2; exit}')
+	cc=$(echo "$cf" | awk -F= '/^loc=/{print $2; exit}')
+	[[ -z $country && -n $cc ]] && country=$cc
+fi
+[[ -n $ip ]] && RESULTS[geo]="$ip/${country:-unknown}" || RESULTS[geo]=unknown
 [[ $MODE == text ]] && printf "%-28s %s\n" "Exit IP Country" "${RESULTS[geo]}"
 
 SUMMARY=$((score*100/max_score))
