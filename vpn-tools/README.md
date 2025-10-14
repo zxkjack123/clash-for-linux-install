@@ -61,9 +61,8 @@ cd vpn-tools
 - **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Essential commands reference
 - **[TOOLS_INVENTORY.md](TOOLS_INVENTORY.md)** - Complete inventory of all tools
 
-### Generated Reports
-- **[AI_CONNECTIVITY_REPORT.md](AI_CONNECTIVITY_REPORT.md)** - AI performance analysis
-- **[YOUTUBE_STREAMING_REPORT.md](YOUTUBE_STREAMING_REPORT.md)** - Streaming optimization results
+### Generated Reports (on-demand)
+- Reports are generated on-demand by scripts and no longer versioned in the repo.
 
 ## 🎯 Usage Scenarios
 
