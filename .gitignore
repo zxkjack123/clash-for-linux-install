@@ -29,3 +29,15 @@ resources/mixin.yaml.bak-*
 *.key
 *.pem
 *.p12
+
+# Program management (local-only; do not commit)
+.pm-project.json
+.pm-project/
+.pm-project
+.pmrc
+.pm/
+.pm-cache/
+schedule/
+program_management/
+.project-management/
+.project-management.json
