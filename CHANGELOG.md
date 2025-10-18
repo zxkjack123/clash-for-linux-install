@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.4.2] - 2025-10-18
+
+### 🧹 Cleanup
+- Minor housekeeping and version sync; no functional changes.
+
 ## [2.4.1] - 2025-10-18
 
 ### 🛠 Fixes
