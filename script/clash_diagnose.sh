@@ -113,9 +113,10 @@ add_json direct_1_1_1_1 "$RULE_DIR1"; add_json direct_8_8_8_8 "$RULE_DIR8"; add_
 [ "$HIJACK" = 0 ] && ok "无关键劫持规则" || { warn "检测到 1.1.1.1/8.8.8.8 劫持 (建议执行 sanitize_runtime.sh)"; STATUS=$(( STATUS==1?1:2 )); }
 
 # 10. 日志失败统计
-FAILS_5M=$(journalctl --user -u "$KERNEL" --since "5 min ago" --no-pager 2>/dev/null | grep -c 'connect error' || echo 0)
-# 保障是整数
-FAILS_5M=${FAILS_5M:-0}; FAILS_5M=$(echo "$FAILS_5M" | grep -Eo '^[0-9]+' || echo 0)
+FAILS_5M_RAW=$(journalctl --user -u "$KERNEL" --since "5 min ago" --no-pager 2>/dev/null | grep -c 'connect error' || true)
+# 保障是整数：去除非数字字符，空则置 0
+FAILS_5M=$(printf '%s' "${FAILS_5M_RAW:-0}" | tr -cd '0-9')
+[ -z "$FAILS_5M" ] && FAILS_5M=0
 add_json fails_5m "$FAILS_5M"
 if [ "$FAILS_5M" -gt 20 ]; then fail "5分钟连接失败数=$FAILS_5M"; [ $STATUS -eq 0 ] && STATUS=2; elif [ "$FAILS_5M" -gt 5 ]; then warn "5分钟失败数=$FAILS_5M"; [ $STATUS -eq 0 ] && STATUS=2; else ok "5分钟失败数=$FAILS_5M"; fi
 

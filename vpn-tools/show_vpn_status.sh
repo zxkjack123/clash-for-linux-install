@@ -7,7 +7,7 @@
 # USAGE:
 #   ./show_vpn_status.sh
 #
-set -euo pipefail
+set -uo pipefail
 API=${CLASH_API:-http://127.0.0.1:9090}
 PROXY=${PROXY:-http://127.0.0.1:7890}
 
@@ -20,10 +20,10 @@ if curl -fsS "$API/version" >/dev/null 2>&1; then
     ver=$(curl -fsS "$API/version" | sed -n 's/.*"version":"\([^"]*\)".*/\1/p')
     echo "Controller: UP (version=$ver)"
 else
-    echo "Controller: DOWN ($API)"; exit 1
+    echo "Controller: DOWN ($API)"; # 不立即退出，继续尝试后续信息
 fi
 
-for g in AI YOUTUBE STREAM MEDIA; do now=$(get_now "$g"); [[ -n $now ]] && printf '%-8s current: %s\n' "$g" "$now"; done
+for g in AI YOUTUBE STREAM MEDIA Streaming Development; do now=$(get_now "$g"); [[ -n ${now:-} ]] && printf '%-8s current: %s\n' "$g" "$now"; done
 
 echo
 echo "-- Quick Probes (proxy) --"
@@ -80,7 +80,12 @@ if curl -s http://127.0.0.1:9090/version >/dev/null 2>&1; then
     echo -e "${GREEN}✅ Clash API: Accessible${NC}"
     
     # Get version info
-    version_info=$(curl -s http://127.0.0.1:9090/version | jq -r '.version' 2>/dev/null || echo "Unknown")
+    if have jq; then
+        version_info=$(curl -s http://127.0.0.1:9090/version | jq -r '.version' 2>/dev/null || echo "Unknown")
+    else
+        version_info=$(curl -s http://127.0.0.1:9090/version | sed -n 's/.*"version":"\([^"]*\)".*/\1/p')
+        [ -z "$version_info" ] && version_info="Unknown"
+    fi
     echo "📦 Version: $version_info"
 else
     echo -e "${RED}❌ Clash API: Not accessible${NC}"
@@ -91,9 +96,18 @@ echo "🎯 CURRENT ROUTING CONFIGURATION:"
 echo "=================================="
 
 # Get current proxy settings
-AI_NODE=$(curl -s http://127.0.0.1:9090/proxies/AI | jq -r '.now' 2>/dev/null || echo "Unknown")
-STREAMING_NODE=$(curl -s http://127.0.0.1:9090/proxies/Streaming | jq -r '.now' 2>/dev/null || echo "Unknown")
-DEVELOPMENT_NODE=$(curl -s http://127.0.0.1:9090/proxies/Development | jq -r '.now' 2>/dev/null || echo "Unknown")
+if have jq; then
+    AI_NODE=$(curl -s http://127.0.0.1:9090/proxies/AI | jq -r '.now' 2>/dev/null || echo "Unknown")
+    STREAMING_NODE=$(curl -s http://127.0.0.1:9090/proxies/Streaming | jq -r '.now' 2>/dev/null || echo "Unknown")
+    DEVELOPMENT_NODE=$(curl -s http://127.0.0.1:9090/proxies/Development | jq -r '.now' 2>/dev/null || echo "Unknown")
+else
+    AI_NODE=$(curl -s http://127.0.0.1:9090/proxies/AI | sed -n 's/.*"now":"\([^"]*\)".*/\1/p')
+    [ -z "$AI_NODE" ] && AI_NODE="Unknown"
+    STREAMING_NODE=$(curl -s http://127.0.0.1:9090/proxies/Streaming | sed -n 's/.*"now":"\([^"]*\)".*/\1/p')
+    [ -z "$STREAMING_NODE" ] && STREAMING_NODE="Unknown"
+    DEVELOPMENT_NODE=$(curl -s http://127.0.0.1:9090/proxies/Development | sed -n 's/.*"now":"\([^"]*\)".*/\1/p')
+    [ -z "$DEVELOPMENT_NODE" ] && DEVELOPMENT_NODE="Unknown"
+fi
 
 echo "🤖 AI Services:"
 echo "  • Current Node: $AI_NODE"
