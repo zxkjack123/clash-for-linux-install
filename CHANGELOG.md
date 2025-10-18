@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.4.1] - 2025-10-18
+
+### 🛠 Fixes
+- Hardened Git/system proxy configuration to prevent malformed proxy URLs after reboot.
+  - Ensured `clashctl.sh` always derives a valid port before writing Git proxy settings.
+  - Added validation and safe fallback to avoid values like `127.0.0.1:` that break Git.
+
+### ✅ Verification
+- Verified `git ls-remote` and a full `git clone` to GitHub work correctly with the fixed logic.
+
 ## [2.4.0] - 2025-10-15
 
 ### 🧹 Cleanup & Standardization

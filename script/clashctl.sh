@@ -19,6 +19,12 @@ _escape_sed() {
 }
 
 _set_system_proxy() {
+    # Ensure MIXED_PORT is populated and valid before constructing proxy URLs
+    _get_proxy_port
+    if ! [[ "+${MIXED_PORT:-}" =~ ^\+[0-9]+$ ]] || [ "${MIXED_PORT:-0}" -lt 1 ] || [ "${MIXED_PORT:-0}" -gt 65535 ]; then
+        # Fallback to default port to avoid producing an invalid url like 127.0.0.1:
+        MIXED_PORT=7890
+    fi
     local auth=$("$BIN_YQ" '.authentication[0] // ""' "$CLASH_CONFIG_RUNTIME")
     [ -n "$auth" ] && auth=$auth@
 
@@ -129,9 +135,18 @@ _set_system_proxy() {
         kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key NoProxyFor "localhost,127.0.0.1,::1" 2>/dev/null || true
     fi
 
-    # Configure Git proxy
-    git config --global http.proxy "$http_proxy_addr" 2>/dev/null || true
-    git config --global https.proxy "$http_proxy_addr" 2>/dev/null || true
+    # Configure Git proxy – only if port is valid; otherwise do not write malformed values
+    {
+        port_only="${http_proxy_addr##*:}"
+        if [[ "${port_only}" =~ ^[0-9]+$ ]] && [ "${port_only}" -ge 1 ] && [ "${port_only}" -le 65535 ]; then
+            git config --global http.proxy "$http_proxy_addr" 2>/dev/null || true
+            git config --global https.proxy "$http_proxy_addr" 2>/dev/null || true
+        else
+            # Avoid leaving bad settings around
+            git config --global --unset http.proxy 2>/dev/null || true
+            git config --global --unset https.proxy 2>/dev/null || true
+        fi
+    }
 
     # Configure APT proxy (create/update configuration file)
     local apt_proxy_file="/tmp/95clash-proxy"
