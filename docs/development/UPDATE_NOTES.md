@@ -4,6 +4,41 @@
 2025-10-13
 
 ## 更新内容
+\n+### 2025-10-20 — v2.4.3 诊断稳健性与系统代理最佳实践
+
+本次更新聚焦于诊断脚本的稳健性提升与桌面系统代理（GNOME）最佳实践的自动化落地。
+
+#### 🛠 修复与改进
+- 修复 `script/clash_diagnose.sh` 中 5 分钟失败计数的整型解析问题（避免 `[[: integer expression expected]]`）。
+- 强化 `vpn-tools/show_vpn_status.sh` 的健壮性：
+    - 不再因非 2xx/3xx 响应早退；
+    - 当缺失 `jq` 时提供 sed 解析回退；
+    - 兼容缺失的代理分组（AI/Streaming/Development）。
+- 加固 `vpn-tools/quick_vpn_check.sh` 的 GitHub API 探测：
+    - 增加 User-Agent 头以规避罕见 403；
+    - 多端点回退（`/`, `/zen`, `/rate_limit`）提升抗抖动能力。
+
+#### ✨ 最佳实践自动化
+- 新增 `script/ensure_system_proxy_best_practices.sh`：
+    - 一键应用 GNOME `ignore-hosts` 最佳实践（本地/内网/Tailscale/MagicDNS/CGNAT）；
+    - 可选 `--set-manual <port>` 同步设置手动代理与端口。
+- 集成到 `script/clashctl.sh` 与 `vpn-tools/restart_clash_service.sh`：
+    - 启用或重启服务时自动校验并应用最佳实践，保持系统行为一致。
+
+#### ✅ 验证
+- 移除对 1.1.1.1/8.8.8.8 的历史劫持规则，确保 DIRECT；
+- 快速体检、状态视图与快速VPN检查全部通过；
+- GitHub API 探测在网络抖动下依然稳定通过，分数达 100%。
+
+#### 🔗 相关脚本
+- `script/clash_diagnose.sh`
+- `vpn-tools/show_vpn_status.sh`
+- `vpn-tools/quick_vpn_check.sh`
+- `script/ensure_system_proxy_best_practices.sh`
+- `script/clashctl.sh`
+- `vpn-tools/restart_clash_service.sh`
+
+---
 
 ### 1. 调整AI服务监控列表 🤖
 
