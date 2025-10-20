@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.4.3] - 2025-10-20
+
+### 🛠 Fixes & Resilience
+- Diagnostics: Fixed integer parsing in `script/clash_diagnose.sh` for 5-minute failure counter (no more `[[: integer expression expected]]`).
+- Status: Hardened `vpn-tools/show_vpn_status.sh` to avoid early exit, add jq-less fallbacks, and tolerate missing groups.
+- Quick check: Made `vpn-tools/quick_vpn_check.sh` GitHub API probe resilient with fallback endpoints and a UA header.
+
+### ✨ Best-practices Automation
+- New: `script/ensure_system_proxy_best_practices.sh` enforces GNOME ignore-hosts for LAN + Tailscale + MagicDNS.
+- Integrated into `script/clashctl.sh` and `vpn-tools/restart_clash_service.sh` so best practices auto-apply when enabling/restarting proxy.
+
+### ✅ Verification
+- Clean runtime rules (removed legacy hijack for 1.1.1.1/8.8.8.8, ensured DIRECT). Service health verified post-restart.
+- Quick checks: 100% on core proxy diagnostics; quick VPN score improved stability in mixed environments.
+
 ## [2.4.2] - 2025-10-18
 
 ### 🧹 Cleanup

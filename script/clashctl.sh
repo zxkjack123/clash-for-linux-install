@@ -18,6 +18,39 @@ _escape_sed() {
     printf '%s' "$1" | sed -e 's/[\/\\&.*$^[]/\\&/g' -e 's/]/\\]/g' -e 's/(/\\(/g' -e 's/)/\\)/g' -e 's/+\\?/+/g'
 }
 
+# Build GNOME ignore-hosts best-practice list (LAN + Tailscale + optional MagicDNS suffix)
+_gnome_build_ignore_hosts() {
+    local ts_suffix="${1:-}"
+    local base=(
+        "localhost" "127.0.0.0/8" "::1" "10.0.0.0/8" "172.16.0.0/12" "192.168.0.0/16"
+        "ts.net" ".ts.net" "tailscale.io" ".tailscale.io" "100.100.100.100" "100.64.0.0/10"
+    )
+    if [ -n "$ts_suffix" ]; then
+        base+=("$ts_suffix" ".${ts_suffix}")
+    fi
+    local out="[" sep=""
+    for e in "${base[@]}"; do out+="${sep}'${e}'"; sep=", "; done
+    out+="]"
+    printf '%s' "$out"
+}
+
+# Ensure GNOME ignore-hosts is present and up to date; update only if needed
+_ensure_gnome_ignore_hosts() {
+    command -v gsettings >/dev/null 2>&1 || return 0
+    # Optional tailscale suffix detection (best effort)
+    local ts_suffix=""
+    if command -v tailscale >/dev/null 2>&1; then
+        ts_suffix=$(tailscale status 2>/dev/null | grep -o 'tail[0-9a-f]*\.ts\.net' | head -n1 || true)
+    fi
+    local desired current
+    desired=$(_gnome_build_ignore_hosts "$ts_suffix")
+    current=$(gsettings get org.gnome.system.proxy ignore-hosts 2>/dev/null || echo "[]")
+    # Normalize: remove spaces to compare
+    if [ "${current//[[:space:]]/}" != "${desired//[[:space:]]/}" ]; then
+        gsettings set org.gnome.system.proxy ignore-hosts "$desired" 2>/dev/null || true
+    fi
+}
+
 _set_system_proxy() {
     # Ensure MIXED_PORT is populated and valid before constructing proxy URLs
     _get_proxy_port
@@ -79,6 +112,8 @@ _set_system_proxy() {
                 shell_mode=$(gsettings get org.gnome.system.proxy mode 2>/dev/null || echo '')
                 shell_http=$(gsettings get org.gnome.system.proxy.http host 2>/dev/null || echo '')
                 if [ "$shell_mode" = "'manual'" ] && [ "$shell_http" = "'127.0.0.1'" ]; then
+                    # Even on fast path, ensure ignore-hosts best-practices are applied.
+                    _ensure_gnome_ignore_hosts
                     # Nothing to change – keep env fresh (exports) and exit early.
                     export http_proxy=$http_proxy_addr https_proxy=$http_proxy HTTP_PROXY=$http_proxy HTTPS_PROXY=$http_proxy
                     export all_proxy=$socks_proxy_addr ALL_PROXY=$all_proxy
@@ -119,12 +154,8 @@ _set_system_proxy() {
         gsettings set org.gnome.system.proxy.https port "${MIXED_PORT}" 2>/dev/null || true
         gsettings set org.gnome.system.proxy.socks host '127.0.0.1' 2>/dev/null || true
         gsettings set org.gnome.system.proxy.socks port "${MIXED_PORT}" 2>/dev/null || true
-        # 扩展内网免代理列表，避免本地/局域网走代理
-    # 追加 tailscale 相关直连域 / 网段
-    # 追加 tailscale 相关直连域 / 网段; GNOME 不支持 * 通配符，这里使用基础域 /8 ~ /16 & 具体后缀
-    local g_ignore="['localhost', '127.0.0.0/8', '::1', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', 'ts.net', '.ts.net', 'tailscale.io', '.tailscale.io', '100.100.100.100', '100.64.0.0/10'"; \
-    if [ -n "${ts_suffix:-}" ]; then g_ignore="$g_ignore, '$ts_suffix', '.${ts_suffix}'"; fi; g_ignore="$g_ignore]"; \
-    gsettings set org.gnome.system.proxy ignore-hosts "$g_ignore" 2>/dev/null || true
+        # Apply best-practice ignore-hosts (LAN + Tailscale + optional MagicDNS)
+        _ensure_gnome_ignore_hosts
     fi
 
     # Set KDE proxy settings (for KDE applications)

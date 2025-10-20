@@ -180,6 +180,12 @@ fi
 
 echo ""
 
+# Step 5.1: Apply system proxy best-practices (GNOME ignore-hosts)
+if command -v gsettings >/dev/null 2>&1; then
+    echo "🧰 Applying GNOME proxy ignore-hosts best practices..."
+    bash "$(dirname "$PWD")/script/ensure_system_proxy_best_practices.sh" --set-manual 7890 || true
+fi
+
 # Step 6: Test configuration changes
 echo "🧪 Testing configuration changes:"
 echo "================================="

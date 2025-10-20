@@ -122,7 +122,27 @@ if (( proxy_ok )); then RESULTS[proxy_http]="OK($proxy_code,$proxy_t)"; ((++scor
 # Streaming quick (YouTube base HTML)
 test_step youtube "YouTube" --proxy http://$PROXY_HOST:$HTTP_PORT https://www.youtube.com/
 test_step github_web "GitHub Web" --proxy http://$PROXY_HOST:$HTTP_PORT https://github.com/
-test_step github_api "GitHub API" --proxy http://$PROXY_HOST:$HTTP_PORT https://api.github.com/
+# GitHub API: be resilient against sporadic network hiccups and rate-limit edges
+# Try root, then /zen, then /rate_limit; include a simple UA to avoid 403s in rare environments
+{
+	out=$(timed_curl --proxy http://$PROXY_HOST:$HTTP_PORT -H "User-Agent: curl/8.4" https://api.github.com/); code=${out%%,*}; t=${out##*,}
+	if [[ $code =~ ^[23][0-9][0-9]$ ]]; then
+		RESULTS[github_api]="OK($code,$t)"; ((++score))
+	else
+		out=$(timed_curl --proxy http://$PROXY_HOST:$HTTP_PORT -H "User-Agent: curl/8.4" https://api.github.com/zen); code=${out%%,*}; t=${out##*,}
+		if [[ $code =~ ^[23][0-9][0-9]$ ]]; then
+			RESULTS[github_api]="OK($code,$t)"; ((++score))
+		else
+			out=$(timed_curl --proxy http://$PROXY_HOST:$HTTP_PORT -H "User-Agent: curl/8.4" https://api.github.com/rate_limit); code=${out%%,*}; t=${out##*,}
+			if [[ $code =~ ^[23][0-9][0-9]$ ]]; then
+				RESULTS[github_api]="OK($code,$t)"; ((++score))
+			else
+				RESULTS[github_api]="FAIL(${code:-noresp},${t:-$TIMEOUT})"
+			fi
+		fi
+	fi
+}
+[[ $MODE == text ]] && printf "%-28s %s\n" "GitHub API" "${RESULTS[github_api]}"
 # Copilot root may return 401/403; accept 2xx/3xx/401/403/404 as reachable
 out=$(timed_curl --proxy http://$PROXY_HOST:$HTTP_PORT https://api.githubcopilot.com/)
 code=${out%%,*}; t=${out##*,}; status=FAIL
