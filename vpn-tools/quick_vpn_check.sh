@@ -39,6 +39,7 @@ timed_curl() { curl -s -o /dev/null -w '%{http_code},%{time_total}' --connect-ti
 
 declare -A RESULTS
 # Scoring baseline components: controller + ports(2) + proxy_http + youtube + github_web + github_api + copilot_edge = 8
+# We'll dynamically increase max_score as we add more tests below (Docker Hub/Registry, PyPI, ProtonVPN, Copilot Proxy).
 score=0; max_score=8
 
 controller_status_details=""
@@ -150,6 +151,44 @@ if [[ $code =~ ^([23][0-9][0-9]|401|403|404)$ ]]; then status=OK; ((++score)); f
 RESULTS[copilot_edge]="$status($code,$t)"
 [[ $MODE == text ]] && printf "%-28s %s\n" "Copilot Edge" "${RESULTS[copilot_edge]}"
 
+# Additional developer/infra endpoints (requested): Docker Hub, Docker Registry, PyPI, ProtonVPN, Copilot Proxy
+
+# PyPI main index
+((max_score++))
+test_step pypi "PyPI" --proxy http://$PROXY_HOST:$HTTP_PORT https://pypi.org/simple/
+
+# PyPI file CDN
+((max_score++))
+test_step pypi_files "PyPI Files" --proxy http://$PROXY_HOST:$HTTP_PORT https://files.pythonhosted.org/
+
+# Docker Hub web
+((max_score++))
+test_step docker_hub "Docker Hub" --proxy http://$PROXY_HOST:$HTTP_PORT https://hub.docker.com/
+
+# Docker Registry v2 endpoint (401/403 are acceptable as reachability)
+((max_score++))
+out=$(timed_curl --proxy http://$PROXY_HOST:$HTTP_PORT https://registry-1.docker.io/v2/); code=${out%%,*}; t=${out##*,}
+status=FAIL
+if [[ $code =~ ^([23][0-9][0-9]|401|403)$ ]]; then status=OK; ((++score)); fi
+RESULTS[docker_registry]="$status($code,$t)"
+[[ $MODE == text ]] && printf "%-28s %s\n" "Docker Registry" "${RESULTS[docker_registry]}"
+
+# ProtonVPN repository (package mirror) – accept 2xx/3xx/403 as reachable
+((max_score++))
+out=$(timed_curl --proxy http://$PROXY_HOST:$HTTP_PORT https://repo.protonvpn.com/); code=${out%%,*}; t=${out##*,}
+status=FAIL
+if [[ $code =~ ^([23][0-9][0-9]|403)$ ]]; then status=OK; ((++score)); fi
+RESULTS[protonvpn_repo]="$status($code,$t)"
+[[ $MODE == text ]] && printf "%-28s %s\n" "ProtonVPN Repo" "${RESULTS[protonvpn_repo]}"
+
+# Copilot Proxy endpoint (401/403/404 acceptable)
+((max_score++))
+out=$(timed_curl --proxy http://$PROXY_HOST:$HTTP_PORT https://copilot-proxy.githubusercontent.com/); code=${out%%,*}; t=${out##*,}
+status=FAIL
+if [[ $code =~ ^([23][0-9][0-9]|401|403|404)$ ]]; then status=OK; ((++score)); fi
+RESULTS[copilot_proxy]="$status($code,$t)"
+[[ $MODE == text ]] && printf "%-28s %s\n" "Copilot Proxy" "${RESULTS[copilot_proxy]}"
+
 # Geo check (which exit IP)
 geo_json=$(curl -s --proxy http://$PROXY_HOST:$HTTP_PORT https://ipapi.co/json 2>/dev/null || true)
 country=$(echo "$geo_json" | sed -n 's/.*"country_name":"\([^"]*\)".*/\1/p')
@@ -182,7 +221,7 @@ else
 	{
 		echo '{'
 		echo '  "timestamp": '"$(date +%s)",
-		for k in controller port_$HTTP_PORT port_$SOCKS_PORT proxy_http youtube github_web github_api copilot_edge geo; do
+		for k in controller port_$HTTP_PORT port_$SOCKS_PORT proxy_http youtube github_web github_api copilot_edge pypi pypi_files docker_hub docker_registry protonvpn_repo copilot_proxy geo; do
 			v=${RESULTS[$k]:-NA}; printf '  "%s": "%s",\n' "$k" "$v" | json_escape
 		done
 		echo '  "score": '"$score",'

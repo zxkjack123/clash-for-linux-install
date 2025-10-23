@@ -27,6 +27,15 @@ groups[STREAM_basejs]=https://www.youtube.com/s/player/230b3f4e/player_ias.vflse
 groups[GEN_google]=https://www.google.com/
 groups[GEN_cloudflare]=https://www.cloudflare.com/
 groups[GEN_bing]=https://www.bing.com/
+groups[DEV_github_web]=https://github.com/
+groups[DEV_github_api]=https://api.github.com/
+groups[DEV_copilot]=https://api.githubcopilot.com/
+groups[DEV_copilot_proxy]=https://copilot-proxy.githubusercontent.com/
+groups[DEV_docker_hub]=https://hub.docker.com/
+groups[DEV_docker_registry]=https://registry-1.docker.io/v2/
+groups[DEV_pypi]=https://pypi.org/simple/
+groups[DEV_pypi_files]=https://files.pythonhosted.org/
+groups[GEN_protonvpn]=https://repo.protonvpn.com/
 
 echo "# Proxy Connectivity Report"
 echo "Generated: $(date '+%F %T')"
