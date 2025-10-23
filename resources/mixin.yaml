@@ -125,6 +125,11 @@ dns:
 
 # 如需额外规则覆盖可继续添加 rules: 键; 这里新增 QDAI 修复与常用开发/AI/会议规则
 rules:
+  # GitHub Copilot: force DIRECT to avoid flaky proxy paths (SSE/HTTP2/WebSocket)
+  - DOMAIN,api.githubcopilot.com,DIRECT
+  - DOMAIN,api.individual.githubcopilot.com,DIRECT
+  - DOMAIN-SUFFIX,githubcopilot.com,DIRECT
+  - DOMAIN,copilot-proxy.githubusercontent.com,DIRECT
   # QDAI 临时子域解析 / 访问修复 (必须放在 DOMAIN-SUFFIX,cn,DIRECT 之前)
   - DOMAIN,c-1966322474660876290.qdai.scnet.cn,AI
   - DOMAIN-SUFFIX,qdai.scnet.cn,AI
@@ -136,8 +141,7 @@ rules:
   - IP-CIDR,1.1.1.1/32,DIRECT,no-resolve
   - IP-CIDR,8.8.8.8/32,DIRECT,no-resolve
   # GitHub / Dev
-  - DOMAIN,api.individual.githubcopilot.com,Development
-  - DOMAIN-SUFFIX,githubcopilot.com,Development
+  # Copilot rules are DIRECT above; keep other dev endpoints via Development
   - DOMAIN-SUFFIX,githubusercontent.com,Development
   - DOMAIN-SUFFIX,githubassets.com,Development
   - DOMAIN-KEYWORD,github,Development

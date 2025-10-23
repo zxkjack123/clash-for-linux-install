@@ -31,11 +31,15 @@ fi
 echo ""
 echo "🧪 测试关键服务连接..."
 
+PROXY_URL="http://127.0.0.1:7890"
+
 test_endpoint() {
     local name="$1"
     local url="$2"
     local result
-    result=$(curl -s -w "HTTP:%{http_code} Time:%{time_total}s" -o /dev/null --connect-timeout 5 --max-time 10 "$url" 2>&1)
+    result=$(curl -s -w "HTTP:%{http_code} Time:%{time_total}s" -o /dev/null \
+        --connect-timeout 6 --max-time 10 \
+        --proxy "$PROXY_URL" "$url" 2>&1 || true)
     if echo "$result" | grep -q "HTTP:"; then
         echo "  ✓ $name - $result"
     else
@@ -43,10 +47,24 @@ test_endpoint() {
     fi
 }
 
-test_endpoint "GitHub API" "https://api.github.com"
-test_endpoint "GitHub Copilot" "https://api.githubcopilot.com/healthz"
-test_endpoint "Copilot Proxy" "https://copilot-proxy.githubusercontent.com"
-test_endpoint "OpenAI API" "https://api.openai.com/v1/models"
+test_endpoint "GitHub API (proxy)" "https://api.github.com/"
+test_endpoint "Copilot API (proxy)" "https://api.githubcopilot.com/healthz"
+test_endpoint "Copilot Proxy (proxy)" "https://copilot-proxy.githubusercontent.com/"
+test_endpoint "OpenAI API (proxy)" "https://api.openai.com/v1/models"
+
+# If Copilot endpoints fail via proxy, check direct path and recommend VS Code relaunch with NO_PROXY bypass
+echo ""
+echo "🔍 Copilot endpoint bypass check (direct vs proxy) ..."
+direct_copilot=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 4 --max-time 6 https://api.githubcopilot.com/healthz || echo 000)
+proxy_copilot=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 6 --max-time 10 --proxy "$PROXY_URL" https://api.githubcopilot.com/healthz || echo 000)
+echo "  Direct: $direct_copilot  |  Proxy: $proxy_copilot"
+if [[ "$proxy_copilot" == "000" || "$proxy_copilot" == "408" ]] && [[ "$direct_copilot" =~ ^(200|204|301|302|404)$ ]]; then
+    echo ""
+    echo "💡 观察到 Copilot 通过代理失败、直连成功 —— 为 VS Code 临时绕过代理 (NO_PROXY) 可快速恢复稳定性。"
+    echo "   接下来会提供一条命令启动一个带 NO_PROXY 绕过的 VS Code 窗口。"
+    echo ""
+    echo "👉 运行: $SCRIPT_DIR/fix_vscode_stale_proxy.sh --launch-here"
+fi
 
 # 4. 检查代理环境变量
 echo ""

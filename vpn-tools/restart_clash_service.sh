@@ -28,8 +28,12 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
+# Resolve repo paths robustly regardless of current working directory
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
+
 # Configuration paths
-CONFIG_DIR="/home/gw/opt/clash-for-linux-install/resources"
+CONFIG_DIR="$ROOT_DIR/resources"
 CONFIG_FILE="$CONFIG_DIR/config.yaml"
 MIXIN_FILE="$CONFIG_DIR/mixin.yaml"
 BACKUP_DIR="$CONFIG_DIR/backup"
@@ -183,7 +187,11 @@ echo ""
 # Step 5.1: Apply system proxy best-practices (GNOME ignore-hosts)
 if command -v gsettings >/dev/null 2>&1; then
     echo "🧰 Applying GNOME proxy ignore-hosts best practices..."
-    bash "$(dirname "$PWD")/script/ensure_system_proxy_best_practices.sh" --set-manual 7890 || true
+    if [ -x "$ROOT_DIR/script/ensure_system_proxy_best_practices.sh" ]; then
+        bash "$ROOT_DIR/script/ensure_system_proxy_best_practices.sh" --set-manual 7890 || true
+    else
+        echo -e "${YELLOW}⚠️ ensure_system_proxy_best_practices.sh not found at $ROOT_DIR/script, skipping${NC}"
+    fi
 fi
 
 # Step 6: Test configuration changes

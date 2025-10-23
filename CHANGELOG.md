@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.4.4] - 2025-10-23
+
+### 🛠 Fixes
+- Restart tooling: `vpn-tools/restart_clash_service.sh` now resolves the repository root from its own location, fixing a path bug that caused the GNOME best-practice step to fail in certain working directories. The script reliably applies `script/ensure_system_proxy_best_practices.sh`.
+
+### 🔧 Routing improvements
+- VS Code Copilot stability: enforced DIRECT routing for Copilot endpoints in `resources/mixin.yaml` to avoid flaky proxy paths (SSE/HTTP2/WebSocket).
+  - Added: `api.githubcopilot.com`, `api.individual.githubcopilot.com`, `copilot-proxy.githubusercontent.com`, and `*.githubcopilot.com` → `DIRECT`.
+  - Removed conflicting `Development` routes for Copilot-specific domains (other GitHub dev traffic remains under `Development`).
+
+### ✅ Verification
+- Applied mixin → runtime merge and single restart via `clashctl` internal merge routine; GNOME ignore-hosts step confirmed as applied (idempotent).
+- OpenXLab direct rules remained intact; service restart completed successfully.
+
 ## [2.4.3] - 2025-10-20
 
 ### 🛠 Fixes & Resilience
