@@ -130,6 +130,9 @@ rules:
   - DOMAIN,api.individual.githubcopilot.com,DIRECT
   - DOMAIN-SUFFIX,githubcopilot.com,DIRECT
   - DOMAIN,copilot-proxy.githubusercontent.com,DIRECT
+  # GitHub core API/auth: prefer DIRECT to ensure VS Code sign-in and API calls when proxies are unstable
+  - DOMAIN,api.github.com,DIRECT
+  - DOMAIN,github.com,DIRECT
   # QDAI 临时子域解析 / 访问修复 (必须放在 DOMAIN-SUFFIX,cn,DIRECT 之前)
   - DOMAIN,c-1966322474660876290.qdai.scnet.cn,AI
   - DOMAIN-SUFFIX,qdai.scnet.cn,AI

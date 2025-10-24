@@ -1,4 +1,28 @@
 # Changelog
+## [2.4.5] - 2025-10-24
+
+### ✨ New
+- One-click start/stop scripts:
+  - `vpn-tools/start_vpn.sh` to start mihomo and apply system proxy safely (wraps clashon and prints controller /version).
+  - `vpn-tools/stop_vpn.sh` to stop the service and fully clean proxy settings (env, GNOME/KDE), leaving no residue.
+
+### 🔧 Improvements
+- Diagnostics coverage extended in `vpn-tools/quick_vpn_check.sh` and `vpn-tools/proxy_connectivity_report.sh`:
+  - Added PyPI, PyPI Files, Docker Hub, Docker Registry (treat 401 as reachable), ProtonVPN Repo (treat 403 as reachable), and Copilot Proxy (treat 404 as reachable) endpoints.
+- Dev routing hardening in `resources/mixin.yaml` and VS Code launcher env in `vpn-tools/fix_vscode_stale_proxy.sh`:
+  - Ensure `api.github.com` and `github.com` go DIRECT to avoid flaky proxy paths for sign-in/API.
+  - Add the same domains to `no_proxy` for VS Code sanitized launch.
+- Utility: `vpn-tools/probe_domain_across_nodes.sh` now auto-detects controller port from `runtime.yaml` (`external-controller`), working with non-default ports (e.g. 9990).
+
+### 🧹 Cleanup
+- Removed stray temporary files created during ad-hoc runs (`Switch`, `; done`, resource `wget-log*`).
+- Dropped duplicate `resources/config.yml` to avoid confusion with the canonical `resources/config.yaml`.
+
+### ✅ Verification
+- Verified service lifecycle via one-click scripts and `clashon/clashoff` wrappers.
+- Controller: http://127.0.0.1:9990, version `v1.19.2`; mixed-port `7890` for HTTP/SOCKS.
+- Quick VPN Check: 13/13 (100%) GOOD on representative endpoints.
+
 
 All notable changes to this project will be documented in this file.
 
