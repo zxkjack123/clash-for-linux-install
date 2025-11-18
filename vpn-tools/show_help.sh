@@ -96,6 +96,7 @@ case "${1:-list}" in
         echo "========================"
         show_script_help "network_connectivity_test.sh"
         show_script_help "quick_vpn_check.sh"
+    show_script_help "fix_apt_protonvpn_repo.sh"
         ;;
         
     *.sh)

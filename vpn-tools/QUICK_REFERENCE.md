@@ -48,16 +48,17 @@ Useful switches:
 | ./run_batch_diagnostics.sh           | Batch run key quick diagnostics & summarize | 20–40s        |
 
 ## Specialized / Regional / Misc
-| Command                           | Purpose                                               |
-| --------------------------------- | ----------------------------------------------------- |
-| ./test_chinese_ai_platforms.sh    | Regional AI platforms reachability                    |
-| ./quick_openxlab_access.sh        | OpenXLab quick access test                            |
-| ./fix_openxlab_connectivity.sh    | Attempt to remediate OpenXLab issues                  |
-| ./test_braintrust_connectivity.sh | Braintrust connectivity deep test                     |
-| ./test_docker_proxy.sh            | Docker traffic proxy verification                     |
-| ./launcher.sh                     | Unified interactive menu for categories               |
-| ./show_help.sh                    | Extended help / catalog                               |
-| ./merge_subscription.sh           | Merge new subscription & (optional) screen slow nodes |
+| Command                           | Purpose                                                 |
+| --------------------------------- | ------------------------------------------------------- |
+| ./test_chinese_ai_platforms.sh    | Regional AI platforms reachability                      |
+| ./quick_openxlab_access.sh        | OpenXLab quick access test                              |
+| ./fix_openxlab_connectivity.sh    | Attempt to remediate OpenXLab issues                    |
+| ./fix_apt_protonvpn_repo.sh       | Fix apt ProtonVPN repo timeouts (ForceIPv4 + APT proxy) |
+| ./test_braintrust_connectivity.sh | Braintrust connectivity deep test                       |
+| ./test_docker_proxy.sh            | Docker traffic proxy verification                       |
+| ./launcher.sh                     | Unified interactive menu for categories                 |
+| ./show_help.sh                    | Extended help / catalog                                 |
+| ./merge_subscription.sh           | Merge new subscription & (optional) screen slow nodes   |
 
 ## Typical Workflows
 1. Quick health: ./show_vpn_status.sh then ./quick_ai_test.sh
