@@ -1,4 +1,16 @@
 # Changelog
+## [2.4.6] - 2025-11-19
+
+### 🔧 Tooling
+- `vpn-tools/test_docker_proxy.sh` now auto-detects the active `mixed-port` and `external-controller` values from `~/.local/share/clash` (runtime/config/mixin). This prevents false failures when the controller isn’t bound to the legacy `9090` port and respects custom LAN bindings out of the box.
+- Ports can be overridden per run via `CLASH_PROXY_PORT` / `CLASH_API_PORT` environment variables for remote or non-standard setups.
+
+### 📚 Docs
+- Updated `vpn-tools/DOCKER_PROXY_TESTING_ENHANCED.md` to describe automatic port detection and the new override flags for advanced scenarios.
+
+### ✅ Verification
+- Executed `vpn-tools/test_docker_proxy.sh` with controller on `9990` and proxy on `7890`. Pre-flight now succeeds and the suite continues through the service matrix (remaining failures, if any, are due to real network timeouts such as `claude.ai`).
+
 ## [2.4.5] - 2025-10-24
 
 ### ✨ New

@@ -88,6 +88,16 @@ external-controller: "0.0.0.0:9090"
 mixed-port: 7890
 ```
 
+### Automatic Port Detection & Overrides
+
+The test script reads `~/.local/share/clash/runtime.yaml` (falling back to `config.yaml`/`mixin.yaml`) to auto-detect the actual `mixed-port` and `external-controller` values. This means you no longer need to hardcode 7890/9090—as long as the Clash service is running with LAN access, the script will discover the correct ports.
+
+If you need to override the detected ports (for example, when running against a remote host), export the environment variables before executing the test suite:
+
+```bash
+CLASH_PROXY_PORT=7891 CLASH_API_PORT=9900 ./test_docker_proxy.sh
+```
+
 ### Firewall Rules
 Ensure Docker containers can access Clash:
 ```bash

@@ -19,9 +19,51 @@ NC='\033[0m' # No Color
 
 # Configuration
 HOST_IP=$(hostname -I | awk '{print $1}')
-CLASH_PROXY_PORT=7890
-CLASH_API_PORT=9090
 TIMEOUT=10
+
+DEFAULT_PROXY_PORT=7890
+DEFAULT_API_PORT=9090
+CLASH_DATA_DIR="${HOME}/.local/share/clash"
+RUNTIME_FILE="${CLASH_DATA_DIR}/runtime.yaml"
+BASE_CONFIG_FILE="${CLASH_DATA_DIR}/config.yaml"
+MIXIN_FILE="${CLASH_DATA_DIR}/mixin.yaml"
+CONFIG_CANDIDATES=("${RUNTIME_FILE}" "${BASE_CONFIG_FILE}" "${MIXIN_FILE}")
+
+read_yaml_value() {
+    local key="$1"
+    local file="$2"
+
+    [ -f "$file" ] || return 1
+
+    local line
+    if ! line=$(grep -m1 -E "^[[:space:]]*${key}:" "$file" 2>/dev/null); then
+        return 1
+    fi
+
+    line=${line#*:}
+    line=${line//\"/}
+    line=${line//$'\''/}
+    echo "$line" | xargs
+}
+
+detect_port_from_config() {
+    local key="$1"
+    local fallback="$2"
+    local value
+
+    for file in "${CONFIG_CANDIDATES[@]}"; do
+        value=$(read_yaml_value "$key" "$file") || continue
+        if [[ "$value" =~ ([0-9]{2,5})$ ]]; then
+            echo "${BASH_REMATCH[1]}"
+            return 0
+        fi
+    done
+
+    echo "$fallback"
+}
+
+: "${CLASH_PROXY_PORT:=$(detect_port_from_config "mixed-port" "$DEFAULT_PROXY_PORT")}"
+: "${CLASH_API_PORT:=$(detect_port_from_config "external-controller" "$DEFAULT_API_PORT")}"
 
 # Test URLs - Basic connectivity
 BASIC_TEST_URLS=(
