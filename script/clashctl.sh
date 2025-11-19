@@ -18,11 +18,12 @@ _escape_sed() {
     printf '%s' "$1" | sed -e 's/[\/\\&.*$^[]/\\&/g' -e 's/]/\\]/g' -e 's/(/\\(/g' -e 's/)/\\)/g' -e 's/+\\?/+/g'
 }
 
-# Build GNOME ignore-hosts best-practice list (LAN + Tailscale + optional MagicDNS suffix)
+# Build GNOME ignore-hosts best-practice list (LAN + Tailscale + optional MagicDNS suffix + local services)
 _gnome_build_ignore_hosts() {
     local ts_suffix="${1:-}"
     local base=(
-        "localhost" "127.0.0.0/8" "::1" "10.0.0.0/8" "172.16.0.0/12" "192.168.0.0/16"
+        "localhost" "127.0.0.0/8" "::1" "0.0.0.0" "*.local" ".localhost" ".local"
+        "10.0.0.0/8" "172.16.0.0/12" "192.168.0.0/16"
         "ts.net" ".ts.net" "tailscale.io" ".tailscale.io" "100.100.100.100" "100.64.0.0/10"
     )
     if [ -n "$ts_suffix" ]; then
@@ -71,7 +72,8 @@ _set_system_proxy() {
     #  1) 同时包含 "ts.net" 与 ".ts.net" 以兼容不同实现对前导点匹配语义 (某些实现只有前导点才匹配子域)
     #  2) tailscale MagicDNS 解析 & Funnel 域 统一走直连, 避免被 http_proxy 劫持到本地 127.0.0.1:PORT 造成连接失败
     #  3) 加入 100.100.100.100 (Tailscale 内部 DNS) 及 100.64.0.0/10 CGNAT 地址空间; 虽然多数工具不支持 CIDR 匹配, 但保留不影响
-    local no_proxy_addr="localhost,127.0.0.1,::1,ts.net,.ts.net,tailscale.io,.tailscale.io,100.100.100.100,100.64.0.0/10"
+    #  4) 添加 0.0.0.0, *.local, .localhost 以确保所有本地服务（包括Docker容器、本地Web服务等）都能正常访问
+    local no_proxy_addr="localhost,127.0.0.1,::1,0.0.0.0,*.local,.localhost,.local,ts.net,.ts.net,tailscale.io,.tailscale.io,100.100.100.100,100.64.0.0/10"
     # 动态探测 tailnet MagicDNSSuffix (tailscale status --json) 例: tail69c12a.ts.net
     if command -v tailscale >/dev/null 2>&1; then
         local ts_suffix
