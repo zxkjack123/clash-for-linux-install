@@ -45,7 +45,7 @@ Updates (Aug 2025):
 Scoring: Each successful component adds to score; percentage = earned / possible.
 
 ### quick_ai_test.sh
-Targets core AI endpoints to confirm reachability. Provides success counts and basic latency; no node switching.
+Targets core AI endpoints (ChatGPT, Braintrust, GitHub, Copilot) plus SCNET、UIUI API、硅基流动、OpenRouter。判定逻辑会将 401/403/405 等“需要认证”状态视为网络可达（不再作为失败）。输出包括每个端点的 HTTP 码与响应时间，方便快速定位具体供应商的问题。
 
 ### optimize_ai.sh / optimize_ai_enhanced.sh
 Both perform node scoring for AI usage; enhanced variant uses more endpoints and possibly parallel probing (if configured). Standard version favors speed (under 30s). Result: best node optionally applied with `--apply`.
@@ -60,6 +60,10 @@ Multi-round methodology:
 4. Composite Score = Success (60%) + Latency (30%) + Stability (10%). Latency sub-score blends median (60%) and P95 (40%). Jitter currently omitted (future reintroduction planned).
 5. Emits aligned table; pipe to `sort -k<SCORE_COL> -nr` for ranking. Optional `--json file` & `--md file` for artifacts.
 6. Layered secret autodetect: environment > mixin.yaml > runtime.yaml.
+7. 扩展端点矩阵覆盖 SCNET / UIUI API / 硅基流动 / OpenRouter，并允许 per-endpoint 成功码（例如 SCNET 的 405 Method Not Allowed 也代表网络可达）。
+
+### test_scnet_api.sh
+端到端 SCNET LLM API 健康检查脚本。使用 `.env` 中的 `SCNET_API_KEY` 与 `SCNET_MODEL` 构造最小 `chat/completions` 请求，可选择仅代理/仅直连模式，自动报告 HTTP 码、耗时和响应前几行内容。用于快速验证密钥、模型、代理链路是否协同工作。
 
 ### customize_ai_group.sh
 Interactive fuzzy filter + quick latency test to let an operator manually choose nodes. Does not auto-rank beyond displayed metrics.

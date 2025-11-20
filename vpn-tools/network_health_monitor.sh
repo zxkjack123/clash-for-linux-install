@@ -86,7 +86,7 @@ check_clash_service() {
 
 # 测试单个URL
 test_url() {
-    local url="$1" label="$2" use_proxy="${3:-yes}"
+    local url="$1" label="$2" use_proxy="${3:-yes}" pattern="${4:-^[23]}"
     local start_ms end_ms duration_ms http_code
     
     start_ms=$(date +%s%3N)
@@ -101,7 +101,9 @@ test_url() {
     duration_ms=$((end_ms - start_ms))
     
     local success=0
-    [[ "$http_code" =~ ^[23] ]] && success=1
+    if [[ "$http_code" =~ $pattern ]]; then
+        success=1
+    fi
     
     echo "$label|$http_code|$duration_ms|$success"
 }
@@ -113,14 +115,16 @@ check_ai_services() {
     
     local services=(
         "https://chat.openai.com/|ChatGPT"
-        "https://sg.uiuiapi.com/|UIUI-API"
-        "https://siliconflow.cn/|硅基流动"
+        "https://api.scnet.cn/api/llm/v1/chat/completions|SCNET|^(20[0-9]|401|403|405)$"
+        "https://sg.uiuiapi.com/|UIUI-API|^(20[0-9]|30[12378])$"
+        "https://api.siliconflow.cn/health|硅基流动|^(20[0-9]|401|403)$"
+        "https://openrouter.ai/api/v1|OpenRouter|^(20[0-9]|401|403)$"
         "https://kimi.moonshot.cn/|Kimi"
     )
     
     for service in "${services[@]}"; do
-        IFS='|' read -r url label <<< "$service"
-        result=$(test_url "$url" "$label" "yes")
+        IFS='|' read -r url label pattern <<< "$service"
+        result=$(test_url "$url" "$label" "yes" "${pattern:-^[23]}")
         IFS='|' read -r lbl code latency succ <<< "$result"
         
         ((total++))

@@ -61,7 +61,27 @@ ENDPOINTS=(
   "ghapi:https://api.github.com/"
   "latency1:https://www.gstatic.com/generate_204"
   "latency2:https://www.cloudflare.com/cdn-cgi/trace"
+  "scnet:https://api.scnet.cn/api/llm/v1/chat/completions"
+  "uiui:https://sg.uiuiapi.com/"
+  "siliconflow:https://api.siliconflow.cn/health"
+  "openrouter:https://openrouter.ai/api/v1"
 )
+
+declare -A ENDPOINT_OK=(
+  [default]='200 201 202 203 204 206 301 302'
+  [scnet]='200 201 202 203 204 401 403 405'
+  [uiui]='200 201 202 203 204 301 302 307 308'
+  [siliconflow]='200 201 202 203 204 401 403'
+  [openrouter]='200 201 202 203 204 401 403'
+)
+
+code_ok(){
+  local name=$1 code=$2 allow="${ENDPOINT_OK[$name]:-${ENDPOINT_OK[default]}}"
+  for val in $allow; do
+    [[ $code == "$val" ]] && return 0
+  done
+  return 1
+}
 
 declare -A MET
 
@@ -81,7 +101,7 @@ for node in "${NODES[@]}"; do
     mapfile -t SHUF < <(printf '%s\n' "${ENDPOINTS[@]}" | shuf)
     for ep in "${SHUF[@]}"; do
       svc=${ep%%:*}; url=${ep#*:}; res=$(curl_probe "$url"); code=${res%%,*}; t=${res##*,}; attempts=$((attempts+1))
-      if [[ $code == 200 || $code == 204 || $code == 101 ]]; then successes=$((successes+1)); lat+=($t); fi
+      if code_ok "$svc" "$code"; then successes=$((successes+1)); lat+=($t); fi
     done
     if [[ $r -eq 2 ]]; then sr_tmp=$(awk -v s=$successes -v a=$attempts 'BEGIN{if(a==0)print 0; else print s/a}'); awk -v v=$sr_tmp 'BEGIN{exit !(v<0.3)}'; [[ $? -eq 0 ]] && break; fi
   done

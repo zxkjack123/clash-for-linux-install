@@ -5962,6 +5962,14 @@ rules:
   - DOMAIN-SUFFIX,intercom.io,速云梯
   - DOMAIN-SUFFIX,intercomcdn.com,速云梯
   - DOMAIN-SUFFIX,ai.com,速云梯
+  - DOMAIN,api.scnet.cn,速云梯
+  - DOMAIN-SUFFIX,scnet.cn,速云梯
+  - DOMAIN,sg.uiuiapi.com,速云梯
+  - DOMAIN-SUFFIX,uiuiapi.com,速云梯
+  - DOMAIN,api.siliconflow.cn,速云梯
+  - DOMAIN-SUFFIX,siliconflow.cn,速云梯
+  - DOMAIN,api.openrouter.ai,速云梯
+  - DOMAIN-SUFFIX,openrouter.ai,速云梯
   - DOMAIN-SUFFIX,openai.com,速云梯
   - DOMAIN,chat.openai.com.cdn.cloudflare.net,速云梯
   - DOMAIN,openaiapi-site.azureedge.net,速云梯

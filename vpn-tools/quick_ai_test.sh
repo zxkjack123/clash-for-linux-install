@@ -24,16 +24,26 @@ declare -A targets=(
 	[github_web]="https://github.com/"
 	[github_api]="https://api.github.com/"
 	[copilot_edge]="https://api.githubcopilot.com/"
+	[scnet]="https://api.scnet.cn/api/llm/v1/chat/completions"
+	[uiui_api]="https://sg.uiuiapi.com/"
+	[siliconflow]="https://api.siliconflow.cn/health"
+	[openrouter]="https://openrouter.ai/api/v1"
 )
+
+order=(chatgpt braintrust github_web github_api copilot_edge scnet uiui_api siliconflow openrouter)
 
 # Allowed HTTP status patterns per target (regex). Default: 2xx/3xx
 declare -A allow_codes=(
 	[default]='^[23][0-9][0-9]$'
 	[copilot_edge]='^([23][0-9][0-9]|401|403|404)$'
+	[scnet]='^([23][0-9][0-9]|401|403|405)$'
+	[uiui_api]='^([23][0-9][0-9]|301|302|403)$'
+	[siliconflow]='^([23][0-9][0-9]|401|403)$'
+	[openrouter]='^([23][0-9][0-9]|401|403)$'
 )
 declare -A res
-score=0; max=5
-for k in chatgpt braintrust github_web github_api copilot_edge; do
+score=0; max=${#order[@]}
+for k in "${order[@]}"; do
 	out=$(test "${targets[$k]}") || true
 	code=${out%%,*}; t=${out##*,}; status=FAIL
 	pattern=${allow_codes[$k]:-${allow_codes[default]}}
@@ -51,7 +61,7 @@ else
 	printf '  "score": %s, "max": %s, "percent": %s,\n' "$score" "$max" "$percent"
 	printf '  "results": {\n'
 	first=1
-	for k in chatgpt braintrust github_web github_api copilot_edge; do
+	for k in "${order[@]}"; do
 		v=${res[$k]}
 		if [[ $first -eq 0 ]]; then printf ',\n'; fi
 		printf '    "%s": "%s"' "$k" "$v"

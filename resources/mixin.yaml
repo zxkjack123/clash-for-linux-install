@@ -3,7 +3,7 @@
 # 目的:
 #  1. 仅覆盖需要的 proxy-groups 与精简 DNS
 #  2. 保持手动选择, 避免启动并发测速
-#  3. 新增 qdai.scnet.cn 解析与路由修复
+#  3. 扩展 SCNET / UIUI / 硅基流动 / OpenRouter 的解析与路由
 #############################################
 
 proxy-groups:
@@ -103,6 +103,9 @@ dns:
     "+.qdai.scnet.cn":
       - https://1.1.1.1/dns-query
       - https://dns.google/dns-query
+    "+.scnet.cn":
+      - https://1.1.1.1/dns-query
+      - https://dns.google/dns-query
   fake-ip-filter:
     - api.individual.githubcopilot.com
     - "*.github.com"
@@ -118,6 +121,11 @@ dns:
     - "claude.ai"
     - "*.claude.ai"
     - "*.qdai.scnet.cn"
+    - "*.scnet.cn"
+    - "sg.uiuiapi.com"
+    - "*.uiuiapi.com"
+    - "*.siliconflow.cn"
+    - "api.openrouter.ai"
     - "*.zoom.us"
     - "zoom.us"
     - "*.zoomcdn.net"
@@ -136,6 +144,14 @@ rules:
   # QDAI 临时子域解析 / 访问修复 (必须放在 DOMAIN-SUFFIX,cn,DIRECT 之前)
   - DOMAIN,c-1966322474660876290.qdai.scnet.cn,AI
   - DOMAIN-SUFFIX,qdai.scnet.cn,AI
+  - DOMAIN,api.scnet.cn,AI
+  - DOMAIN-SUFFIX,scnet.cn,AI
+  - DOMAIN,sg.uiuiapi.com,AI
+  - DOMAIN-SUFFIX,uiuiapi.com,AI
+  - DOMAIN,api.siliconflow.cn,AI
+  - DOMAIN-SUFFIX,siliconflow.cn,AI
+  - DOMAIN,api.openrouter.ai,AI
+  - DOMAIN-SUFFIX,openrouter.ai,AI
   # Tailscale / Funnel
   - DOMAIN-SUFFIX,ts.net,DIRECT
   - DOMAIN-SUFFIX,tailscale.io,DIRECT
