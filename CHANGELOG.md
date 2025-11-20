@@ -1,4 +1,30 @@
 # Changelog
+## [2.5.0] - 2025-11-20
+
+### ✨ New
+- **AI Connectivity Enhancements**:
+  - Added support for **SCNET**, **UIUI**, **SiliconFlow**, and **OpenRouter** in connectivity tests and configuration.
+  - Updated `resources/mixin.yaml` and `resources/config.yaml` with new rules and DNS policies for these AI services.
+  - Created `vpn-tools/test_scnet_api.sh` for dedicated SCNET testing.
+  - Updated `vpn-tools/test_ai_connectivity.sh` to include new endpoints.
+
+### 🚀 Performance & Architecture
+- **Shell Startup Optimization**:
+  - Eliminated shell startup latency by removing synchronous `watch_proxy` checks from `.bashrc`.
+  - Implemented a "Best Practice" architecture using a lightweight state file (`/tmp/.clash_system_proxy_state`) for instant shell environment setup.
+  - Created `docs/development/CLASH_PROXY_STARTUP_BEST_PRACTICES.md` documenting the new architecture.
+  - Updated `script/common.sh` to clean up legacy hooks and support the new pattern.
+
+### 🔧 Improvements
+- **Network Testing**:
+  - `vpn-tools/network_connectivity_test.sh` now includes SCNET, UIUI, SiliconFlow, and OpenRouter in reachability checks.
+  - `vpn-tools/test_ai_connectivity.sh` now supports a wider range of AI endpoints.
+
+### ✅ Verification
+- Verified shell startup is instant (0 overhead).
+- Verified proxy connectivity to Google, YouTube, and new AI endpoints.
+- Verified systemd services (`mihomo`, `clash-proxy-env`) function correctly with the new architecture.
+
 ## [2.4.6] - 2025-11-19
 
 ### 🔧 Tooling
