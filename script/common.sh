@@ -95,17 +95,37 @@ _set_bin() {
 }
 _set_bin
 
-_set_rc() {
-    [ "$1" = "unset" ] && {
-        sed -i "\|$CLASH_SCRIPT_DIR|d" "$SHELL_RC_BASH" "$SHELL_RC_ZSH" 2>/dev/null
-        rm -f "$SHELL_RC_FISH" 2>/dev/null
-        return
-    }
+_clean_rc_hooks() {
+    for rc in "$SHELL_RC_BASH" "$SHELL_RC_ZSH"; do
+        [ -n "$rc" ] && [ -f "$rc" ] || continue
+        sed -i "/# >>> clashctl auto-start >>>/,/# <<< clashctl auto-start <<</d" "$rc" 2>/dev/null || true
+        sed -i "\|$CLASH_SCRIPT_DIR|d" "$rc" 2>/dev/null || true
+    done
+    [ -n "$SHELL_RC_FISH" ] && rm -f "$SHELL_RC_FISH" 2>/dev/null || true
+}
 
-    # Add clash functions and auto-start proxy on login
-    echo "source $CLASH_SCRIPT_DIR/common.sh && source $CLASH_SCRIPT_DIR/clashctl.sh && watch_proxy && clashon 2>/dev/null" |
-        tee -a "$SHELL_RC_BASH" "$SHELL_RC_ZSH" >&/dev/null
+_set_rc() {
+    # New behaviour:
+    #   - "unset": remove legacy auto-start hooks from shell RCs and fish conf.d.
+    #   - default (install/upgrade): clean old hooks, install fish helper, but DO NOT
+    #     inject any bash/zsh snippet or run watch_proxy/clashon automatically.
+    if [ "${1:-}" = "unset" ]; then
+        _clean_rc_hooks
+        return
+    fi
+
+    # On fresh install / upgrade, proactively clean any legacy RC snippets that
+    # may still be calling watch_proxy/clashon on every shell startup.
+    _clean_rc_hooks
+
+    # Keep fish integration lightweight: just install the function wrapper into
+    # conf.d so fish users still have `clash`/`mihomo` commands available.
     [ -n "$SHELL_RC_FISH" ] && /usr/bin/install "$SCRIPT_FISH" "$SHELL_RC_FISH"
+
+    # Do not auto-edit bash/zsh RC anymore. Point users to the best-practice doc
+    # for an optional lightweight proxy env + lazy helper stubs.
+    _okcat '📄' "已清理旧的 shell 自动注入配置 (不再在每个 shell 启动时运行 watch_proxy)"
+    _okcat '💡' "如需在交互 shell 中导出 http_proxy/ALL_PROXY, 请参考 docs/development/CLASH_PROXY_STARTUP_BEST_PRACTICES.md 手动添加轻量级片段"
 }
 
 # 默认集成、安装mihomo内核
