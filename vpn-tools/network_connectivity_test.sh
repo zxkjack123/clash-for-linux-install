@@ -13,7 +13,37 @@
 set -euo pipefail
 MODE=${1:-quick}
 PROXY=${PROXY:-http://127.0.0.1:7890}
-API=${CLASH_API:-http://127.0.0.1:9090}
+
+detect_controller() {
+	local runtime="${CLASH_CONFIG_RUNTIME:-$HOME/.local/share/clash/runtime.yaml}"
+	local candidate="" host="" port="" default="http://127.0.0.1:9090"
+	[ -f "$runtime" ] || { echo "$default"; return; }
+	if command -v yq >/dev/null 2>&1; then
+		candidate=$(yq '."external-controller" // ""' "$runtime" 2>/dev/null || true)
+	fi
+	if [ -z "$candidate" ]; then
+		candidate=$(grep -E '^ *external-controller:' "$runtime" 2>/dev/null | tail -n1 | cut -d':' -f2- | tr -d ' "' || true)
+	fi
+	candidate=${candidate//$'\n'/}
+	candidate=${candidate//\"/}
+	candidate=${candidate//\'/}
+	candidate=${candidate//[[:space:]]/}
+	[ -z "$candidate" ] && { echo "$default"; return; }
+	if [[ "$candidate" == http*://* ]]; then
+		echo "$candidate"
+		return
+	fi
+	host=${candidate%:*}
+	port=${candidate##*:}
+	[ -z "$port" ] && port=9090
+	case "$host" in
+		""|"0.0.0.0"|"::") host=127.0.0.1 ;;
+		*) : ;;
+	esac
+	echo "http://${host}:${port}"
+}
+
+API=${CLASH_API:-$(detect_controller)}
 TIMEOUT=6
 
 have() { command -v "$1" >/dev/null 2>&1; }

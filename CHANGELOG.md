@@ -1,4 +1,14 @@
 # Changelog
+## [2.5.1] - 2025-11-30
+
+### 🛠 Fixes
+- `vpn-tools/network_connectivity_test.sh` now auto-detects the controller endpoint directly from `~/.local/share/clash/runtime.yaml` (falling back to `127.0.0.1:9090` only when the runtime file is missing). This prevents false "Controller unreachable" warnings when users customize `external-controller` (e.g., port `9990`).
+- Normalized controller strings (trim spaces/quotes, handle bare `:9990` notation) to keep the diagnostics output clean.
+- Marked `script/clash_diagnose.sh` as executable so it can be launched without manual `chmod +x`.
+
+### ✅ Verification
+- `vpn-tools/network_connectivity_test.sh full`
+
 ## [2.5.0] - 2025-11-20
 
 ### ✨ New
