@@ -90,7 +90,8 @@ test_url() {
     local start_ms end_ms duration_ms http_code
     
     start_ms=$(date +%s%3N)
-    if [ "$use_proxy" = "yes" ]; then
+    local mode=$(echo "$use_proxy" | tr '[:upper:]' '[:lower:]')
+    if [[ "$mode" == "yes" || "$mode" == "proxy" ]]; then
         http_code=$(curl -s -o /dev/null -w '%{http_code}' --connect-timeout 5 --max-time 10 \
             --proxy "$PROXY" "$url" 2>/dev/null || echo "000")
     else
@@ -117,14 +118,30 @@ check_ai_services() {
         "https://chat.openai.com/|ChatGPT"
         "https://api.scnet.cn/api/llm/v1/chat/completions|SCNET|^(20[0-9]|401|403|405)$"
         "https://sg.uiuiapi.com/|UIUI-API|^(20[0-9]|30[12378])$"
-        "https://api.siliconflow.cn/health|硅基流动|^(20[0-9]|401|403)$"
+        "https://siliconflow.cn/|硅基流动|^(20[0-9]|30[0-9])$||direct"
         "https://openrouter.ai/api/v1|OpenRouter|^(20[0-9]|401|403)$"
         "https://kimi.moonshot.cn/|Kimi"
     )
     
     for service in "${services[@]}"; do
-        IFS='|' read -r url label pattern <<< "$service"
-        result=$(test_url "$url" "$label" "yes" "${pattern:-^[23]}")
+        local proxy_pref="yes"
+        local data="$service"
+        if [[ "$data" == *'||'* ]]; then
+            proxy_pref="${data##*||}"
+            data="${data%||*}"
+        fi
+        IFS='|' read -r url label pattern <<< "$data"
+        local regex="${pattern:-^[23]}"
+        local proxy_mode="$proxy_pref"
+        case "${proxy_mode,,}" in
+            direct|no|off)
+                proxy_mode="no"
+                ;;
+            *)
+                proxy_mode="yes"
+                ;;
+         esac
+        result=$(test_url "$url" "$label" "$proxy_mode" "$regex")
         IFS='|' read -r lbl code latency succ <<< "$result"
         
         ((total++))
@@ -146,15 +163,15 @@ check_dev_services() {
     local total=0 success=0 total_latency=0
     
     local services=(
-        "https://api.github.com|GitHub"
-        "https://registry.npmjs.org|NPM"
-        "https://pypi.org|PyPI"
-        "https://crates.io|Crates"
+        "https://api.github.com|GitHub|^[23]"
+        "https://registry.npmjs.org|NPM|^[23]"
+        "https://pypi.org|PyPI|^[23]"
+        "https://crates.io|Crates|^(20[0-9]|30[0-9]|403)$"
     )
     
     for service in "${services[@]}"; do
-        IFS='|' read -r url label <<< "$service"
-        result=$(test_url "$url" "$label" "yes")
+        IFS='|' read -r url label pattern <<< "$service"
+        result=$(test_url "$url" "$label" "yes" "${pattern:-^[23]}")
         IFS='|' read -r lbl code latency succ <<< "$result"
         
         ((total++))

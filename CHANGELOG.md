@@ -1,10 +1,31 @@
 # Changelog
+## [2.5.2] - 2025-12-05
+
+### ✨ New
+- Added `script/refresh_subscription_direct.sh` plus user-level systemd units (`clash-subscription-refresh.service/.timer`) and an end-to-end guide (`docs/installation/AUTO_SUBSCRIPTION_REFRESH.md`) so subscriptions can refresh every day without inheriting proxy variables. Optional post-refresh optimization is built in.
+- Introduced `vpn-tools/optimize_dev_nodes.sh` to benchmark GitHub / NPM / PyPI / Docker endpoints and auto-switch the best node across groups. The tool is documented in both `README.md` and `vpn-tools/README.md`.
+- Published `docs/development/JP_PERSONAL_PROXY_NODE.md`, a full walkthrough for building a personal JP exit via Tailscale + sing-box; linked from the docs index.
+
+### 🔧 Improvements
+- `resources/mixin.yaml` and `resources/config.yaml` now pin the entire `*.scnet.cn` / `*.szai.scnet.cn` / `*.qdai.scnet.cn` surface (including `c-1996024701209694210.szai.scnet.cn:58043`) to DIRECT, keeping the SCNET rule block ahead of `DOMAIN-SUFFIX,cn`. The sanitizer reorders these rules automatically, and `script/clashctl.sh` exports the same domains inside `no_proxy`/`NO_PROXY` so curl/pdf2md bypasses the proxy as well.
+- `vpn-tools/quick_ai_test.sh`, `test_ai_connectivity.sh`, `network_connectivity_test.sh`, `network_health_monitor.sh`, `optimize_all_network.sh`, `show_vpn_status.sh`, and related docs now point SiliconFlow checks at `https://siliconflow.cn/` and OpenRouter at `https://openrouter.ai/api/v1/*` to match the current production endpoints.
+- `vpn-tools/README.md` and the top-level README now highlight the new Dev optimization workflow so it is part of the recommended daily toolkit.
+- `.gitignore` ignores the subscription refresh log that the new automation produces.
+
+### 🛠 Fixes
+- Hardened the `速云梯` policy groups in both config sources so URL-test selectors keep working even after provider refactors.
+- `docs/development/SILICONFLOW_FIX.md` reflects the updated SiliconFlow health check URL to avoid false negatives when copying commands from the guide.
+
+### ✅ Verification
+- `vpn-tools/network_connectivity_test.sh full`
+
 ## [2.5.1] - 2025-11-30
 
 ### 🛠 Fixes
 - `vpn-tools/network_connectivity_test.sh` now auto-detects the controller endpoint directly from `~/.local/share/clash/runtime.yaml` (falling back to `127.0.0.1:9090` only when the runtime file is missing). This prevents false "Controller unreachable" warnings when users customize `external-controller` (e.g., port `9990`).
 - Normalized controller strings (trim spaces/quotes, handle bare `:9990` notation) to keep the diagnostics output clean.
 - Marked `script/clash_diagnose.sh` as executable so it can be launched without manual `chmod +x`.
+- Updated all OpenRouter routing and docs references to use the active base domain `https://openrouter.ai/api/v1/*` (legacy `api.openrouter.ai` DNS has been retired). Existing DNS/rule entries keep the legacy host for compatibility, but the new domain now receives priority in `resources/mixin.yaml` and downstream consumers.
 
 ### ✅ Verification
 - `vpn-tools/network_connectivity_test.sh full`

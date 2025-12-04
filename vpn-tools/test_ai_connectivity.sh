@@ -63,7 +63,7 @@ ENDPOINTS=(
   "latency2:https://www.cloudflare.com/cdn-cgi/trace"
   "scnet:https://api.scnet.cn/api/llm/v1/chat/completions"
   "uiui:https://sg.uiuiapi.com/"
-  "siliconflow:https://api.siliconflow.cn/health"
+  "siliconflow:https://siliconflow.cn/"
   "openrouter:https://openrouter.ai/api/v1"
 )
 
@@ -71,7 +71,7 @@ declare -A ENDPOINT_OK=(
   [default]='200 201 202 203 204 206 301 302'
   [scnet]='200 201 202 203 204 401 403 405'
   [uiui]='200 201 202 203 204 301 302 307 308'
-  [siliconflow]='200 201 202 203 204 401 403'
+  [siliconflow]='200 201 202 203 204 301 302 307 308 401 403'
   [openrouter]='200 201 202 203 204 401 403'
 )
 

@@ -20,6 +20,7 @@ cd vpn-tools
 ./optimize_all_network_fast.sh  # 3–5 min one-click stabilization (guard+AI+verify)
 ./quick_vpn_check.sh             # 30-second status check
 ./optimize_ai.sh                 # AI optimization (ChatGPT, Claude)
+./optimize_dev_nodes.sh          # GitHub / NPM / PyPI optimization
 ./select_youtube_node.sh         # YouTube optimization
 ```
 
@@ -33,11 +34,15 @@ cd vpn-tools
 
 ## 📋 Tool Categories
 
-### � AI Optimization
+### 🤖 AI Optimization
 - **`optimize_ai.sh`** - Quick AI optimization (2-3 min)
 - **`test_ai_connectivity.sh`** - Comprehensive AI testing (15-20 min)
 - **`customize_ai_group.sh`** - Interactive AI management
 - **`quick_ai_test.sh`** - Instant AI verification (30s)
+
+### 🧑‍💻 Dev / Research Optimization
+- **`optimize_dev_nodes.sh`** - Auto-select GitHub/NPM/PyPI friendly nodes (2-3 min)
+- **`quick_dev_research_test.sh`** - Deep diagnostics for GitHub/NPM/PyPI (2-3 min)
 
 ### 🎬 Streaming Optimization
 - **`select_youtube_node.sh`** - Quick YouTube optimization (3-5 min)
@@ -71,6 +76,7 @@ cd vpn-tools
 cd vpn-tools
 ./quick_vpn_check.sh             # Morning status check
 ./optimize_ai.sh                 # Before AI work
+./optimize_dev_nodes.sh          # Before GitHub/NPM work
 ./select_youtube_node.sh         # Before streaming
 ```
 
@@ -80,9 +86,10 @@ cd vpn-tools
 ./quick_vpn_check.sh                    # 1. Quick diagnosis
 ./network_connectivity_test.sh quick    # 2. Detailed check
 ./optimize_ai.sh                        # 3. Fix AI issues
-./select_youtube_node.sh                # 4. Fix YouTube streaming
-./fix_zoom_connectivity.sh              # 5. Fix Zoom connectivity
-./network_connectivity_test.sh full     # 5. Final verification
+./optimize_dev_nodes.sh                 # 4. Fix GitHub/NPM/PyPI latency
+./select_youtube_node.sh                # 5. Fix YouTube streaming
+./fix_zoom_connectivity.sh              # 6. Fix Zoom connectivity
+./network_connectivity_test.sh full     # 7. Final verification
 ```
 
 ### 🚀 Initial Setup
@@ -164,6 +171,7 @@ cd vpn-tools
 cd vpn-tools
 ./quick_vpn_check.sh           # Quick status
 ./optimize_ai.sh               # AI optimization
+./optimize_dev_nodes.sh        # GitHub/NPM/PyPI optimization
 ./select_youtube_node.sh       # YouTube optimization
 ./network_connectivity_test.sh full  # Comprehensive test
 ```

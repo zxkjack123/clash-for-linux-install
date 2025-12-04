@@ -9,6 +9,38 @@ BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PARENT_DIR="$(dirname "$BASE_DIR")"
 LOG_FILE="$HOME/.local/share/clash/logs/optimize_all_$(date +%Y%m%d_%H%M%S).log"
 
+detect_controller() {
+    local runtime="${CLASH_CONFIG_RUNTIME:-$HOME/.local/share/clash/runtime.yaml}"
+    local candidate="" host="" port="" default="http://127.0.0.1:9090"
+    [[ -f "$runtime" ]] || { echo "$default"; return; }
+    if command -v yq >/dev/null 2>&1; then
+        candidate=$(yq '."external-controller" // ""' "$runtime" 2>/dev/null || true)
+    fi
+    if [[ -z "$candidate" ]]; then
+        candidate=$(grep -E '^ *external-controller:' "$runtime" 2>/dev/null | tail -n1 | cut -d':' -f2- | tr -d ' "' || true)
+    fi
+    candidate=${candidate//$'\n'/}
+    candidate=${candidate//\"/}
+    candidate=${candidate//\'/}
+    candidate=${candidate//[[:space:]]/}
+    [[ -z "$candidate" ]] && { echo "$default"; return; }
+    if [[ "$candidate" == http*://* ]]; then
+        echo "$candidate"
+        return
+    fi
+    host=${candidate%:*}
+    port=${candidate##*:}
+    [[ -z "$port" ]] && port=9090
+    case "$host" in
+        ""|"0.0.0.0"|"::") host=127.0.0.1 ;;
+        *) : ;;
+    esac
+    echo "http://${host}:${port}"
+}
+
+API=${CLASH_API:-$(detect_controller)}
+export CLASH_API="$API"
+
 # 加载环境变量配置（.env文件）
 if [[ -f "$BASE_DIR/load_env.sh" ]]; then
     source "$BASE_DIR/load_env.sh"
@@ -67,8 +99,8 @@ check_clash_status() {
         log_success "Clash服务运行正常"
     fi
     
-    if curl -fsS http://127.0.0.1:9090/version >/dev/null 2>&1; then
-        local version=$(curl -s http://127.0.0.1:9090/version | grep -oP '"version":"\K[^"]+' || echo "未知")
+    if curl -fsS "$API/version" >/dev/null 2>&1; then
+        local version=$(curl -s "$API/version" | grep -oP '"version":"\K[^"]+' || echo "未知")
         log_success "Clash API可访问 (版本: $version)"
     else
         log_error "Clash API不可访问"

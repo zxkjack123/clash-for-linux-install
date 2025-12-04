@@ -1,9 +1,9 @@
 mixed-port: 7890
-allow-lan: true
+allow-lan: false
 mode: Rule
 log-level: info
-external-controller: ":9990"
-secret: ""
+external-controller: ':9990'
+secret: ''
 # Clash for Windows
 cfw-latency-url: http://cp.cloudflare.com/generate_204
 cfw-latency-timeout: 3000
@@ -11,814 +11,281 @@ cfw-latency-type: 1
 cfw-conn-break-strategy: true
 # Stash
 url-rewrite:
-  - ^https?:\/\/(www.)?(g|google)\.cn https://www.google.com 302
-  - ^https?:\/\/(ditu|maps).google\.cn https://maps.google.com 302
+    - ^https?:\/\/(www.)?(g|google)\.cn https://www.google.com 302
+    - ^https?:\/\/(ditu|maps).google\.cn https://maps.google.com 302
 clash-for-android:
   append-system-dns: false
 dns:
   enable: true
   enhanced-mode: fake-ip
   fake-ip-range: 198.18.0.1/16
-  nameserver-policy:
-    {
-      "*.tw": 1.1.1.1,
-      testflight.apple.com: 8.8.8.8,
-      "*.tmall.com": 223.5.5.5,
-      "*.taobao.com": 223.5.5.5,
-      "*.alicdn.com": 223.5.5.5,
-      "*.aliyun.com": 223.5.5.5,
-      "*.alipay*.com": 223.5.5.5,
-      "*.alibaba*.com": 223.5.5.5,
-      "*.alimama*.com": 223.5.5.5,
-      "*.qq.com": 114.114.114.114,
-      "*.tencent.com": 114.114.114.114,
-      "*.weixin.com": 114.114.114.114,
-      "*.qpic.cn": 114.114.114.114,
-      "*.jd.com": 114.114.114.114,
-      "*.bilibili.com": 114.114.114.114,
-      hdslb.com: 114.114.114.114,
-      "*.163.com": 119.29.29.29,
-      "*.126.com": 119.29.29.29,
-      "*.126.net": 114.114.114.114,
-      "*.127.net": 114.114.114.114,
-      "*.netease.com": 114.114.114.114,
-      "*.10010.com": 114.114.114.114,
-      "*.unicompayment.com": 114.114.114.114,
-      "*.ximalaya.com": 114.114.114.114,
-      "*.baidu.com": 114.114.114.114,
-      "*.bdstatic.com": 114.114.114.114,
-    }
-  nameserver:
-    [
-      119.29.29.29,
-      223.5.5.5,
-      https://dns.alidns.com/dns-query,
-      https://doh.pub/dns-query,
-      114.114.114.114,
-      156.154.70.1,
-      1.0.0.1,
-      8.8.4.4,
-    ]
-  fallback:
-    [
-      "208.67.222.222:5353",
-      "208.67.220.220:5353",
-      "208.67.222.220:5353",
-      "208.67.220.222:5353",
-      "https://1.1.1.1/dns-query",
-      "https://1.1.1.2/dns-query",
-      "https://1.1.1.3/dns-query",
-      "https://1.0.0.1/dns-query",
-      "https://1.0.0.2/dns-query",
-      "https://1.0.0.3/dns-query",
-      "https://45.11.45.11/dns-query",
-      "https://146.112.41.2/dns-query",
-      "https://162.159.36.1/dns-query",
-      "https://162.159.46.1/dns-query",
-      "https://9.9.9.11:5053/dns-query",
-      "https://101.6.6.6:8443/dns-query",
-      "https://208.67.222.222/dns-query",
-      "https://208.67.220.220/dns-query",
-      "https://185.222.222.222/dns-query",
-      "https://101.101.101.101/dns-query",
-      "https://149.112.112.11:5053/dns-query",
-    ]
-  fallback-filter: { geoip: true, geoip-code: CN, ipcidr: [240.0.0.0/4] }
+  nameserver-policy: {
+    '*.tw': 1.1.1.1,
+    testflight.apple.com: 8.8.8.8,
+    '*.tmall.com': 223.5.5.5,
+    '*.taobao.com': 223.5.5.5,
+    '*.alicdn.com': 223.5.5.5,
+    '*.aliyun.com': 223.5.5.5,
+    '*.alipay*.com': 223.5.5.5,
+    '*.alibaba*.com': 223.5.5.5,
+    '*.alimama*.com': 223.5.5.5,
+    '*.qq.com': 114.114.114.114,
+    '*.tencent.com': 114.114.114.114,
+    '*.weixin.com': 114.114.114.114,
+    '*.qpic.cn': 114.114.114.114,
+    '*.jd.com': 114.114.114.114,
+    '*.bilibili.com': 114.114.114.114,
+    hdslb.com: 114.114.114.114,
+    '*.163.com': 119.29.29.29,
+    '*.126.com': 119.29.29.29,
+    '*.126.net': 114.114.114.114,
+    '*.127.net': 114.114.114.114,
+    '*.netease.com': 114.114.114.114,
+    '*.10010.com': 114.114.114.114,
+    '*.unicompayment.com': 114.114.114.114,
+    '*.ximalaya.com': 114.114.114.114,
+    '*.baidu.com': 114.114.114.114,
+    '*.bdstatic.com': 114.114.114.114
+  }
+  nameserver: [
+    119.29.29.29,
+    223.5.5.5,
+    https://dns.alidns.com/dns-query,
+    https://doh.pub/dns-query,
+    114.114.114.114,
+    156.154.70.1,
+    1.0.0.1,
+    8.8.4.4
+  ]
+  fallback: [
+    '208.67.222.222:5353',
+    '208.67.220.220:5353',
+    '208.67.222.220:5353',
+    '208.67.220.222:5353',
+    'https://1.1.1.1/dns-query',
+    'https://1.1.1.2/dns-query',
+    'https://1.1.1.3/dns-query',
+    'https://1.0.0.1/dns-query',
+    'https://1.0.0.2/dns-query',
+    'https://1.0.0.3/dns-query',
+    'https://45.11.45.11/dns-query',
+    'https://146.112.41.2/dns-query',
+    'https://162.159.36.1/dns-query',
+    'https://162.159.46.1/dns-query',
+    'https://9.9.9.11:5053/dns-query',
+    'https://101.6.6.6:8443/dns-query',
+    'https://208.67.222.222/dns-query',
+    'https://208.67.220.220/dns-query',
+    'https://185.222.222.222/dns-query',
+    'https://101.101.101.101/dns-query',
+    'https://149.112.112.11:5053/dns-query'
+  ]
+  fallback-filter: {
+    geoip: true,
+    geoip-code: CN,
+    ipcidr: [240.0.0.0/4]
+  }
 proxies:
-  - {
-      "name": "V4-121|香港|x1.0",
-      "type": "vmess",
-      "server": "qszx.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50121,
-      "uuid": "2bf6356a-89bf-3f38-88e9-566fa1e9fd3a",
-      "alterId": 0,
-      "cipher": "auto",
-      "udp": true,
-      "tags": "hk",
-      "network": "ws",
-      "ws-opts":
-        { "path": "/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8" },
-      "skip-cert-verify": false,
-    }
-  - {
-      "name": "V4-133|香港|x2.0",
-      "type": "vmess",
-      "server": "qszx.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50133,
-      "uuid": "2bf6356a-89bf-3f38-88e9-566fa1e9fd3a",
-      "alterId": 0,
-      "cipher": "auto",
-      "udp": true,
-      "tags": "hk",
-      "network": "ws",
-      "ws-opts":
-        { "path": "/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8" },
-      "skip-cert-verify": false,
-    }
-  - {
-      "name": "V4-153|香港|x2.0",
-      "type": "vmess",
-      "server": "wybzda.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50153,
-      "uuid": "2bf6356a-89bf-3f38-88e9-566fa1e9fd3a",
-      "alterId": 0,
-      "cipher": "auto",
-      "udp": true,
-      "tags": "hk",
-      "network": "ws",
-      "ws-opts":
-        { "path": "/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8" },
-      "skip-cert-verify": false,
-    }
-  - {
-      "name": "V4-161|香港|x2.0",
-      "type": "vmess",
-      "server": "qszx.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50161,
-      "uuid": "2bf6356a-89bf-3f38-88e9-566fa1e9fd3a",
-      "alterId": 0,
-      "cipher": "auto",
-      "udp": true,
-      "tags": "hk",
-      "network": "ws",
-      "ws-opts":
-        { "path": "/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8" },
-      "skip-cert-verify": false,
-    }
-  - {
-      "name": "V4-174|香港|x2.0",
-      "type": "vmess",
-      "server": "wybzda.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50174,
-      "uuid": "2bf6356a-89bf-3f38-88e9-566fa1e9fd3a",
-      "alterId": 0,
-      "cipher": "auto",
-      "udp": true,
-      "tags": "hk",
-      "network": "ws",
-      "ws-opts":
-        { "path": "/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8" },
-      "skip-cert-verify": false,
-    }
-  - {
-      "name": "V4-18|新加坡|x1.0",
-      "type": "vmess",
-      "server": "aasx2.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50018,
-      "uuid": "2bf6356a-89bf-3f38-88e9-566fa1e9fd3a",
-      "alterId": 0,
-      "cipher": "auto",
-      "udp": true,
-      "tags": "sg",
-      "network": "ws",
-      "ws-opts":
-        { "path": "/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8" },
-      "skip-cert-verify": false,
-    }
-  - {
-      "name": "V4-192|日本|x2.0",
-      "type": "vmess",
-      "server": "sttrbjp.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50192,
-      "uuid": "2bf6356a-89bf-3f38-88e9-566fa1e9fd3a",
-      "alterId": 0,
-      "cipher": "auto",
-      "udp": true,
-      "tags": "jp",
-      "network": "ws",
-      "ws-opts":
-        { "path": "/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8" },
-      "skip-cert-verify": false,
-    }
-  - {
-      "name": "V4-193|日本|x2.0",
-      "type": "vmess",
-      "server": "sttrbjp.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50193,
-      "uuid": "2bf6356a-89bf-3f38-88e9-566fa1e9fd3a",
-      "alterId": 0,
-      "cipher": "auto",
-      "udp": true,
-      "tags": "jp",
-      "network": "ws",
-      "ws-opts":
-        { "path": "/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8" },
-      "skip-cert-verify": false,
-    }
-  - {
-      "name": "V4-194|日本|x1.0",
-      "type": "vmess",
-      "server": "sttrbjp.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50194,
-      "uuid": "2bf6356a-89bf-3f38-88e9-566fa1e9fd3a",
-      "alterId": 0,
-      "cipher": "auto",
-      "udp": true,
-      "tags": "jp",
-      "network": "ws",
-      "ws-opts":
-        { "path": "/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8" },
-      "skip-cert-verify": false,
-    }
-  - {
-      "name": "V4-19|新加坡|x1.0",
-      "type": "vmess",
-      "server": "aasx2.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50019,
-      "uuid": "2bf6356a-89bf-3f38-88e9-566fa1e9fd3a",
-      "alterId": 0,
-      "cipher": "auto",
-      "udp": true,
-      "tags": "sg",
-      "network": "ws",
-      "ws-opts":
-        { "path": "/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8" },
-      "skip-cert-verify": false,
-    }
-  - {
-      "name": "V4-20|香港|x1.5",
-      "type": "vmess",
-      "server": "hyhda123.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50020,
-      "uuid": "2bf6356a-89bf-3f38-88e9-566fa1e9fd3a",
-      "alterId": 0,
-      "cipher": "auto",
-      "udp": true,
-      "tags": "hk",
-      "network": "ws",
-      "ws-opts":
-        { "path": "/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8" },
-      "skip-cert-verify": false,
-    }
-  - {
-      "name": "V4-210|日本|x1.5",
-      "type": "vmess",
-      "server": "dcv69.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50210,
-      "uuid": "2bf6356a-89bf-3f38-88e9-566fa1e9fd3a",
-      "alterId": 0,
-      "cipher": "auto",
-      "udp": true,
-      "tags": "jp",
-      "network": "ws",
-      "ws-opts":
-        { "path": "/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8" },
-      "skip-cert-verify": false,
-    }
-  - {
-      "name": "V4-222|香港|x1.5",
-      "type": "vmess",
-      "server": "hyhda123.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50222,
-      "uuid": "2bf6356a-89bf-3f38-88e9-566fa1e9fd3a",
-      "alterId": 0,
-      "cipher": "auto",
-      "udp": true,
-      "tags": "hk",
-      "network": "ws",
-      "ws-opts":
-        { "path": "/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8" },
-      "skip-cert-verify": false,
-    }
-  - {
-      "name": "V4-235|香港|x1.5",
-      "type": "vmess",
-      "server": "chfgmdbg.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50235,
-      "uuid": "2bf6356a-89bf-3f38-88e9-566fa1e9fd3a",
-      "alterId": 0,
-      "cipher": "auto",
-      "udp": true,
-      "tags": "hk",
-      "network": "ws",
-      "ws-opts":
-        { "path": "/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8" },
-      "skip-cert-verify": false,
-    }
-  - {
-      "name": "V4-236|香港|x1.5",
-      "type": "vmess",
-      "server": "chfgmdbg.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50236,
-      "uuid": "2bf6356a-89bf-3f38-88e9-566fa1e9fd3a",
-      "alterId": 0,
-      "cipher": "auto",
-      "udp": true,
-      "tags": "hk",
-      "network": "ws",
-      "ws-opts":
-        { "path": "/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8" },
-      "skip-cert-verify": false,
-    }
-  - {
-      "name": "V4-24|香港|x1.5",
-      "type": "vmess",
-      "server": "hyhda123.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50024,
-      "uuid": "2bf6356a-89bf-3f38-88e9-566fa1e9fd3a",
-      "alterId": 0,
-      "cipher": "auto",
-      "udp": true,
-      "tags": "hk",
-      "network": "ws",
-      "ws-opts":
-        { "path": "/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8" },
-      "skip-cert-verify": false,
-    }
-  - {
-      "name": "V4-29|台湾|x2.0",
-      "type": "vmess",
-      "server": "bnm4.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50029,
-      "uuid": "2bf6356a-89bf-3f38-88e9-566fa1e9fd3a",
-      "alterId": 0,
-      "cipher": "auto",
-      "udp": true,
-      "tags": "tw",
-      "network": "ws",
-      "ws-opts":
-        { "path": "/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8" },
-      "skip-cert-verify": false,
-    }
-  - {
-      "name": "V4-30|台湾|x2.0",
-      "type": "vmess",
-      "server": "bnm4.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50030,
-      "uuid": "2bf6356a-89bf-3f38-88e9-566fa1e9fd3a",
-      "alterId": 0,
-      "cipher": "auto",
-      "udp": true,
-      "tags": "tw",
-      "network": "ws",
-      "ws-opts":
-        { "path": "/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8" },
-      "skip-cert-verify": false,
-    }
-  - {
-      "name": "V4-46|日本|x1.5",
-      "type": "vmess",
-      "server": "dcv69.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50046,
-      "uuid": "2bf6356a-89bf-3f38-88e9-566fa1e9fd3a",
-      "alterId": 0,
-      "cipher": "auto",
-      "udp": true,
-      "tags": "jp",
-      "network": "ws",
-      "ws-opts":
-        { "path": "/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8" },
-      "skip-cert-verify": false,
-    }
-  - {
-      "name": "V4-86|香港|x2.0",
-      "type": "vmess",
-      "server": "qszx.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50086,
-      "uuid": "2bf6356a-89bf-3f38-88e9-566fa1e9fd3a",
-      "alterId": 0,
-      "cipher": "auto",
-      "udp": true,
-      "tags": "hk",
-      "network": "ws",
-      "ws-opts":
-        { "path": "/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8" },
-      "skip-cert-verify": false,
-    }
-  - {
-      "name": "V4-117|香港|x1.0 ",
-      "type": "ssr",
-      "server": "qszx.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50117,
-      "cipher": "chacha20-ietf",
-      "password": "jL76UJd",
-      "protocol": "auth_aes128_sha1",
-      "protocol-param": "414167:UeuELP",
-      "obfs": "tls1.2_ticket_auth",
-      "obfs-param": "ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com",
-      "udp": true,
-      "tags": "hk",
-    }
-  - {
-      "name": "V4-131|香港|x2.0 ",
-      "type": "ssr",
-      "server": "qszx.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50131,
-      "cipher": "chacha20-ietf",
-      "password": "jL76UJd",
-      "protocol": "auth_aes128_sha1",
-      "protocol-param": "414167:UeuELP",
-      "obfs": "tls1.2_ticket_auth",
-      "obfs-param": "ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com",
-      "udp": true,
-      "tags": "hk",
-    }
-  - {
-      "name": "V4-149|香港|x2.0 ",
-      "type": "ssr",
-      "server": "wsmwa.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50149,
-      "cipher": "chacha20-ietf",
-      "password": "jL76UJd",
-      "protocol": "auth_aes128_sha1",
-      "protocol-param": "414167:UeuELP",
-      "obfs": "tls1.2_ticket_auth",
-      "obfs-param": "ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com",
-      "udp": true,
-      "tags": "hk",
-    }
-  - {
-      "name": "V4-157|香港|x2.0 ",
-      "type": "ssr",
-      "server": "qszx.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50157,
-      "cipher": "chacha20-ietf",
-      "password": "jL76UJd",
-      "protocol": "auth_aes128_sha1",
-      "protocol-param": "414167:UeuELP",
-      "obfs": "tls1.2_ticket_auth",
-      "obfs-param": "ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com",
-      "udp": true,
-      "tags": "hk",
-    }
-  - {
-      "name": "V4-15|新加坡|x1.0 ",
-      "type": "ssr",
-      "server": "aasx2.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50015,
-      "cipher": "chacha20-ietf",
-      "password": "jL76UJd",
-      "protocol": "auth_aes128_sha1",
-      "protocol-param": "414167:UeuELP",
-      "obfs": "tls1.2_ticket_auth",
-      "obfs-param": "ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com",
-      "udp": true,
-      "tags": "sg",
-    }
-  - {
-      "name": "V4-16|新加坡|x1.0 ",
-      "type": "ssr",
-      "server": "aasx2.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50016,
-      "cipher": "chacha20-ietf",
-      "password": "jL76UJd",
-      "protocol": "auth_aes128_sha1",
-      "protocol-param": "414167:UeuELP",
-      "obfs": "tls1.2_ticket_auth",
-      "obfs-param": "ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com",
-      "udp": true,
-      "tags": "sg",
-    }
-  - {
-      "name": "V4-170|香港|x2.0 ",
-      "type": "ssr",
-      "server": "wsmwa.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50170,
-      "cipher": "chacha20-ietf",
-      "password": "jL76UJd",
-      "protocol": "auth_aes128_sha1",
-      "protocol-param": "414167:UeuELP",
-      "obfs": "tls1.2_ticket_auth",
-      "obfs-param": "ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com",
-      "udp": true,
-      "tags": "hk",
-    }
-  - {
-      "name": "V4-17|香港|x1.5 ",
-      "type": "ssr",
-      "server": "sutyckla1.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50017,
-      "cipher": "chacha20-ietf",
-      "password": "jL76UJd",
-      "protocol": "auth_aes128_sha1",
-      "protocol-param": "414167:UeuELP",
-      "obfs": "tls1.2_ticket_auth",
-      "obfs-param": "ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com",
-      "udp": true,
-      "tags": "hk",
-    }
-  - {
-      "name": "V4-182|日本|x2.0 ",
-      "type": "ssr",
-      "server": "sttrbjp.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50182,
-      "cipher": "chacha20-ietf",
-      "password": "jL76UJd",
-      "protocol": "auth_aes128_sha1",
-      "protocol-param": "414167:UeuELP",
-      "obfs": "tls1.2_ticket_auth",
-      "obfs-param": "ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com",
-      "udp": true,
-      "tags": "jp",
-    }
-  - {
-      "name": "V4-183|日本|x2.0 ",
-      "type": "ssr",
-      "server": "sttrbjp.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50183,
-      "cipher": "chacha20-ietf",
-      "password": "jL76UJd",
-      "protocol": "auth_aes128_sha1",
-      "protocol-param": "414167:UeuELP",
-      "obfs": "tls1.2_ticket_auth",
-      "obfs-param": "ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com",
-      "udp": true,
-      "tags": "jp",
-    }
-  - {
-      "name": "V4-184|日本|x1.0 ",
-      "type": "ssr",
-      "server": "sttrbjp.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50184,
-      "cipher": "chacha20-ietf",
-      "password": "jL76UJd",
-      "protocol": "auth_aes128_sha1",
-      "protocol-param": "414167:UeuELP",
-      "obfs": "tls1.2_ticket_auth",
-      "obfs-param": "ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com",
-      "udp": true,
-      "tags": "jp",
-    }
-  - {
-      "name": "V4-206|日本|x1.5 ",
-      "type": "ssr",
-      "server": "dcv69.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50206,
-      "cipher": "chacha20-ietf",
-      "password": "jL76UJd",
-      "protocol": "auth_aes128_sha1",
-      "protocol-param": "414167:UeuELP",
-      "obfs": "tls1.2_ticket_auth",
-      "obfs-param": "ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com",
-      "udp": true,
-      "tags": "jp",
-    }
-  - {
-      "name": "V4-219|香港|x1.5 ",
-      "type": "ssr",
-      "server": "sutyckla1.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50219,
-      "cipher": "chacha20-ietf",
-      "password": "jL76UJd",
-      "protocol": "auth_aes128_sha1",
-      "protocol-param": "414167:UeuELP",
-      "obfs": "tls1.2_ticket_auth",
-      "obfs-param": "ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com",
-      "udp": true,
-      "tags": "hk",
-    }
-  - {
-      "name": "V4-21|香港|x1.5 ",
-      "type": "ssr",
-      "server": "sutyckla1.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50021,
-      "cipher": "chacha20-ietf",
-      "password": "jL76UJd",
-      "protocol": "auth_aes128_sha1",
-      "protocol-param": "414167:UeuELP",
-      "obfs": "tls1.2_ticket_auth",
-      "obfs-param": "ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com",
-      "udp": true,
-      "tags": "hk",
-    }
-  - {
-      "name": "V4-230|香港|x1.5 ",
-      "type": "ssr",
-      "server": "chfgmdbg.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50230,
-      "cipher": "chacha20-ietf",
-      "password": "jL76UJd",
-      "protocol": "auth_aes128_sha1",
-      "protocol-param": "414167:UeuELP",
-      "obfs": "tls1.2_ticket_auth",
-      "obfs-param": "ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com",
-      "udp": true,
-      "tags": "hk",
-    }
-  - {
-      "name": "V4-231|香港|x1.5 ",
-      "type": "ssr",
-      "server": "chfgmdbg.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50231,
-      "cipher": "chacha20-ietf",
-      "password": "jL76UJd",
-      "protocol": "auth_aes128_sha1",
-      "protocol-param": "414167:UeuELP",
-      "obfs": "tls1.2_ticket_auth",
-      "obfs-param": "ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com",
-      "udp": true,
-      "tags": "hk",
-    }
-  - {
-      "name": "V4-27|台湾|x2.0 ",
-      "type": "ssr",
-      "server": "bnm4.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50027,
-      "cipher": "chacha20-ietf",
-      "password": "jL76UJd",
-      "protocol": "auth_aes128_sha1",
-      "protocol-param": "414167:UeuELP",
-      "obfs": "tls1.2_ticket_auth",
-      "obfs-param": "ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com",
-      "udp": true,
-      "tags": "tw",
-    }
-  - {
-      "name": "V4-28|台湾|x2.0 ",
-      "type": "ssr",
-      "server": "bnm4.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50028,
-      "cipher": "chacha20-ietf",
-      "password": "jL76UJd",
-      "protocol": "auth_aes128_sha1",
-      "protocol-param": "414167:UeuELP",
-      "obfs": "tls1.2_ticket_auth",
-      "obfs-param": "ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com",
-      "udp": true,
-      "tags": "tw",
-    }
-  - {
-      "name": "V4-43|日本|x1.5 ",
-      "type": "ssr",
-      "server": "dcv69.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50043,
-      "cipher": "chacha20-ietf",
-      "password": "jL76UJd",
-      "protocol": "auth_aes128_sha1",
-      "protocol-param": "414167:UeuELP",
-      "obfs": "tls1.2_ticket_auth",
-      "obfs-param": "ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com",
-      "udp": true,
-      "tags": "jp",
-    }
-  - {
-      "name": "V4-84|香港|x2.0 ",
-      "type": "ssr",
-      "server": "qszx.cdn.node.a.cndsytdmiee.xyz",
-      "port": 50084,
-      "cipher": "chacha20-ietf",
-      "password": "jL76UJd",
-      "protocol": "auth_aes128_sha1",
-      "protocol-param": "414167:UeuELP",
-      "obfs": "tls1.2_ticket_auth",
-      "obfs-param": "ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com",
-      "udp": true,
-      "tags": "hk",
-    }
+  - {"name":"V4-121|香港|x1.0","type":"vmess","server":"qszx.cdn.node.a.datahub7.net","port":50121,"uuid":"2bf6356a-89bf-3f38-88e9-566fa1e9fd3a","alterId":0,"cipher":"auto","udp":true,"tags":"hk","network":"ws","ws-opts":{"path":"/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8"},"skip-cert-verify":false}
+  - {"name":"V4-133|香港|x2.0","type":"vmess","server":"qszx.cdn.node.a.datahub7.net","port":50133,"uuid":"2bf6356a-89bf-3f38-88e9-566fa1e9fd3a","alterId":0,"cipher":"auto","udp":true,"tags":"hk","network":"ws","ws-opts":{"path":"/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8"},"skip-cert-verify":false}
+  - {"name":"V4-153|香港|x2.0","type":"vmess","server":"wybzda.cdn.node.a.datahub7.net","port":50153,"uuid":"2bf6356a-89bf-3f38-88e9-566fa1e9fd3a","alterId":0,"cipher":"auto","udp":true,"tags":"hk","network":"ws","ws-opts":{"path":"/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8"},"skip-cert-verify":false}
+  - {"name":"V4-161|香港|x2.0","type":"vmess","server":"qszx.cdn.node.a.datahub7.net","port":50161,"uuid":"2bf6356a-89bf-3f38-88e9-566fa1e9fd3a","alterId":0,"cipher":"auto","udp":true,"tags":"hk","network":"ws","ws-opts":{"path":"/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8"},"skip-cert-verify":false}
+  - {"name":"V4-174|香港|x2.0","type":"vmess","server":"wybzda.cdn.node.a.datahub7.net","port":50174,"uuid":"2bf6356a-89bf-3f38-88e9-566fa1e9fd3a","alterId":0,"cipher":"auto","udp":true,"tags":"hk","network":"ws","ws-opts":{"path":"/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8"},"skip-cert-verify":false}
+  - {"name":"V4-18|新加坡|x1.0","type":"vmess","server":"aasx2.cdn.node.a.datahub7.net","port":50018,"uuid":"2bf6356a-89bf-3f38-88e9-566fa1e9fd3a","alterId":0,"cipher":"auto","udp":true,"tags":"sg","network":"ws","ws-opts":{"path":"/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8"},"skip-cert-verify":false}
+  - {"name":"V4-192|日本GPT|x1.5","type":"vmess","server":"sttrbjp.cdn.node.a.datahub7.net","port":50192,"uuid":"2bf6356a-89bf-3f38-88e9-566fa1e9fd3a","alterId":0,"cipher":"auto","udp":true,"tags":"jp","network":"ws","ws-opts":{"path":"/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8"},"skip-cert-verify":false}
+  - {"name":"V4-193|日本GPT|x1.5","type":"vmess","server":"sttrbjp.cdn.node.a.datahub7.net","port":50193,"uuid":"2bf6356a-89bf-3f38-88e9-566fa1e9fd3a","alterId":0,"cipher":"auto","udp":true,"tags":"jp","network":"ws","ws-opts":{"path":"/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8"},"skip-cert-verify":false}
+  - {"name":"V4-194|日本GPT|x1.0","type":"vmess","server":"sttrbjp.cdn.node.a.datahub7.net","port":50194,"uuid":"2bf6356a-89bf-3f38-88e9-566fa1e9fd3a","alterId":0,"cipher":"auto","udp":true,"tags":"jp","network":"ws","ws-opts":{"path":"/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8"},"skip-cert-verify":false}
+  - {"name":"V4-19|新加坡|x1.0","type":"vmess","server":"cvb7.cdn.node.a.datahub7.net","port":50019,"uuid":"2bf6356a-89bf-3f38-88e9-566fa1e9fd3a","alterId":0,"cipher":"auto","udp":true,"tags":"sg","network":"ws","ws-opts":{"path":"/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8"},"skip-cert-verify":false}
+  - {"name":"V4-20|香港|x1.5","type":"vmess","server":"hyhda123.cdn.node.a.datahub7.net","port":50020,"uuid":"2bf6356a-89bf-3f38-88e9-566fa1e9fd3a","alterId":0,"cipher":"auto","udp":true,"tags":"hk","network":"ws","ws-opts":{"path":"/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8"},"skip-cert-verify":false}
+  - {"name":"V4-210|日本|x1.5","type":"vmess","server":"dcv69.cdn.node.a.datahub7.net","port":50210,"uuid":"2bf6356a-89bf-3f38-88e9-566fa1e9fd3a","alterId":0,"cipher":"auto","udp":true,"tags":"jp","network":"ws","ws-opts":{"path":"/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8"},"skip-cert-verify":false}
+  - {"name":"V4-222|香港|x1.5","type":"vmess","server":"sutyckla1.cdn.node.a.datahub7.net","port":50222,"uuid":"2bf6356a-89bf-3f38-88e9-566fa1e9fd3a","alterId":0,"cipher":"auto","udp":true,"tags":"hk","network":"ws","ws-opts":{"path":"/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8"},"skip-cert-verify":false}
+  - {"name":"V4-235|香港|x1.5","type":"vmess","server":"chfgmdbg.cdn.node.a.datahub7.net","port":50235,"uuid":"2bf6356a-89bf-3f38-88e9-566fa1e9fd3a","alterId":0,"cipher":"auto","udp":true,"tags":"hk","network":"ws","ws-opts":{"path":"/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8"},"skip-cert-verify":false}
+  - {"name":"V4-236|香港|x1.5","type":"vmess","server":"chfgmdbg.cdn.node.a.datahub7.net","port":50236,"uuid":"2bf6356a-89bf-3f38-88e9-566fa1e9fd3a","alterId":0,"cipher":"auto","udp":true,"tags":"hk","network":"ws","ws-opts":{"path":"/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8"},"skip-cert-verify":false}
+  - {"name":"V4-24|香港|x1.5","type":"vmess","server":"hyhda123.cdn.node.a.datahub7.net","port":50024,"uuid":"2bf6356a-89bf-3f38-88e9-566fa1e9fd3a","alterId":0,"cipher":"auto","udp":true,"tags":"hk","network":"ws","ws-opts":{"path":"/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8"},"skip-cert-verify":false}
+  - {"name":"V4-29|台湾|x2.0","type":"vmess","server":"bnm4.cdn.node.a.datahub7.net","port":50029,"uuid":"2bf6356a-89bf-3f38-88e9-566fa1e9fd3a","alterId":0,"cipher":"auto","udp":true,"tags":"tw","network":"ws","ws-opts":{"path":"/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8"},"skip-cert-verify":false}
+  - {"name":"V4-30|台湾|x2.0","type":"vmess","server":"bnm4.cdn.node.a.datahub7.net","port":50030,"uuid":"2bf6356a-89bf-3f38-88e9-566fa1e9fd3a","alterId":0,"cipher":"auto","udp":true,"tags":"tw","network":"ws","ws-opts":{"path":"/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8"},"skip-cert-verify":false}
+  - {"name":"V4-46|日本|x1.5","type":"vmess","server":"dcv69.cdn.node.a.datahub7.net","port":50046,"uuid":"2bf6356a-89bf-3f38-88e9-566fa1e9fd3a","alterId":0,"cipher":"auto","udp":true,"tags":"jp","network":"ws","ws-opts":{"path":"/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8"},"skip-cert-verify":false}
+  - {"name":"V4-86|香港|x2.0","type":"vmess","server":"qszx.cdn.node.a.datahub7.net","port":50086,"uuid":"2bf6356a-89bf-3f38-88e9-566fa1e9fd3a","alterId":0,"cipher":"auto","udp":true,"tags":"hk","network":"ws","ws-opts":{"path":"/009c250b-54f5-43a8-8b18-dccbb5d8c66a.y.live01.m3u8"},"skip-cert-verify":false}
+  - {"name":"V4-117|香港|x1.0 ","type":"ssr","server":"qszx.cdn.node.a.datahub7.net","port":50117,"cipher":"chacha20-ietf","password":"jL76UJd","protocol":"auth_aes128_sha1","protocol-param":"414167:UeuELP","obfs":"tls1.2_ticket_auth","obfs-param":"ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com","udp":true,"tags":"hk"}
+  - {"name":"V4-131|香港|x2.0 ","type":"ssr","server":"qszx.cdn.node.a.datahub7.net","port":50131,"cipher":"chacha20-ietf","password":"jL76UJd","protocol":"auth_aes128_sha1","protocol-param":"414167:UeuELP","obfs":"tls1.2_ticket_auth","obfs-param":"ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com","udp":true,"tags":"hk"}
+  - {"name":"V4-149|香港|x2.0 ","type":"ssr","server":"wsmwa.cdn.node.a.datahub7.net","port":50149,"cipher":"chacha20-ietf","password":"jL76UJd","protocol":"auth_aes128_sha1","protocol-param":"414167:UeuELP","obfs":"tls1.2_ticket_auth","obfs-param":"ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com","udp":true,"tags":"hk"}
+  - {"name":"V4-157|香港|x2.0 ","type":"ssr","server":"qszx.cdn.node.a.datahub7.net","port":50157,"cipher":"chacha20-ietf","password":"jL76UJd","protocol":"auth_aes128_sha1","protocol-param":"414167:UeuELP","obfs":"tls1.2_ticket_auth","obfs-param":"ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com","udp":true,"tags":"hk"}
+  - {"name":"V4-15|新加坡|x1.0 ","type":"ssr","server":"cvb7.cdn.node.a.datahub7.net","port":50015,"cipher":"chacha20-ietf","password":"jL76UJd","protocol":"auth_aes128_sha1","protocol-param":"414167:UeuELP","obfs":"tls1.2_ticket_auth","obfs-param":"ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com","udp":true,"tags":"sg"}
+  - {"name":"V4-16|新加坡|x1.0 ","type":"ssr","server":"aasx2.cdn.node.a.datahub7.net","port":50016,"cipher":"chacha20-ietf","password":"jL76UJd","protocol":"auth_aes128_sha1","protocol-param":"414167:UeuELP","obfs":"tls1.2_ticket_auth","obfs-param":"ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com","udp":true,"tags":"sg"}
+  - {"name":"V4-170|香港|x2.0 ","type":"ssr","server":"wsmwa.cdn.node.a.datahub7.net","port":50170,"cipher":"chacha20-ietf","password":"jL76UJd","protocol":"auth_aes128_sha1","protocol-param":"414167:UeuELP","obfs":"tls1.2_ticket_auth","obfs-param":"ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com","udp":true,"tags":"hk"}
+  - {"name":"V4-17|香港|x1.5 ","type":"ssr","server":"hyhda123.cdn.node.a.datahub7.net","port":50017,"cipher":"chacha20-ietf","password":"jL76UJd","protocol":"auth_aes128_sha1","protocol-param":"414167:UeuELP","obfs":"tls1.2_ticket_auth","obfs-param":"ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com","udp":true,"tags":"hk"}
+  - {"name":"V4-182|日本GPT|x1.5 ","type":"ssr","server":"sttrbjp.cdn.node.a.datahub7.net","port":50182,"cipher":"chacha20-ietf","password":"jL76UJd","protocol":"auth_aes128_sha1","protocol-param":"414167:UeuELP","obfs":"tls1.2_ticket_auth","obfs-param":"ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com","udp":true,"tags":"jp"}
+  - {"name":"V4-183|日本GPT|x1.5 ","type":"ssr","server":"sttrbjp.cdn.node.a.datahub7.net","port":50183,"cipher":"chacha20-ietf","password":"jL76UJd","protocol":"auth_aes128_sha1","protocol-param":"414167:UeuELP","obfs":"tls1.2_ticket_auth","obfs-param":"ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com","udp":true,"tags":"jp"}
+  - {"name":"V4-184|日本GPT|x1.0 ","type":"ssr","server":"sttrbjp.cdn.node.a.datahub7.net","port":50184,"cipher":"chacha20-ietf","password":"jL76UJd","protocol":"auth_aes128_sha1","protocol-param":"414167:UeuELP","obfs":"tls1.2_ticket_auth","obfs-param":"ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com","udp":true,"tags":"jp"}
+  - {"name":"V4-206|日本|x1.5 ","type":"ssr","server":"dcv69.cdn.node.a.datahub7.net","port":50206,"cipher":"chacha20-ietf","password":"jL76UJd","protocol":"auth_aes128_sha1","protocol-param":"414167:UeuELP","obfs":"tls1.2_ticket_auth","obfs-param":"ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com","udp":true,"tags":"jp"}
+  - {"name":"V4-219|香港|x1.5 ","type":"ssr","server":"sutyckla1.cdn.node.a.datahub7.net","port":50219,"cipher":"chacha20-ietf","password":"jL76UJd","protocol":"auth_aes128_sha1","protocol-param":"414167:UeuELP","obfs":"tls1.2_ticket_auth","obfs-param":"ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com","udp":true,"tags":"hk"}
+  - {"name":"V4-21|香港|x1.5 ","type":"ssr","server":"sutyckla1.cdn.node.a.datahub7.net","port":50021,"cipher":"chacha20-ietf","password":"jL76UJd","protocol":"auth_aes128_sha1","protocol-param":"414167:UeuELP","obfs":"tls1.2_ticket_auth","obfs-param":"ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com","udp":true,"tags":"hk"}
+  - {"name":"V4-230|香港|x1.5 ","type":"ssr","server":"chfgmdbg.cdn.node.a.datahub7.net","port":50230,"cipher":"chacha20-ietf","password":"jL76UJd","protocol":"auth_aes128_sha1","protocol-param":"414167:UeuELP","obfs":"tls1.2_ticket_auth","obfs-param":"ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com","udp":true,"tags":"hk"}
+  - {"name":"V4-231|香港|x1.5 ","type":"ssr","server":"chfgmdbg.cdn.node.a.datahub7.net","port":50231,"cipher":"chacha20-ietf","password":"jL76UJd","protocol":"auth_aes128_sha1","protocol-param":"414167:UeuELP","obfs":"tls1.2_ticket_auth","obfs-param":"ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com","udp":true,"tags":"hk"}
+  - {"name":"V4-27|台湾|x2.0 ","type":"ssr","server":"bnm4.cdn.node.a.datahub7.net","port":50027,"cipher":"chacha20-ietf","password":"jL76UJd","protocol":"auth_aes128_sha1","protocol-param":"414167:UeuELP","obfs":"tls1.2_ticket_auth","obfs-param":"ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com","udp":true,"tags":"tw"}
+  - {"name":"V4-28|台湾|x2.0 ","type":"ssr","server":"bnm4.cdn.node.a.datahub7.net","port":50028,"cipher":"chacha20-ietf","password":"jL76UJd","protocol":"auth_aes128_sha1","protocol-param":"414167:UeuELP","obfs":"tls1.2_ticket_auth","obfs-param":"ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com","udp":true,"tags":"tw"}
+  - {"name":"V4-43|日本|x1.5 ","type":"ssr","server":"dcv69.cdn.node.a.datahub7.net","port":50043,"cipher":"chacha20-ietf","password":"jL76UJd","protocol":"auth_aes128_sha1","protocol-param":"414167:UeuELP","obfs":"tls1.2_ticket_auth","obfs-param":"ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com","udp":true,"tags":"jp"}
+  - {"name":"V4-84|香港|x2.0 ","type":"ssr","server":"qszx.cdn.node.a.datahub7.net","port":50084,"cipher":"chacha20-ietf","password":"jL76UJd","protocol":"auth_aes128_sha1","protocol-param":"414167:UeuELP","obfs":"tls1.2_ticket_auth","obfs-param":"ceb2c414167.cloudfront.com,cloudflare.com,itunes.apple.com,www.icloud.com,ajax.microsoft.com,apps.bdimg.com,www.bing.com","udp":true,"tags":"hk"}
 proxy-groups:
-  - name: 速云梯
-    type: select
-    proxies:
-      - "🇭🇰 HK-自动选择"
-      - "🇯🇵 JP-自动选择"
-      - "🇸🇬 SG-自动选择"
-      - "🇹🇼 TW-自动选择"
-      - 故障转移
-      - V4-121|香港|x1.0
-      - V4-133|香港|x2.0
-      - V4-153|香港|x2.0
-      - V4-161|香港|x2.0
-      - V4-174|香港|x2.0
-      - V4-18|新加坡|x1.0
-      - V4-192|日本|x2.0
-      - V4-193|日本|x2.0
-      - V4-194|日本|x1.0
-      - V4-19|新加坡|x1.0
-      - V4-20|香港|x1.5
-      - V4-210|日本|x1.5
-      - V4-222|香港|x1.5
-      - V4-235|香港|x1.5
-      - V4-236|香港|x1.5
-      - V4-24|香港|x1.5
-      - V4-29|台湾|x2.0
-      - V4-30|台湾|x2.0
-      - V4-46|日本|x1.5
-      - V4-86|香港|x2.0
-      - "V4-117|香港|x1.0 "
-      - "V4-131|香港|x2.0 "
-      - "V4-149|香港|x2.0 "
-      - "V4-157|香港|x2.0 "
-      - "V4-15|新加坡|x1.0 "
-      - "V4-16|新加坡|x1.0 "
-      - "V4-170|香港|x2.0 "
-      - "V4-17|香港|x1.5 "
-      - "V4-182|日本|x2.0 "
-      - "V4-183|日本|x2.0 "
-      - "V4-184|日本|x1.0 "
-      - "V4-206|日本|x1.5 "
-      - "V4-219|香港|x1.5 "
-      - "V4-21|香港|x1.5 "
-      - "V4-230|香港|x1.5 "
-      - "V4-231|香港|x1.5 "
-      - "V4-27|台湾|x2.0 "
-      - "V4-28|台湾|x2.0 "
-      - "V4-43|日本|x1.5 "
-      - "V4-84|香港|x2.0 "
-  - name: "🇭🇰 HK-自动选择"
-    type: url-test
-    proxies:
-      - V4-121|香港|x1.0
-      - V4-133|香港|x2.0
-      - V4-153|香港|x2.0
-      - V4-161|香港|x2.0
-      - V4-174|香港|x2.0
-      - V4-20|香港|x1.5
-      - V4-222|香港|x1.5
-      - V4-235|香港|x1.5
-      - V4-236|香港|x1.5
-      - V4-24|香港|x1.5
-      - V4-86|香港|x2.0
-      - "V4-117|香港|x1.0 "
-      - "V4-131|香港|x2.0 "
-      - "V4-149|香港|x2.0 "
-      - "V4-157|香港|x2.0 "
-      - "V4-170|香港|x2.0 "
-      - "V4-17|香港|x1.5 "
-      - "V4-219|香港|x1.5 "
-      - "V4-21|香港|x1.5 "
-      - "V4-230|香港|x1.5 "
-      - "V4-231|香港|x1.5 "
-      - "V4-84|香港|x2.0 "
-    url: "https://www.google.com/generate_204"
-    interval: 86400
-  - name: "🇯🇵 JP-自动选择"
-    type: url-test
-    proxies:
-      - V4-192|日本|x2.0
-      - V4-193|日本|x2.0
-      - V4-194|日本|x1.0
-      - V4-210|日本|x1.5
-      - V4-46|日本|x1.5
-      - "V4-182|日本|x2.0 "
-      - "V4-183|日本|x2.0 "
-      - "V4-184|日本|x1.0 "
-      - "V4-206|日本|x1.5 "
-      - "V4-43|日本|x1.5 "
-    url: "https://www.google.com/generate_204"
-    interval: 86400
-  - name: "🇸🇬 SG-自动选择"
-    type: url-test
-    proxies:
-      - V4-18|新加坡|x1.0
-      - V4-19|新加坡|x1.0
-      - "V4-15|新加坡|x1.0 "
-      - "V4-16|新加坡|x1.0 "
-    url: "https://www.google.com/generate_204"
-    interval: 86400
-  - name: "🇹🇼 TW-自动选择"
-    type: url-test
-    proxies:
-      - V4-29|台湾|x2.0
-      - V4-30|台湾|x2.0
-      - "V4-27|台湾|x2.0 "
-      - "V4-28|台湾|x2.0 "
-    url: "https://www.google.com/generate_204"
-    interval: 86400
-  - name: 故障转移
-    type: fallback
-    proxies:
-      - V4-121|香港|x1.0
-      - V4-133|香港|x2.0
-      - V4-153|香港|x2.0
-      - V4-161|香港|x2.0
-      - V4-174|香港|x2.0
-      - V4-18|新加坡|x1.0
-      - V4-192|日本|x2.0
-      - V4-193|日本|x2.0
-      - V4-194|日本|x1.0
-      - V4-19|新加坡|x1.0
-      - V4-20|香港|x1.5
-      - V4-210|日本|x1.5
-      - V4-222|香港|x1.5
-      - V4-235|香港|x1.5
-      - V4-236|香港|x1.5
-      - V4-24|香港|x1.5
-      - V4-29|台湾|x2.0
-      - V4-30|台湾|x2.0
-      - V4-46|日本|x1.5
-      - V4-86|香港|x2.0
-      - "V4-117|香港|x1.0 "
-      - "V4-131|香港|x2.0 "
-      - "V4-149|香港|x2.0 "
-      - "V4-157|香港|x2.0 "
-      - "V4-15|新加坡|x1.0 "
-      - "V4-16|新加坡|x1.0 "
-      - "V4-170|香港|x2.0 "
-      - "V4-17|香港|x1.5 "
-      - "V4-182|日本|x2.0 "
-      - "V4-183|日本|x2.0 "
-      - "V4-184|日本|x1.0 "
-      - "V4-206|日本|x1.5 "
-      - "V4-219|香港|x1.5 "
-      - "V4-21|香港|x1.5 "
-      - "V4-230|香港|x1.5 "
-      - "V4-231|香港|x1.5 "
-      - "V4-27|台湾|x2.0 "
-      - "V4-28|台湾|x2.0 "
-      - "V4-43|日本|x1.5 "
-      - "V4-84|香港|x2.0 "
-    url: "https://www.google.com/generate_204"
-    interval: 7200
+-
+  name: 速云梯
+  type: select
+  proxies:
+    - '🇭🇰 HK-自动选择'
+    - '🇯🇵 JP-自动选择'
+    - '🇸🇬 SG-自动选择'
+    - '🇹🇼 TW-自动选择'
+    - 故障转移
+    - V4-121|香港|x1.0
+    - V4-133|香港|x2.0
+    - V4-153|香港|x2.0
+    - V4-161|香港|x2.0
+    - V4-174|香港|x2.0
+    - V4-18|新加坡|x1.0
+    - V4-192|日本GPT|x1.5
+    - V4-193|日本GPT|x1.5
+    - V4-194|日本GPT|x1.0
+    - V4-19|新加坡|x1.0
+    - V4-20|香港|x1.5
+    - V4-210|日本|x1.5
+    - V4-222|香港|x1.5
+    - V4-235|香港|x1.5
+    - V4-236|香港|x1.5
+    - V4-24|香港|x1.5
+    - V4-29|台湾|x2.0
+    - V4-30|台湾|x2.0
+    - V4-46|日本|x1.5
+    - V4-86|香港|x2.0
+    - 'V4-117|香港|x1.0 '
+    - 'V4-131|香港|x2.0 '
+    - 'V4-149|香港|x2.0 '
+    - 'V4-157|香港|x2.0 '
+    - 'V4-15|新加坡|x1.0 '
+    - 'V4-16|新加坡|x1.0 '
+    - 'V4-170|香港|x2.0 '
+    - 'V4-17|香港|x1.5 '
+    - 'V4-182|日本GPT|x1.5 '
+    - 'V4-183|日本GPT|x1.5 '
+    - 'V4-184|日本GPT|x1.0 '
+    - 'V4-206|日本|x1.5 '
+    - 'V4-219|香港|x1.5 '
+    - 'V4-21|香港|x1.5 '
+    - 'V4-230|香港|x1.5 '
+    - 'V4-231|香港|x1.5 '
+    - 'V4-27|台湾|x2.0 '
+    - 'V4-28|台湾|x2.0 '
+    - 'V4-43|日本|x1.5 '
+    - 'V4-84|香港|x2.0 '
+-
+  name: '🇭🇰 HK-自动选择'
+  type: url-test
+  proxies:
+    - V4-121|香港|x1.0
+    - V4-133|香港|x2.0
+    - V4-153|香港|x2.0
+    - V4-161|香港|x2.0
+    - V4-174|香港|x2.0
+    - V4-20|香港|x1.5
+    - V4-222|香港|x1.5
+    - V4-235|香港|x1.5
+    - V4-236|香港|x1.5
+    - V4-24|香港|x1.5
+    - V4-86|香港|x2.0
+    - 'V4-117|香港|x1.0 '
+    - 'V4-131|香港|x2.0 '
+    - 'V4-149|香港|x2.0 '
+    - 'V4-157|香港|x2.0 '
+    - 'V4-170|香港|x2.0 '
+    - 'V4-17|香港|x1.5 '
+    - 'V4-219|香港|x1.5 '
+    - 'V4-21|香港|x1.5 '
+    - 'V4-230|香港|x1.5 '
+    - 'V4-231|香港|x1.5 '
+    - 'V4-84|香港|x2.0 '
+  url: 'https://www.google.com/generate_204'
+  interval: 86400
+-
+  name: '🇯🇵 JP-自动选择'
+  type: url-test
+  proxies:
+    - V4-192|日本GPT|x1.5
+    - V4-193|日本GPT|x1.5
+    - V4-194|日本GPT|x1.0
+    - V4-210|日本|x1.5
+    - V4-46|日本|x1.5
+    - 'V4-182|日本GPT|x1.5 '
+    - 'V4-183|日本GPT|x1.5 '
+    - 'V4-184|日本GPT|x1.0 '
+    - 'V4-206|日本|x1.5 '
+    - 'V4-43|日本|x1.5 '
+  url: 'https://www.google.com/generate_204'
+  interval: 86400
+-
+  name: '🇸🇬 SG-自动选择'
+  type: url-test
+  proxies:
+    - V4-18|新加坡|x1.0
+    - V4-19|新加坡|x1.0
+    - 'V4-15|新加坡|x1.0 '
+    - 'V4-16|新加坡|x1.0 '
+  url: 'https://www.google.com/generate_204'
+  interval: 86400
+-
+  name: '🇹🇼 TW-自动选择'
+  type: url-test
+  proxies:
+    - V4-29|台湾|x2.0
+    - V4-30|台湾|x2.0
+    - 'V4-27|台湾|x2.0 '
+    - 'V4-28|台湾|x2.0 '
+  url: 'https://www.google.com/generate_204'
+  interval: 86400
+-
+  name: 故障转移
+  type: fallback
+  proxies:
+    - V4-121|香港|x1.0
+    - V4-133|香港|x2.0
+    - V4-153|香港|x2.0
+    - V4-161|香港|x2.0
+    - V4-174|香港|x2.0
+    - V4-18|新加坡|x1.0
+    - V4-192|日本GPT|x1.5
+    - V4-193|日本GPT|x1.5
+    - V4-194|日本GPT|x1.0
+    - V4-19|新加坡|x1.0
+    - V4-20|香港|x1.5
+    - V4-210|日本|x1.5
+    - V4-222|香港|x1.5
+    - V4-235|香港|x1.5
+    - V4-236|香港|x1.5
+    - V4-24|香港|x1.5
+    - V4-29|台湾|x2.0
+    - V4-30|台湾|x2.0
+    - V4-46|日本|x1.5
+    - V4-86|香港|x2.0
+    - 'V4-117|香港|x1.0 '
+    - 'V4-131|香港|x2.0 '
+    - 'V4-149|香港|x2.0 '
+    - 'V4-157|香港|x2.0 '
+    - 'V4-15|新加坡|x1.0 '
+    - 'V4-16|新加坡|x1.0 '
+    - 'V4-170|香港|x2.0 '
+    - 'V4-17|香港|x1.5 '
+    - 'V4-182|日本GPT|x1.5 '
+    - 'V4-183|日本GPT|x1.5 '
+    - 'V4-184|日本GPT|x1.0 '
+    - 'V4-206|日本|x1.5 '
+    - 'V4-219|香港|x1.5 '
+    - 'V4-21|香港|x1.5 '
+    - 'V4-230|香港|x1.5 '
+    - 'V4-231|香港|x1.5 '
+    - 'V4-27|台湾|x2.0 '
+    - 'V4-28|台湾|x2.0 '
+    - 'V4-43|日本|x1.5 '
+    - 'V4-84|香港|x2.0 '
+  url: 'https://www.google.com/generate_204'
+  interval: 7200
 
 rules:
   - DOMAIN-SUFFIX,services.googleapis.cn,速云梯
@@ -5962,14 +5429,6 @@ rules:
   - DOMAIN-SUFFIX,intercom.io,速云梯
   - DOMAIN-SUFFIX,intercomcdn.com,速云梯
   - DOMAIN-SUFFIX,ai.com,速云梯
-  - DOMAIN,api.scnet.cn,速云梯
-  - DOMAIN-SUFFIX,scnet.cn,速云梯
-  - DOMAIN,sg.uiuiapi.com,速云梯
-  - DOMAIN-SUFFIX,uiuiapi.com,速云梯
-  - DOMAIN,api.siliconflow.cn,速云梯
-  - DOMAIN-SUFFIX,siliconflow.cn,速云梯
-  - DOMAIN,api.openrouter.ai,速云梯
-  - DOMAIN-SUFFIX,openrouter.ai,速云梯
   - DOMAIN-SUFFIX,openai.com,速云梯
   - DOMAIN,chat.openai.com.cdn.cloudflare.net,速云梯
   - DOMAIN,openaiapi-site.azureedge.net,速云梯

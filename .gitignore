@@ -19,6 +19,7 @@ trace*.txt
 guard_*.txt
 resources/mixin.yaml.bak-*
 /tmp/.clash_latency.*
+.refresh_subscription.log
 
 # 敏感信息配置文件
 .env

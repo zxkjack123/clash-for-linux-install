@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily Clash subscription refresh
+
+[Timer]
+OnCalendar=*-*-* 04:30
+Persistent=true
+Unit=clash-subscription-refresh.service
+RandomizedDelaySec=15m
+
+[Install]
+WantedBy=timers.target

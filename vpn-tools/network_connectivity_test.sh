@@ -72,7 +72,7 @@ for row in \
 	"https://ipapi.co/json ipapi" \
 	"https://api.scnet.cn/api/llm/v1/chat/completions scnet" \
 	"https://sg.uiuiapi.com/ uiui" \
-	"https://api.siliconflow.cn/health siliconflow" \
+	"https://siliconflow.cn/ siliconflow" \
 	"https://openrouter.ai/api/v1 openrouter"; do
 	test_pair ${row% *} ${row##* }
 done
@@ -84,7 +84,7 @@ for t in "${targets[@]}"; do
 
 if [[ $MODE == full ]]; then
 	section "EXTENDED AI / STREAMING"
-	extended=(https://chat.openai.com/ https://api.scnet.cn/api/llm/v1/chat/completions https://sg.uiuiapi.com/ https://api.siliconflow.cn/health https://openrouter.ai/api/v1 https://i.ytimg.com/generate_204 https://dash.akamaized.net/envivio/EnvivioDash3/manifest.mpd https://www.braintrust.dev/ https://huggingface.co/)
+	extended=(https://chat.openai.com/ https://api.scnet.cn/api/llm/v1/chat/completions https://sg.uiuiapi.com/ https://siliconflow.cn/ https://openrouter.ai/api/v1 https://i.ytimg.com/generate_204 https://dash.akamaized.net/envivio/EnvivioDash3/manifest.mpd https://www.braintrust.dev/ https://huggingface.co/)
 	for u in "${extended[@]}"; do out=$(curl_t --proxy "$PROXY" "$u"); printf '%-55s %s %ss\n' "$u" "${out%%,*}" "${out##*,}"; done
 
 	section "REPEATABILITY (OpenAI 5x via proxy)"

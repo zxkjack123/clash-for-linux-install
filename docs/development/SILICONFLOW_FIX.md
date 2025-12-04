@@ -128,7 +128,7 @@ nano network_health_monitor.sh
 # "https://api.siliconflow.cn/|硅基流动"
 
 # 或者替换为其他服务，例如：
-"https://openrouter.ai/|OpenRouter"
+"https://openrouter.ai/api/v1|OpenRouter"
 ```
 
 ## 验证修复

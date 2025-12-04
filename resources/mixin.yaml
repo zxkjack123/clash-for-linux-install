@@ -6,82 +6,97 @@
 #  3. 扩展 SCNET / UIUI / 硅基流动 / OpenRouter 的解析与路由
 #############################################
 
+mixed-port: 7890
+allow-lan: true
+bind-address: "*"
+mode: Rule
+external-controller: "0.0.0.0:9090"
+
+proxies:
+  - name: JP-Tailscale
+    type: ss
+    server: 100.82.241.21
+    port: 9000
+    cipher: 2022-blake3-aes-256-gcm
+    password: "5z3O9YHKuKRnlkedo5Rva2SBVt+JYe4GaAXcMwc78XM="
+    udp: true
+
 proxy-groups:
-  - name: 自动选择
-    type: select
-    proxies:
-      - AUTO-SMART
-      - V1-香港01
-      - DIRECT
-  - name: 故障转移
-    type: select
-    proxies:
-      - AUTO-SMART
-      - V1-香港01
-      - DIRECT
-  - name: 西瓜加速
-    type: select
-    proxies:
-      - AUTO-SMART
-      - V1-香港01
   - name: AUTO-SMART
-    type: url-test
+    type: select
     proxies:
-      - V1-日本01|流媒体|GPT
-      - V1-日本02|流媒体|GPT
-      - V1-日本03|流媒体|GPT
-      - V1-日本04|流媒体|GPT
-      - V1-香港01
-      - V1-香港02
-      - V1-香港03
-      - V1-香港04
-      - V2-香港07
-      - V1-新加坡01|流媒体|GPT
-      - V1-新加坡02|流媒体|GPT
-      - V1-新加坡03|流媒体|GPT
-      - V1-新加坡04|流媒体|GPT
-      - V2-新加坡05|流媒体|GPT
-      - V2-新加坡06|流媒体|GPT
-      - V1-韩国01
-      - V1-韩国02
-      - V2-韩国03
-      - V2-韩国04
-      - "V1-台湾省01|流媒体|GPT"
-    url: https://www.gstatic.com/generate_204
-    interval: 300
-    tolerance: 50
+      - JP-Tailscale
+      - 速云梯
+      - "🇯🇵 JP-自动选择"
+      - "🇸🇬 SG-自动选择"
+      - "🇭🇰 HK-自动选择"
+      - "🇹🇼 TW-自动选择"
+      - 故障转移
+      - V4-192|日本GPT|x1.5
+      - V4-193|日本GPT|x1.5
+      - V4-210|日本|x1.5
+      - V4-46|日本|x1.5
+      - V4-18|新加坡|x1.0
+      - V4-19|新加坡|x1.0
+      - V4-121|香港|x1.0
+      - V4-133|香港|x2.0
   - name: AI
     type: select
     proxies:
-      - V1-美国01|流媒体|GPT
-      - V1-美国02|流媒体|GPT
-      - V1-美国03|流媒体|GPT
-      - V1-新加坡01|流媒体|GPT
-      - V1-日本01|流媒体|GPT
+      - JP-Tailscale
+      - AUTO-SMART
+      - "🇯🇵 JP-自动选择"
+      - "🇸🇬 SG-自动选择"
+      - V4-192|日本GPT|x1.5
+      - V4-193|日本GPT|x1.5
+      - V4-194|日本GPT|x1.0
+      - V4-210|日本|x1.5
+      - V4-46|日本|x1.5
+      - V4-18|新加坡|x1.0
+      - V4-19|新加坡|x1.0
   - name: Development
     type: select
     proxies:
+      - JP-Tailscale
       - AUTO-SMART
-      - V1-香港01
-      - V1-新加坡01|流媒体|GPT
-      - V1-日本01|流媒体|GPT
-      - V1-美国01|流媒体|GPT
+      - 速云梯
+      - "🇭🇰 HK-自动选择"
+      - "🇸🇬 SG-自动选择"
+      - "🇯🇵 JP-自动选择"
+      - V4-121|香港|x1.0
+      - V4-133|香港|x2.0
+      - V4-153|香港|x2.0
+      - V4-20|香港|x1.5
+      - V4-18|新加坡|x1.0
+      - V4-19|新加坡|x1.0
   - name: Streaming
     type: select
     proxies:
+      - JP-Tailscale
       - AUTO-SMART
-      - V1-香港01
-      - V1-新加坡01|流媒体|GPT
-      - V1-日本01|流媒体|GPT
-      - V1-美国01|流媒体|GPT
+      - "🇯🇵 JP-自动选择"
+      - "🇸🇬 SG-自动选择"
+      - "🇭🇰 HK-自动选择"
+      - V4-192|日本GPT|x1.5
+      - V4-193|日本GPT|x1.5
+      - V4-194|日本GPT|x1.0
+      - V4-210|日本|x1.5
+      - V4-20|香港|x1.5
+      - V4-18|新加坡|x1.0
   - name: Gaming
     type: select
     proxies:
+      - JP-Tailscale
       - AUTO-SMART
-      - V1-香港01
-      - V1-香港02
-      - V1-日本01|流媒体|GPT
-      - V1-韩国01
+      - "🇯🇵 JP-自动选择"
+      - "🇸🇬 SG-自动选择"
+      - "🇭🇰 HK-自动选择"
+      - V4-210|日本|x1.5
+      - V4-46|日本|x1.5
+      - V4-18|新加坡|x1.0
+      - V4-19|新加坡|x1.0
+      - V4-121|香港|x1.0
+      - V4-133|香港|x2.0
 
 dns:
   enable: true
@@ -125,7 +140,9 @@ dns:
     - "sg.uiuiapi.com"
     - "*.uiuiapi.com"
     - "*.siliconflow.cn"
-    - "api.openrouter.ai"
+    - "openrouter.ai"
+    - "*.openrouter.ai"
+    - "api.openrouter.ai" # legacy endpoint (no longer active but kept for compatibility)
     - "*.zoom.us"
     - "zoom.us"
     - "*.zoomcdn.net"
@@ -142,14 +159,16 @@ rules:
   - DOMAIN,api.github.com,DIRECT
   - DOMAIN,github.com,DIRECT
   # QDAI 临时子域解析 / 访问修复 (必须放在 DOMAIN-SUFFIX,cn,DIRECT 之前)
-  - DOMAIN,c-1966322474660876290.qdai.scnet.cn,AI
-  - DOMAIN-SUFFIX,qdai.scnet.cn,AI
-  - DOMAIN,api.scnet.cn,AI
-  - DOMAIN-SUFFIX,scnet.cn,AI
+  - DOMAIN,c-1966322474660876290.qdai.scnet.cn,DIRECT
+  - DOMAIN,c-1996024701209694210.szai.scnet.cn,DIRECT
+  - DOMAIN-SUFFIX,qdai.scnet.cn,DIRECT
+  - DOMAIN,api.scnet.cn,DIRECT
+  - DOMAIN-SUFFIX,scnet.cn,DIRECT
   - DOMAIN,sg.uiuiapi.com,AI
   - DOMAIN-SUFFIX,uiuiapi.com,AI
-  - DOMAIN,api.siliconflow.cn,AI
-  - DOMAIN-SUFFIX,siliconflow.cn,AI
+  - DOMAIN,api.siliconflow.cn,DIRECT
+  - DOMAIN-SUFFIX,siliconflow.cn,DIRECT
+  - DOMAIN,openrouter.ai,AI
   - DOMAIN,api.openrouter.ai,AI
   - DOMAIN-SUFFIX,openrouter.ai,AI
   # Tailscale / Funnel

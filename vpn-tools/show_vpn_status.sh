@@ -11,9 +11,63 @@ set -uo pipefail
 API=${CLASH_API:-http://127.0.0.1:9990}
 PROXY=${PROXY:-http://127.0.0.1:7890}
 
+STATUS_GROUPS=(
+    "GLOBAL"
+    "速云梯"
+    "🇭🇰 HK-自动选择"
+    "🇯🇵 JP-自动选择"
+    "🇸🇬 SG-自动选择"
+    "🇹🇼 TW-自动选择"
+    "故障转移"
+)
+declare -A GROUP_DESCRIPTIONS=(
+    ["GLOBAL"]="AI/开发/流媒体统一调度"
+    ["速云梯"]="主控分组，可手动挑选任意节点"
+    ["🇭🇰 HK-自动选择"]="香港自动测速"
+    ["🇯🇵 JP-自动选择"]="日本自动测速"
+    ["🇸🇬 SG-自动选择"]="新加坡自动测速"
+    ["🇹🇼 TW-自动选择"]="台湾自动测速"
+    ["故障转移"]="超时自动切换 (Fallback)"
+)
+
 have() { command -v "$1" >/dev/null 2>&1; }
 fetch_json() { curl -fsS "$1" 2>/dev/null || echo '{}'; }
-get_now() { curl -fsS "$API/proxies/$1" 2>/dev/null | sed -n 's/.*"now":"\([^"]*\)".*/\1/p'; }
+
+urlencode_component() {
+    local raw="$1"
+    if command -v python3 >/dev/null 2>&1; then
+        python3 - "$raw" <<'PY'
+import sys, urllib.parse
+print(urllib.parse.quote(sys.argv[1], safe=''))
+PY
+    elif command -v jq >/dev/null 2>&1; then
+        printf '%s' "$raw" | jq -sRr @uri
+    elif command -v perl >/dev/null 2>&1; then
+        perl -MURI::Escape -e 'print uri_escape($ARGV[0]);' "$raw"
+    else
+        local LC_CTYPE=C
+        local out="" c hex i
+        for ((i=0; i<${#raw}; i++)); do
+            c=${raw:i:1}
+            case "$c" in
+                [a-zA-Z0-9._-]) out+="$c" ;;
+                ' ') out+="%20" ;;
+                *)
+                    hex=$(printf '%s' "$c" | od -An -tx1 | head -n1 | tr -d ' \n')
+                    hex=${hex^^}
+                    out+="%${hex:-00}"
+                ;;
+            esac
+        done
+        printf '%s\n' "$out"
+    fi
+}
+
+get_now() {
+    local group="$1" encoded
+    encoded=$(urlencode_component "$group")
+    curl -fsS "$API/proxies/${encoded}" 2>/dev/null | sed -n 's/.*"now":"\([^"]*\)".*/\1/p'
+}
 
 echo "=== VPN Status ($(date '+%F %T')) ==="
 if curl -fsS "$API/version" >/dev/null 2>&1; then
@@ -23,7 +77,10 @@ else
     echo "Controller: DOWN ($API)"; # 不立即退出，继续尝试后续信息
 fi
 
-for g in AI YOUTUBE STREAM MEDIA Streaming Development; do now=$(get_now "$g"); [[ -n ${now:-} ]] && printf '%-8s current: %s\n' "$g" "$now"; done
+for g in "${STATUS_GROUPS[@]}"; do
+    now=$(get_now "$g")
+    printf '%-20s current: %s\n' "$g" "${now:-Unknown}"
+done
 
 echo
 echo "-- Quick Probes (proxy) --"
@@ -95,33 +152,15 @@ echo ""
 echo "🎯 CURRENT ROUTING CONFIGURATION:"
 echo "=================================="
 
-# Get current proxy settings
-if have jq; then
-    AI_NODE=$(curl -s http://127.0.0.1:9990/proxies/AI | jq -r '.now' 2>/dev/null || echo "Unknown")
-    STREAMING_NODE=$(curl -s http://127.0.0.1:9990/proxies/Streaming | jq -r '.now' 2>/dev/null || echo "Unknown")
-    DEVELOPMENT_NODE=$(curl -s http://127.0.0.1:9990/proxies/Development | jq -r '.now' 2>/dev/null || echo "Unknown")
-else
-    AI_NODE=$(curl -s http://127.0.0.1:9990/proxies/AI | sed -n 's/.*"now":"\([^"]*\)".*/\1/p')
-    [ -z "$AI_NODE" ] && AI_NODE="Unknown"
-    STREAMING_NODE=$(curl -s http://127.0.0.1:9990/proxies/Streaming | sed -n 's/.*"now":"\([^"]*\)".*/\1/p')
-    [ -z "$STREAMING_NODE" ] && STREAMING_NODE="Unknown"
-    DEVELOPMENT_NODE=$(curl -s http://127.0.0.1:9990/proxies/Development | sed -n 's/.*"now":"\([^"]*\)".*/\1/p')
-    [ -z "$DEVELOPMENT_NODE" ] && DEVELOPMENT_NODE="Unknown"
-fi
-
-echo "🤖 AI Services:"
-echo "  • Current Node: $AI_NODE"
-echo "  • Routes: OpenAI, Claude, ChatGPT, Braintrust.dev"
-echo ""
-
-echo "🎬 Streaming Services:"
-echo "  • Current Node: $STREAMING_NODE" 
-echo "  • Routes: YouTube, Netflix, Twitch, Bilibili"
-echo ""
-
-echo "⚙️  Development Services:"
-echo "  • Current Node: $DEVELOPMENT_NODE"
-echo "  • Routes: GitHub, Docker, NPM, PyPI"
+for g in "${STATUS_GROUPS[@]}"; do
+	now=$(get_now "$g")
+	desc=${GROUP_DESCRIPTIONS[$g]-}
+	printf '  • %-20s %-30s' "$g" "节点: ${now:-Unknown}"
+	if [[ -n ${desc:-} ]]; then
+		printf ' (%s)' "$desc"
+	fi
+	echo
+done
 echo ""
 
 echo "🇨🇳 Chinese AI Platforms (DIRECT):"

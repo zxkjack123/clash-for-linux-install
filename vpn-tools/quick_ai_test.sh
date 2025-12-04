@@ -17,7 +17,14 @@ TIMEOUT=${TIMEOUT:-6}
 SCRIPT_DIR="$(cd "${BASH_SOURCE[0]%/*}" && pwd)"
 . "$SCRIPT_DIR/lib/net_helpers.sh" 2>/dev/null || true
 nh_init_symbols
-test() { nh_curl_t "$1" "$PROXY" "$TIMEOUT"; }
+test() {
+	local url="$1" mode="${2:-proxy}"
+	if [[ "$mode" == direct ]]; then
+		nh_curl_t "$url" "" "$TIMEOUT"
+	else
+		nh_curl_t "$url" "$PROXY" "$TIMEOUT"
+	fi
+}
 declare -A targets=(
 	[chatgpt]="https://chat.openai.com/"
 	[braintrust]="https://www.braintrust.dev/"
@@ -26,11 +33,15 @@ declare -A targets=(
 	[copilot_edge]="https://api.githubcopilot.com/"
 	[scnet]="https://api.scnet.cn/api/llm/v1/chat/completions"
 	[uiui_api]="https://sg.uiuiapi.com/"
-	[siliconflow]="https://api.siliconflow.cn/health"
+	[siliconflow]="https://siliconflow.cn/"
 	[openrouter]="https://openrouter.ai/api/v1"
 )
 
 order=(chatgpt braintrust github_web github_api copilot_edge scnet uiui_api siliconflow openrouter)
+
+declare -A target_proxy=(
+	[siliconflow]=direct
+)
 
 # Allowed HTTP status patterns per target (regex). Default: 2xx/3xx
 declare -A allow_codes=(
@@ -44,7 +55,8 @@ declare -A allow_codes=(
 declare -A res
 score=0; max=${#order[@]}
 for k in "${order[@]}"; do
-	out=$(test "${targets[$k]}") || true
+	mode=${target_proxy[$k]:-proxy}
+	out=$(test "${targets[$k]}" "$mode") || true
 	code=${out%%,*}; t=${out##*,}; status=FAIL
 	pattern=${allow_codes[$k]:-${allow_codes[default]}}
 	if [[ $code =~ $pattern ]]; then status="$NH_OK"; ((score++)); else status="$NH_FAIL"; fi

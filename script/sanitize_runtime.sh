@@ -28,6 +28,15 @@ TARGET_FILE=""
 YQ_BIN="${BIN_YQ:-$HOME/.local/share/clash/bin/yq}"
 SERVICE="${BIN_KERNEL_NAME:-mihomo}"
 
+read -r -d '' SCNET_PRIORITY_RULES <<'EOF' || true
+DOMAIN,c-1966322474660876290.qdai.scnet.cn,DIRECT
+DOMAIN,c-1996024701209694210.szai.scnet.cn,DIRECT
+DOMAIN-SUFFIX,qdai.scnet.cn,DIRECT
+DOMAIN,api.scnet.cn,DIRECT
+DOMAIN-SUFFIX,scnet.cn,DIRECT
+DOMAIN-SUFFIX,szai.scnet.cn,DIRECT
+EOF
+
 DRY=false
 RESTART=false
 VERBOSE=false
@@ -116,6 +125,35 @@ if ! $MODIFIED; then
   if ! grep -q "IP-CIDR,8.8.8.8/32,DIRECT,no-resolve" "$RUNTIME"; then
     sed -i "/^rules:/a \  - IP-CIDR,8.8.8.8/32,DIRECT,no-resolve" "$RUNTIME"
     MODIFIED=true
+  fi
+fi
+
+# 优先保持 QDAI/SCNET 相关规则在列表上方, 避免被 DOMAIN-SUFFIX,cn 提前截断
+if [ -x "$YQ_BIN" ] && [ -n "$SCNET_PRIORITY_RULES" ]; then
+  if "$YQ_BIN" -e '.rules? | length > 0' "$RUNTIME" >/dev/null 2>&1; then
+    PRIORITY_RULES="$SCNET_PRIORITY_RULES" "$YQ_BIN" -i '
+      .rules = (
+        (env(PRIORITY_RULES) | split("\n") | map(select(length > 0))) as $prio |
+        ($prio + ((.rules // []) | reduce .[] as $item (
+          [];
+          . + (if ($prio | index($item)) then [] else [$item] end)
+        )))
+      )
+    ' "$RUNTIME" 2>/dev/null && MODIFIED=true || true
+  fi
+fi
+
+# 确保 GEOIP / MATCH 规则始终位于自定义规则之后, 避免 mixin 追加的规则被提前 MATCH 截断
+if [ -x "$YQ_BIN" ]; then
+  if "$YQ_BIN" -e '.rules? | length > 0' "$RUNTIME" >/dev/null 2>&1; then
+    "$YQ_BIN" -i '
+      .rules = (
+        (.rules // []) as $rules |
+        ($rules | map(select(test("^GEOIP,")))) as $geos |
+        ($rules | map(select(test("^MATCH,")))) as $matches |
+        ($rules | map(select((((test("^GEOIP,")) or (test("^MATCH,")))) | not ))) + $geos + $matches
+      )
+    ' "$RUNTIME" 2>/dev/null && MODIFIED=true || true
   fi
 fi
 

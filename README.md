@@ -36,6 +36,9 @@ cd vpn-tools
 # AI 服务优化
 ./optimize_ai.sh
 
+# 开发类服务优化（GitHub / NPM / PyPI）
+./optimize_dev_nodes.sh
+
 # YouTube 流媒体优化
 ./select_youtube_node.sh
 ```
@@ -48,13 +51,14 @@ cd vpn-tools
 
 ### 🎯 工具分类
 
-| 类别         | 工具                                                  | 用途                    | 耗时    |
-| ------------ | ----------------------------------------------------- | ----------------------- | ------- |
-| **🐳 Docker** | `test_docker_proxy.sh`                                | Docker 容器代理连接测试 | 2-3分钟 |
-| **AI 优化**  | `optimize_ai.sh`                                      | ChatGPT/Claude 快速优化 | 2-3分钟 |
-| **流媒体**   | `select_youtube_node.sh` / `fix_zoom_connectivity.sh` | YouTube/Zoom 诊断优化   | 3-5分钟 |
-| **网络测试** | `network_connectivity_test.sh`                        | 全面连通性测试          | 5-8分钟 |
-| **状态检查** | `quick_vpn_check.sh`                                  | 快速状态检查            | 30秒    |
+| 类别         | 工具                                                  | 用途                     | 耗时    |
+| ------------ | ----------------------------------------------------- | ------------------------ | ------- |
+| **🐳 Docker** | `test_docker_proxy.sh`                                | Docker 容器代理连接测试  | 2-3分钟 |
+| **AI 优化**  | `optimize_ai.sh`                                      | ChatGPT/Claude 快速优化  | 2-3分钟 |
+| **开发优化** | `optimize_dev_nodes.sh`                               | GitHub/NPM/PyPI 节点调优 | 2-3分钟 |
+| **流媒体**   | `select_youtube_node.sh` / `fix_zoom_connectivity.sh` | YouTube/Zoom 诊断优化    | 3-5分钟 |
+| **网络测试** | `network_connectivity_test.sh`                        | 全面连通性测试           | 5-8分钟 |
+| **状态检查** | `quick_vpn_check.sh`                                  | 快速状态检查             | 30秒    |
 
 ### 📁 文件结构
 ```
@@ -62,6 +66,7 @@ vpn-tools/
 ├── README.md                      # VPN工具包说明
 ├── launcher.sh                    # 交互式启动器
 ├── optimize_ai.sh                 # AI优化工具
+├── optimize_dev_nodes.sh          # GitHub/NPM/PyPI 节点优化
 ├── select_youtube_node.sh         # YouTube优化工具
 ├── network_connectivity_test.sh   # 网络连通性测试
 ├── quick_vpn_check.sh             # 快速状态检查
