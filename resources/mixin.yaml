@@ -116,11 +116,17 @@ dns:
   domain: [+.google.com, +.facebook.com, +.youtube.com, +.zoom.us]
   nameserver-policy:
     "+.qdai.scnet.cn":
-      - https://1.1.1.1/dns-query
-      - https://dns.google/dns-query
+      # 先尝试公共递归，避免权威服务器返回 REFUSED 时直接失败
+      - 223.5.5.5
+      - 119.29.29.29
+      # 若已接入校内/教育网 VPN，则尝试权威递归（部分仅校内可用，公网会 REFUSED）
+      - 202.112.20.131
+      - 202.112.0.13
     "+.scnet.cn":
-      - https://1.1.1.1/dns-query
-      - https://dns.google/dns-query
+      - 223.5.5.5
+      - 119.29.29.29
+      - 202.112.20.131
+      - 202.112.0.13
   fake-ip-filter:
     - api.individual.githubcopilot.com
     - "*.github.com"
@@ -159,6 +165,7 @@ rules:
   - DOMAIN,api.github.com,DIRECT
   - DOMAIN,github.com,DIRECT
   # QDAI 临时子域解析 / 访问修复 (必须放在 DOMAIN-SUFFIX,cn,DIRECT 之前)
+  - DOMAIN,c-1996151687735582721.qdai.scnet.cn,DIRECT
   - DOMAIN,c-1966322474660876290.qdai.scnet.cn,DIRECT
   - DOMAIN,c-1996024701209694210.szai.scnet.cn,DIRECT
   - DOMAIN-SUFFIX,qdai.scnet.cn,DIRECT
@@ -171,6 +178,10 @@ rules:
   - DOMAIN,openrouter.ai,AI
   - DOMAIN,api.openrouter.ai,AI
   - DOMAIN-SUFFIX,openrouter.ai,AI
+  # 已知 QDAI 直连 IP，避免被误判走代理
+  - IP-CIDR,222.173.100.165/32,DIRECT,no-resolve
+  - IP-CIDR,112.6.197.30/32,DIRECT,no-resolve
+  - IP-CIDR,58.250.98.82/32,DIRECT,no-resolve
   # Tailscale / Funnel
   - DOMAIN-SUFFIX,ts.net,DIRECT
   - DOMAIN-SUFFIX,tailscale.io,DIRECT

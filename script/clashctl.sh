@@ -13,6 +13,9 @@ if [ -z "$CLASH_ENV_INITIALIZED" ]; then
     fi
 fi
 
+CLASH_PROXY_STATE_FILE=${CLASH_PROXY_STATE_FILE:-/tmp/.clash_system_proxy_state}
+CLASH_NO_PROXY_STATE_FILE=${CLASH_NO_PROXY_STATE_FILE:-/tmp/.clash_no_proxy}
+
 # 安全辅助: sed 正则转义 (用于节点名可能包含特殊字符)
 _escape_sed() {
     printf '%s' "$1" | sed -e 's/[\/\\&.*$^[]/\\&/g' -e 's/]/\\]/g' -e 's/(/\\(/g' -e 's/)/\\)/g' -e 's/+\\?/+/g'
@@ -25,6 +28,7 @@ _gnome_build_ignore_hosts() {
         "localhost" "127.0.0.0/8" "::1" "0.0.0.0" "*.local" ".localhost" ".local"
         "10.0.0.0/8" "172.16.0.0/12" "192.168.0.0/16"
         "ts.net" ".ts.net" "tailscale.io" ".tailscale.io" "100.100.100.100" "100.64.0.0/10"
+        "scnet.cn" ".scnet.cn" "szai.scnet.cn" ".szai.scnet.cn" "qdai.scnet.cn" ".qdai.scnet.cn"
     )
     if [ -n "$ts_suffix" ]; then
         base+=("$ts_suffix" ".${ts_suffix}")
@@ -91,6 +95,7 @@ _set_system_proxy() {
             done
         fi
     fi
+    printf '%s\n' "$no_proxy_addr" >"$CLASH_NO_PROXY_STATE_FILE" 2>/dev/null || true
     # 若内核未运行且上一次系统代理仍残留，避免设置一个不可达 127.0.0.1:PORT 导致 curl 直接报错
     systemctl --user is-active "$BIN_KERNEL_NAME" >/dev/null 2>&1 || {
         # 不直接退出函数，先清除遗留变量以便后续 clashon 再次设定
@@ -102,7 +107,7 @@ _set_system_proxy() {
     # Idempotency / jitter reduction: avoid re-applying unchanged settings which can
     # trigger desktop-wide NET::ERR_NETWORK_CHANGED events (especially in Electron / Chrome).
     # Create a small state file capturing last applied port & auth.
-    local state_file="/tmp/.clash_system_proxy_state"
+    local state_file="$CLASH_PROXY_STATE_FILE"
     local current_state="${MIXED_PORT}|${auth}"
     if [ -f "$state_file" ]; then
         local previous_state shell_http shell_mode
@@ -224,8 +229,9 @@ _unset_system_proxy() {
     rm -f /tmp/95clash-proxy 2>/dev/null || true
     [ -f /etc/apt/apt.conf.d/95clash-proxy ] && _okcat '📦' "APT代理配置需要手动删除: sudo rm /etc/apt/apt.conf.d/95clash-proxy"
 
-    # Clear state file so next enable actually re-applies.
-    rm -f /tmp/.clash_system_proxy_state 2>/dev/null || true
+    # Clear state files so next enable actually re-applies.
+    rm -f "$CLASH_PROXY_STATE_FILE" 2>/dev/null || true
+    rm -f "$CLASH_NO_PROXY_STATE_FILE" 2>/dev/null || true
 }
 
 function clashon() {

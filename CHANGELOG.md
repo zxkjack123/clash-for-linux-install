@@ -1,4 +1,15 @@
 # Changelog
+## [2.5.3] - 2025-12-06
+
+### 🔧 Improvements
+- `resources/mixin.yaml` now pins the SZ MinerU endpoint `c-1996024701209694210.szai.scnet.cn:58043` to DIRECT alongside other SCNET/QDAI hosts, and keeps SCNET/QDAI DNS policies preferring public recursors before campus resolvers to avoid REFUSED/NXDOMAIN when off-net.
+- `script/clashctl.sh` writes a unified `no_proxy` state (including SCNET/QDAI/SZAI, Tailscale, LAN) to `/tmp/.clash_no_proxy` and propagates the same bypass set into GNOME ignore-hosts so curl/pdf2md and GUI apps consistently bypass the proxy for campus domains.
+- `vpn-tools/network_connectivity_test.sh` adds explicit SCNET MinerU SZ coverage and refreshed labels, keeping the quick/full matrices aligned with the new endpoints.
+- `docs/development/CLASH_PROXY_STARTUP_BEST_PRACTICES.md` clarifies that shells should reuse `/tmp/.clash_no_proxy` for the curated bypass list emitted by `clash-proxy-env.service` instead of hardcoding domains.
+
+### ✅ Verification
+- `vpn-tools/network_connectivity_test.sh full`
+
 ## [2.5.2] - 2025-12-05
 
 ### ✨ New

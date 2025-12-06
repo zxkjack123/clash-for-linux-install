@@ -137,45 +137,52 @@ This removes the auto‑start block from `~/.bashrc` and `~/.zshrc`, and deletes
 ## 5. Lightweight proxy environment for shells
 
 Once systemd user services are managing the kernel and system‑wide proxy settings, you can let shells pick up the
-current mixed port by reading the state file that `_set_system_proxy` maintains:
+current mixed port and curated bypass list by reading the state files that `_set_system_proxy` maintains:
 
-- Path: `/tmp/.clash_system_proxy_state`
-- Format: `MIXED_PORT|AUTH`, where `AUTH` is either empty or something like `user:pass@`.
+- Proxy state: `/tmp/.clash_system_proxy_state` – format `MIXED_PORT|AUTH`, where `AUTH` is empty or `user:pass@`.
+- no_proxy state: `/tmp/.clash_no_proxy` – the canonical comma‑separated bypass list (one line, newline‑terminated).
 
 Add this small, **pure‑shell** snippet to the end of your `~/.bashrc` and/or `~/.zshrc`:
 
 ```bash
 # >>> clash proxy env (lightweight) >>>
 STATE_FILE="/tmp/.clash_system_proxy_state"
+NO_PROXY_FILE="/tmp/.clash_no_proxy"
+FALLBACK_NO_PROXY="localhost,127.0.0.1,::1,0.0.0.0,*.local,.localhost,.local"
 if [ -f "$STATE_FILE" ]; then
-    IFS='|' read -r MIXED_PORT AUTH_PREFIX <"$STATE_FILE" 2>/dev/null || MIXED_PORT=""
-    # Basic numeric guard; avoid accidental injection of garbage into proxy URLs
-    case "$MIXED_PORT" in
-        ''|*[!0-9]*) : ;;  # non-numeric or empty; skip
-        *)
-            if [ "$MIXED_PORT" -ge 1 ] 2>/dev/null; then
-                # AUTH_PREFIX already includes trailing '@' when auth is configured, or is empty otherwise
-                export http_proxy="http://${AUTH_PREFIX}127.0.0.1:${MIXED_PORT}"
-                export https_proxy="$http_proxy"
-                export HTTP_PROXY="$http_proxy"
-                export HTTPS_PROXY="$http_proxy"
-                export all_proxy="socks5h://${AUTH_PREFIX}127.0.0.1:${MIXED_PORT}"
-                export ALL_PROXY="$all_proxy"
-                # Keep no_proxy simple and fast; systemd/GNOME rules still apply separately
-                export no_proxy="localhost,127.0.0.1,::1,0.0.0.0,*.local,.localhost,.local"
-                export NO_PROXY="$no_proxy"
-            fi
-            ;;
-    esac
+  IFS='|' read -r MIXED_PORT AUTH_PREFIX <"$STATE_FILE" 2>/dev/null || MIXED_PORT=""
+  # Basic numeric guard; avoid accidental injection of garbage into proxy URLs
+  case "$MIXED_PORT" in
+    ''|*[!0-9]*) : ;;  # non-numeric or empty; skip
+    *)
+      if [ "$MIXED_PORT" -ge 1 ] 2>/dev/null; then
+        # AUTH_PREFIX already includes trailing '@' when auth is configured, or is empty otherwise
+        NO_PROXY_VALUE="$FALLBACK_NO_PROXY"
+        if [ -s "$NO_PROXY_FILE" ]; then
+          IFS= read -r NO_PROXY_VALUE <"$NO_PROXY_FILE" 2>/dev/null || NO_PROXY_VALUE="$FALLBACK_NO_PROXY"
+        fi
+        [ -z "$NO_PROXY_VALUE" ] && NO_PROXY_VALUE="$FALLBACK_NO_PROXY"
+        export http_proxy="http://${AUTH_PREFIX}127.0.0.1:${MIXED_PORT}"
+        export https_proxy="$http_proxy"
+        export HTTP_PROXY="$http_proxy"
+        export HTTPS_PROXY="$http_proxy"
+        export all_proxy="socks5h://${AUTH_PREFIX}127.0.0.1:${MIXED_PORT}"
+        export ALL_PROXY="$all_proxy"
+        export no_proxy="$NO_PROXY_VALUE"
+        export NO_PROXY="$no_proxy"
+      fi
+      ;;
+  esac
 fi
 # <<< clash proxy env (lightweight) <<<
 ```
 
 Characteristics:
 
-- Only performs a single small file read and a couple of `export` statements.
+- Only performs two tiny file reads (port/auth + optional `no_proxy`) and a handful of `export` statements.
 - Does **not** run `yq`, `systemctl`, `gsettings`, or any network calls.
-- If the Clash service is stopped, `_unset_system_proxy` removes the state file, so new shells simply skip the block.
+- If the Clash service is stopped, `_unset_system_proxy` removes the state files, so new shells simply skip the block.
+- The `NO_PROXY_FILE` is populated by `clash-proxy-env.service` and already contains LAN, Tailscale, and SCNET/QDAI/SZAI bypass entries; relying on this file avoids hand-maintaining domain lists in your shell RC.
 
 This gives you a fast startup path that still honours the dynamic mixed port chosen by Clash.
 
@@ -222,7 +229,7 @@ terminal but still want them available when needed.
   proxy configuration at login/boot.
 - Keep `~/.bashrc` / `~/.zshrc` **cheap**:
   - remove the heavy `clashctl auto-start` block that runs `watch_proxy` on every shell;
-  - optionally add a small snippet that reads `/tmp/.clash_system_proxy_state` and exports proxy variables;
+  - optionally add a small snippet that reads `/tmp/.clash_system_proxy_state` + `/tmp/.clash_no_proxy` and exports proxy variables;
   - optionally add lazy stubs for `clash`/`clashctl` so helpers load only when used.
 
 With this setup, you get:

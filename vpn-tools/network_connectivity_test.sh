@@ -70,7 +70,9 @@ for row in \
 	"https://www.netflix.com/ netflix" \
 	"https://claude.ai/ claude" \
 	"https://ipapi.co/json ipapi" \
-	"https://api.scnet.cn/api/llm/v1/chat/completions scnet" \
+	"https://api.scnet.cn/api/llm/v1/chat/completions scnet-llm" \
+	"http://c-1996151687735582721.qdai.scnet.cn:58043 scnet-mineru-api" \
+	"http://c-1996024701209694210.szai.scnet.cn:58043 scnet-mineru-api-sz" \
 	"https://sg.uiuiapi.com/ uiui" \
 	"https://siliconflow.cn/ siliconflow" \
 	"https://openrouter.ai/api/v1 openrouter"; do
@@ -84,7 +86,7 @@ for t in "${targets[@]}"; do
 
 if [[ $MODE == full ]]; then
 	section "EXTENDED AI / STREAMING"
-	extended=(https://chat.openai.com/ https://api.scnet.cn/api/llm/v1/chat/completions https://sg.uiuiapi.com/ https://siliconflow.cn/ https://openrouter.ai/api/v1 https://i.ytimg.com/generate_204 https://dash.akamaized.net/envivio/EnvivioDash3/manifest.mpd https://www.braintrust.dev/ https://huggingface.co/)
+	extended=(https://chat.openai.com/ https://api.scnet.cn/api/llm/v1/chat/completions http://c-1996151687735582721.qdai.scnet.cn:58043 http://c-1996024701209694210.szai.scnet.cn:58043 https://sg.uiuiapi.com/ https://siliconflow.cn/ https://openrouter.ai/api/v1 https://i.ytimg.com/generate_204 https://dash.akamaized.net/envivio/EnvivioDash3/manifest.mpd https://www.braintrust.dev/ https://huggingface.co/)
 	for u in "${extended[@]}"; do out=$(curl_t --proxy "$PROXY" "$u"); printf '%-55s %s %ss\n' "$u" "${out%%,*}" "${out##*,}"; done
 
 	section "REPEATABILITY (OpenAI 5x via proxy)"
