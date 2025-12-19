@@ -57,7 +57,7 @@ echo "Proxy     : $PROXY"
 echo "Controller: $API (reachable=$([[ $(curl -fsS "$API/version" 2>/dev/null || echo fail) != fail ]] && echo yes || echo no))"
 
 section "DNS BASELINE"
-for host in api.openai.com claude.ai youtube.com netflix.com braintrust.dev; do
+for host in api.openai.com claude.ai youtube.com netflix.com braintrust.dev upwork.com; do
 	ip=$(getent ahostsv4 "$host" 2>/dev/null | awk '{print $1; exit}')
 	printf '%-18s %s\n' "$host" "${ip:-RESOLVE_FAIL}"
 done
@@ -75,7 +75,8 @@ for row in \
 	"http://c-1996024701209694210.szai.scnet.cn:58043 scnet-mineru-api-sz" \
 	"https://sg.uiuiapi.com/ uiui" \
 	"https://siliconflow.cn/ siliconflow" \
-	"https://openrouter.ai/api/v1 openrouter"; do
+	"https://openrouter.ai/api/v1 openrouter" \
+	"https://www.upwork.com/ upwork"; do
 	test_pair ${row% *} ${row##* }
 done
 
@@ -86,7 +87,7 @@ for t in "${targets[@]}"; do
 
 if [[ $MODE == full ]]; then
 	section "EXTENDED AI / STREAMING"
-	extended=(https://chat.openai.com/ https://api.scnet.cn/api/llm/v1/chat/completions http://c-1996151687735582721.qdai.scnet.cn:58043 http://c-1996024701209694210.szai.scnet.cn:58043 https://sg.uiuiapi.com/ https://siliconflow.cn/ https://openrouter.ai/api/v1 https://i.ytimg.com/generate_204 https://dash.akamaized.net/envivio/EnvivioDash3/manifest.mpd https://www.braintrust.dev/ https://huggingface.co/)
+	extended=(https://chat.openai.com/ https://api.scnet.cn/api/llm/v1/chat/completions http://c-1996151687735582721.qdai.scnet.cn:58043 http://c-1996024701209694210.szai.scnet.cn:58043 https://sg.uiuiapi.com/ https://siliconflow.cn/ https://openrouter.ai/api/v1 https://i.ytimg.com/generate_204 https://dash.akamaized.net/envivio/EnvivioDash3/manifest.mpd https://www.braintrust.dev/ https://huggingface.co/ https://www.upwork.com/)
 	for u in "${extended[@]}"; do out=$(curl_t --proxy "$PROXY" "$u"); printf '%-55s %s %ss\n' "$u" "${out%%,*}" "${out##*,}"; done
 
 	section "REPEATABILITY (OpenAI 5x via proxy)"

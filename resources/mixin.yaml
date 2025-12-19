@@ -20,13 +20,14 @@ proxies:
     cipher: 2022-blake3-aes-256-gcm
     password: "5z3O9YHKuKRnlkedo5Rva2SBVt+JYe4GaAXcMwc78XM="
     udp: true
+    # 明确走 tailscale0，避免多网卡/策略路由环境下偶发选错出口
+    interface-name: tailscale0
 
 proxy-groups:
   - name: AUTO-SMART
     type: select
     proxies:
       - JP-Tailscale
-      - 速云梯
       - "🇯🇵 JP-自动选择"
       - "🇸🇬 SG-自动选择"
       - "🇭🇰 HK-自动选择"
@@ -40,6 +41,13 @@ proxy-groups:
       - V4-19|新加坡|x1.0
       - V4-121|香港|x1.0
       - V4-133|香港|x2.0
+  # 兼容旧规则：大量订阅规则仍指向“速云梯”。为避免到期后大面积失效，
+  # 将该分组在运行时兜底为 AUTO-SMART / JP-Tailscale。
+  - name: 速云梯
+    type: select
+    proxies:
+      - AUTO-SMART
+      - JP-Tailscale
   - name: AI
     type: select
     proxies:
@@ -153,6 +161,9 @@ dns:
     - "zoom.us"
     - "*.zoomcdn.net"
     - "zoomcdn.net"
+    - "*.upwork.com"
+    - upwork.com
+    - odesk.com
 
 # 如需额外规则覆盖可继续添加 rules: 键; 这里新增 QDAI 修复与常用开发/AI/会议规则
 rules:
@@ -161,6 +172,10 @@ rules:
   - DOMAIN,api.individual.githubcopilot.com,DIRECT
   - DOMAIN-SUFFIX,githubcopilot.com,DIRECT
   - DOMAIN,copilot-proxy.githubusercontent.com,DIRECT
+  # Wikipedia / Wikimedia：走稳定出口（避免订阅分组到期后仍命中旧规则）
+  - DOMAIN-SUFFIX,wikipedia.org,AUTO-SMART
+  - DOMAIN-SUFFIX,wikimedia.org,AUTO-SMART
+  - DOMAIN-SUFFIX,wikidata.org,AUTO-SMART
   # GitHub core API/auth: prefer DIRECT to ensure VS Code sign-in and API calls when proxies are unstable
   - DOMAIN,api.github.com,DIRECT
   - DOMAIN,github.com,DIRECT
@@ -232,6 +247,10 @@ rules:
   - DOMAIN-SUFFIX,youtube.com,Streaming
   - DOMAIN-SUFFIX,youtu.be,Streaming
   - DOMAIN-SUFFIX,googlevideo.com,Streaming
+  # Upwork freelancing platform (force proxy to avoid geo restriction/verification errors)
+  - DOMAIN-SUFFIX,upwork.com,AUTO-SMART
+  - DOMAIN-SUFFIX,upworkcdn.com,AUTO-SMART
+  - DOMAIN-SUFFIX,odesk.com,AUTO-SMART
   # AI / 模型
   - DOMAIN-SUFFIX,huggingface.co,AI
   - DOMAIN-SUFFIX,hf.co,AI
@@ -240,3 +259,6 @@ rules:
   - DOMAIN-SUFFIX,kaggle.com,Development
   # 公网 IP 检测
   - DOMAIN,api64.ipify.org,DIRECT
+
+  # 默认兜底出口：AUTO-SMART（JP-Tailscale 优先）
+  - MATCH,AUTO-SMART

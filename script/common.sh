@@ -232,7 +232,13 @@ function _error_quit() {
     if [ "${CLASH_LIB_MODE:-0}" = 1 ]; then
         return 1
     fi
-    exec $_SHELL -i
+    # In non-interactive contexts (cron/systemd/background/piped) or when explicitly requested,
+    # do NOT exec into an interactive shell. That behavior is convenient when sourced
+    # interactively, but looks like a "hang" for scripted usage.
+    if [ "${CLASH_ERROR_MODE:-}" = "exit" ] || [ ! -t 0 ]; then
+        exit 1
+    fi
+    exec "$_SHELL" -i
 }
 
 _is_bind() {
@@ -309,11 +315,24 @@ _download_raw_config() {
     local dest=$1
     local url=$2
     local agent='clash-verge/v2.0.4'
+    # NOTE:
+    # - connect-timeout only covers DNS+TCP handshake; some subscription servers may accept
+    #   the connection and then stall the response body, which previously caused "clash update"
+    #   to appear hung for hours.
+    # - Provide sane total timeouts with env overrides.
+    local max_time=${CLASH_SUBSCRIPTION_MAX_TIME:-45}
+    local speed_time=${CLASH_SUBSCRIPTION_SPEED_TIME:-15}
+    local speed_limit=${CLASH_SUBSCRIPTION_SPEED_LIMIT:-1024}
     curl \
         --silent \
         --show-error \
+        --location \
+        --fail \
         --insecure \
         --connect-timeout 4 \
+        --max-time "$max_time" \
+        --speed-time "$speed_time" \
+        --speed-limit "$speed_limit" \
         --retry 1 \
         --user-agent "$agent" \
         --output "$dest" \
@@ -321,8 +340,9 @@ _download_raw_config() {
         wget \
             --no-verbose \
             --no-check-certificate \
-            --timeout 3 \
-            --tries 1 \
+            --timeout 10 \
+            --tries 2 \
+            --waitretry 1 \
             --user-agent "$agent" \
             --output-document "$dest" \
             "$url"
@@ -337,6 +357,9 @@ _download_convert_config() {
         curl \
             --get \
             --silent \
+            --show-error \
+            --connect-timeout 1 \
+            --max-time 3 \
             --output /dev/null \
             --data-urlencode "target=$target" \
             --data-urlencode "url=$url" \

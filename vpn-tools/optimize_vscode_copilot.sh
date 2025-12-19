@@ -9,11 +9,29 @@ ROOT_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 
 echo "=== VSCode Copilot 网络优化 ($(date '+%Y-%m-%d %H:%M:%S')) ==="
 
+# Runtime/controller info (support secret + non-default port)
+RUNTIME_FILE="${CLASH_CONFIG_RUNTIME:-$HOME/.local/share/clash/runtime.yaml}"
+YQ_BIN="${BIN_YQ:-$HOME/.local/share/clash/bin/yq}"
+
+UI_PORT=9090
+API_SECRET=""
+if [ -x "$YQ_BIN" ] && [ -f "$RUNTIME_FILE" ]; then
+    ui_addr=$($YQ_BIN -r '."external-controller" // "127.0.0.1:9090"' "$RUNTIME_FILE" 2>/dev/null || echo '127.0.0.1:9090')
+    ui_addr=$(printf '%s' "$ui_addr" | tr -d "\"'")
+    UI_PORT=${ui_addr##*:}
+    API_SECRET=$($YQ_BIN -r '.secret // ""' "$RUNTIME_FILE" 2>/dev/null || echo '')
+    API_SECRET=$(printf '%s' "$API_SECRET" | tr -d "\"'")
+fi
+
+AUTH_HDR=()
+[ -n "$API_SECRET" ] && AUTH_HDR=(-H "Authorization: Bearer $API_SECRET")
+
 # 1. 检查 Clash 服务状态
 echo ""
 echo "📡 检查 Clash 服务..."
-if ! curl -s http://127.0.0.1:9090/version >/dev/null 2>&1; then
+if ! curl -s --max-time 2 "${AUTH_HDR[@]}" "http://127.0.0.1:${UI_PORT}/version" >/dev/null 2>&1; then
     echo "❌ Clash 服务未运行"
+    echo "   (提示) 如果你已启用 controller secret，请确保本脚本能读取 runtime.yaml 中的 secret。"
     exit 1
 fi
 echo "✅ Clash 服务正常"
@@ -22,7 +40,7 @@ echo "✅ Clash 服务正常"
 echo ""
 echo "🔧 优化 AI 服务节点..."
 if [ -f "$SCRIPT_DIR/optimize_ai.sh" ]; then
-    bash "$SCRIPT_DIR/optimize_ai.sh" 2>&1 | tail -10
+    bash "$SCRIPT_DIR/optimize_ai.sh" 2>&1 | tail -10 || true
 else
     echo "⚠️  optimize_ai.sh 不存在，跳过"
 fi
@@ -84,16 +102,28 @@ fi
 # 5. 检查 VSCode 进程代理配置
 echo ""
 echo "🔍 检查 VSCode 进程代理..."
-if pgrep -f "code.*extensionHost" >/dev/null 2>&1; then
-    vscode_pids=$(pgrep -f "code.*extensionHost" | head -3)
+vscode_pids=$(pgrep -x code 2>/dev/null | head -10 || true)
+if [ -n "$vscode_pids" ]; then
+    found_proxy=0
     for pid in $vscode_pids; do
-        proxy_info=$(tr '\0' '\n' < /proc/$pid/environ 2>/dev/null | grep -i proxy | head -3 || true)
+        [ -r "/proc/$pid/environ" ] || continue
+        proxy_info=$(tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null \
+            | grep -iE '^(http|https|all|no)_proxy=' \
+            | head -10 || true)
         if [ -n "$proxy_info" ]; then
             echo "  PID $pid:"
             echo "$proxy_info" | sed 's/^/    /'
+            if echo "$proxy_info" | grep -q '127\.0\.0\.1:6209'; then
+                echo "    ⚠️  检测到 6209 stale proxy（旧 VS Code 环境残留），建议完全退出 VS Code 并用 fix_vscode_stale_proxy.sh --launch-here 重新打开。"
+            fi
+            found_proxy=1
             break
         fi
     done
+
+    if [ "$found_proxy" -eq 0 ]; then
+        echo "  ℹ️  检测到 VS Code 进程，但未在前几个进程环境中发现 proxy 变量（可能由 VS Code 内部设置控制，或进程为 zygote/renderer）。"
+    fi
 else
     echo "  ℹ️  VSCode 未运行"
 fi

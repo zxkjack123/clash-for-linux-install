@@ -160,7 +160,8 @@ if [ $STATUS -eq 0 ]; then
   fi
   _guard_metrics_write clash_guard_lock_wait_seconds "${LOCK_WAIT_SECONDS:-0}"
   if $BASELINE_REPORT; then
-    fails=$(journalctl --user -u "$SERVICE" --since "5 min ago" --no-pager 2>/dev/null | grep -c 'connect error' || echo 0)
+    fails=$(journalctl --user -u "$SERVICE" --since "5 min ago" --no-pager 2>/dev/null | grep -c 'connect error' 2>/dev/null || true)
+    fails=$(echo "${fails:-0}" | tail -n 1)
     grade=A; [ $fails -gt 5 ] && grade=B; [ $fails -gt 15 ] && grade=C; [ $fails -gt 30 ] && grade=D
     ok "节点失败(5m):$fails 等级:$grade"
     if $JSON_OUT; then

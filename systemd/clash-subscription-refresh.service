@@ -12,7 +12,7 @@ Environment=OPTIMIZE_DELAY=900
 Environment=OPTIMIZE_SCRIPT=%h/opt/clash-for-linux-install/vpn-tools/optimize_all_network.sh
 ExecStart=%h/opt/clash-for-linux-install/script/refresh_subscription_direct.sh
 # Optional: adjust timeout if provider is slow
-TimeoutStartSec=5min
+TimeoutStartSec=45min
 
 [Install]
 WantedBy=default.target

@@ -16,6 +16,7 @@ cache.db
 runtime.yaml
 .tmp
 trace*.txt
+tmp/
 guard_*.txt
 resources/mixin.yaml.bak-*
 /tmp/.clash_latency.*

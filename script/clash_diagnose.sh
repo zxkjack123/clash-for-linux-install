@@ -68,17 +68,47 @@ fi
 # 3. 端口解析 (mixed-port / external-controller)
 MIXED_PORT=$([ -x "$YQ" ] && "$YQ" '.mixed-port // ."port" // 7890' "$RUNTIME" 2>/dev/null || echo 7890)
 UI_ADDR=$([ -x "$YQ" ] && "$YQ" '."external-controller" // "127.0.0.1:9090"' "$RUNTIME" 2>/dev/null || echo '127.0.0.1:9090')
+UI_ADDR=$(printf '%s' "$UI_ADDR" | tr -d "\"'")
 UI_PORT=${UI_ADDR##*:}
 add_json mixed_port "$MIXED_PORT"; add_json ui_port "$UI_PORT"
+
+# 3.1 安全检查：controller 是否暴露且无鉴权
+ALLOW_LAN=$([ -x "$YQ" ] && "$YQ" '."allow-lan" // false' "$RUNTIME" 2>/dev/null || echo false)
+ALLOW_LAN=$(printf '%s' "$ALLOW_LAN" | tr -d "\"'" | tr '[:upper:]' '[:lower:]')
+SECRET=$([ -x "$YQ" ] && "$YQ" '.secret // ""' "$RUNTIME" 2>/dev/null || echo '')
+SECRET=$(printf '%s' "$SECRET" | tr -d "\"'")
+add_json allow_lan "$ALLOW_LAN"
+add_json controller_secret_set $([ -n "$SECRET" ] && echo true || echo false)
+
+# 判断 controller 是否绑定到非 loopback
+CTRL_HOST=${UI_ADDR%%:*}
+CTRL_EXPOSED=0
+case "$CTRL_HOST" in
+  127.0.0.1|localhost) CTRL_EXPOSED=0 ;;
+  0.0.0.0|::|\[::\]) CTRL_EXPOSED=1 ;;
+  *) CTRL_EXPOSED=1 ;;
+esac
+add_json controller_exposed $([ $CTRL_EXPOSED -eq 1 ] && echo true || echo false)
 
 LISTEN_HTTP=$(ss -ltn 2>/dev/null | grep -E ":$MIXED_PORT\b" || true)
 if [ -n "$LISTEN_HTTP" ]; then ok "监听端口: mixed $MIXED_PORT"; add_json mixed_listen true; else fail "未监听 mixed $MIXED_PORT"; add_json mixed_listen false; STATUS=1; fi
 LISTEN_UI=$(ss -ltn 2>/dev/null | grep -E ":$UI_PORT\b" || true)
 if [ -n "$LISTEN_UI" ]; then ok "监听端口: ui $UI_PORT"; add_json ui_listen true; else warn "控制端口未监听: $UI_PORT"; add_json ui_listen false; STATUS=$(( STATUS==1?1:2 )); fi
 
+# controller 暴露但无 secret：高风险
+if [ $CTRL_EXPOSED -eq 1 ] && [ -z "$SECRET" ]; then
+  warn "安全风险：external-controller=$UI_ADDR 且 secret 为空（同网段任意主机可控制 Clash）"
+  STATUS=$(( STATUS==1?1:2 ))
+elif [ -z "$SECRET" ]; then
+  warn "建议：设置 controller secret（当前为空，虽然 controller 可能仅本机可访问）"
+  STATUS=$(( STATUS==1?1:2 ))
+fi
+
 # 4. 控制接口版本
 API_BASE="http://127.0.0.1:$UI_PORT"
-CTRL_VERSION=$(curl -fsS --max-time 2 "$API_BASE/version" 2>/dev/null || true)
+AUTH_HDR=()
+[ -n "$SECRET" ] && AUTH_HDR=(-H "Authorization: Bearer $SECRET")
+CTRL_VERSION=$(curl -fsS --max-time 2 "${AUTH_HDR[@]}" "$API_BASE/version" 2>/dev/null || true)
 if echo "$CTRL_VERSION" | grep -q '{'; then ok "控制接口可访问"; add_json controller_ok true; else fail "控制接口不可访问"; add_json controller_ok false; STATUS=1; fi
 
 # 5. 代理连通性 (HTTP)
@@ -133,6 +163,14 @@ else
   [ "$RULE_DIR8" = 0 ] && echo ' - 添加 DIRECT 规则: IP-CIDR,8.8.8.8/32,DIRECT,no-resolve' || true
   [ "$HIJACK" = 1 ] && echo ' - 运行: bash script/sanitize_runtime.sh' || true
   [ "$FAILS_5M" -gt 10 ] && echo ' - 执行: clash downgrade  或  重新选择稳定节点' || true
+
+  # 安全提示 (不强制)
+  if [ -z "$SECRET" ]; then
+    echo ' - 安全建议：为 external-controller 设置 secret（clash secret <token>），并考虑将 external-controller 绑定到 127.0.0.1'
+  fi
+  if [ "$ALLOW_LAN" = true ]; then
+    echo ' - 安全建议：allow-lan=true 会让代理端口对局域网可见；若只需本机/容器使用，请评估是否需要收紧'
+  fi
 fi
 
 # 12. JSON 输出

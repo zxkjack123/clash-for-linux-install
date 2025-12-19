@@ -122,6 +122,9 @@ if (( proxy_ok )); then RESULTS[proxy_http]="OK($proxy_code,$proxy_t)"; ((++scor
 
 # Streaming quick (YouTube base HTML)
 test_step youtube "YouTube" --proxy http://$PROXY_HOST:$HTTP_PORT https://www.youtube.com/
+# Upwork access check (common geo-verify issue, ensure proxied works)
+((max_score++))
+test_step upwork "Upwork" --proxy http://$PROXY_HOST:$HTTP_PORT https://www.upwork.com/
 test_step github_web "GitHub Web" --proxy http://$PROXY_HOST:$HTTP_PORT https://github.com/
 # GitHub API: be resilient against sporadic network hiccups and rate-limit edges
 # Try root, then /zen, then /rate_limit; include a simple UA to avoid 403s in rare environments
@@ -221,7 +224,7 @@ else
 	{
 		echo '{'
 		echo '  "timestamp": '"$(date +%s)",
-		for k in controller port_$HTTP_PORT port_$SOCKS_PORT proxy_http youtube github_web github_api copilot_edge pypi pypi_files docker_hub docker_registry protonvpn_repo copilot_proxy geo; do
+		for k in controller port_$HTTP_PORT port_$SOCKS_PORT proxy_http youtube upwork github_web github_api copilot_edge pypi pypi_files docker_hub docker_registry protonvpn_repo copilot_proxy geo; do
 			v=${RESULTS[$k]:-NA}; printf '  "%s": "%s",\n' "$k" "$v" | json_escape
 		done
 		echo '  "score": '"$score",'

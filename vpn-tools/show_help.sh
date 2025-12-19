@@ -50,6 +50,14 @@ case "${1:-list}" in
         echo "🌐 NETWORK TESTING TOOLS:"
         echo "  network_connectivity_test.sh - Comprehensive network test (5-8 min)"
         echo "  quick_vpn_check.sh          - Instant VPN status check (15-30s)"
+        echo "  jp_tailscale_single_node_test.sh - JP-Tailscale single-node benchmark (DERP/latency/throughput/concurrency)"
+        echo "  test_vscode_core_domains.sh - Compare DIRECT vs proxy success-rate for VS Code core domains"
+        echo "  trace_mihomo_connections.sh - Live trace mihomo /connections (rule + chain)"
+        echo ""
+        echo "🛠️  UTILITIES:"
+        echo "  optimize_vscode_copilot.sh  - Verify Copilot/GitHub/OpenAI endpoints via proxy + optional AI optimize"
+        echo "  fix_vscode_stale_proxy.sh   - Launch VS Code with sanitized proxy env (fix stale/ghost proxy)"
+        echo "  harden_controller_security.sh - Bind controller to localhost + set secret (safe by default)"
         echo ""
         echo "📋 USAGE EXAMPLES:"
         echo "  ./show_help.sh optimize_ai.sh           # Get help for specific script"
@@ -96,7 +104,10 @@ case "${1:-list}" in
         echo "========================"
         show_script_help "network_connectivity_test.sh"
         show_script_help "quick_vpn_check.sh"
-    show_script_help "fix_apt_protonvpn_repo.sh"
+        show_script_help "jp_tailscale_single_node_test.sh"
+        show_script_help "test_vscode_core_domains.sh"
+        show_script_help "trace_mihomo_connections.sh"
+        show_script_help "fix_apt_protonvpn_repo.sh"
         ;;
         
     *.sh)

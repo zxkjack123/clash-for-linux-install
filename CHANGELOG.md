@@ -1,4 +1,26 @@
 # Changelog
+## [2.5.4] - 2025-12-19
+
+### ✨ New
+- Added `vpn-tools/trace_mihomo_connections.sh` to live-trace mihomo controller `/connections` and prove whether VS Code/Copilot traffic is reaching mihomo, including the matched `rule` and final `chains`.
+- Added VS Code core-domain and JP-Tailscale single-node testing utilities (see `vpn-tools/test_vscode_core_domains.sh` and `vpn-tools/jp_tailscale_single_node_test.sh`) for repeatable success-rate/latency validation.
+
+### 🔧 Improvements
+- VS Code/Copilot optimization tooling now supports hardened controller setups:
+  - `vpn-tools/optimize_ai.sh` auto-detects `external-controller` + `secret` from `~/.local/share/clash/runtime.yaml` and sends the Authorization header when required.
+  - `vpn-tools/optimize_vscode_copilot.sh` continues through connectivity tests even when AI optimization cannot complete (reduces “one failure stops everything” behavior).
+- Subscription refresh robustness: `systemd/clash-subscription-refresh.service` raises `TimeoutStartSec` to 45 minutes for slow providers.
+
+### 🛠 Fixes
+- `.gitignore` now ignores the repo-root `tmp/` scratch folder (transient diagnostics / ad-hoc artifacts).
+
+### ✅ Verification
+- `bash -n` on all changed shell scripts
+- `script/clash_diagnose.sh --fast --json`
+- `script/runtime_guard.sh --check --json`
+- `vpn-tools/optimize_vscode_copilot.sh`
+- `vpn-tools/trace_mihomo_connections.sh --seconds 2`
+
 ## [2.5.3] - 2025-12-06
 
 ### 🔧 Improvements

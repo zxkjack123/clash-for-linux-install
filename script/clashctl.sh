@@ -419,6 +419,54 @@ _merge_sanitize_restart() {
         "$BIN_YQ" -i '.rules += ["IP-CIDR,8.8.8.8/32,DIRECT,no-resolve"]' "$tmp_out" 2>/dev/null || true
     # 去重 DIRECT 规则 (及所有规则防膨胀)
     "$BIN_YQ" -i '.rules |= ( . // [] | unique )' "$tmp_out" 2>/dev/null || true
+
+    # 防御性修复：ProxyGroup 循环 (AUTO-SMART <-> 速云梯)
+    # 该循环会导致 mihomo -t 直接失败，从而让 update 看起来“卡住/失败”。
+    # 优先保留兼容分组「速云梯 -> AUTO-SMART」，并从 AUTO-SMART 中移除「速云梯」以打破环。
+    if [ -x "$BIN_YQ" ]; then
+        if "$BIN_YQ" -e '.proxy-groups[] | select(.name=="AUTO-SMART") | ((.proxies // []) | contains(["速云梯"]))' "$tmp_out" >/dev/null 2>&1 && \
+           "$BIN_YQ" -e '.proxy-groups[] | select(.name=="速云梯") | ((.proxies // []) | contains(["AUTO-SMART"]))' "$tmp_out" >/dev/null 2>&1; then
+            "$BIN_YQ" -i '(.proxy-groups[] | select(.name=="AUTO-SMART") | .proxies) |= ((. // []) | map(select(. != "速云梯")))' "$tmp_out" 2>/dev/null || true
+        fi
+    fi
+
+        # 默认路由策略：若存在 AUTO-SMART 分组，则强制将最终 MATCH 指向该分组，避免订阅过期导致默认落回某个订阅分组。
+        # 允许通过环境变量 CLASH_MATCH_GROUP 覆盖目标分组名。
+        # 规则调整原则：
+        #   - 移除所有现有 MATCH,*（避免“先匹配先返回”导致新 MATCH 不生效）
+        #   - 将 wikipedia/wikimedia/wikidata 路由到目标分组（插入在 GEOIP 之前）
+        #   - 追加 MATCH,<target> 作为最后一条规则
+        if [ -x "$BIN_YQ" ]; then
+                local match_group="${CLASH_MATCH_GROUP:-AUTO-SMART}"
+                if CLASH_MATCH_GROUP="$match_group" "$BIN_YQ" -e '((.["proxy-groups"] // []) | map(.name) | contains([strenv(CLASH_MATCH_GROUP)]))' "$tmp_out" >/dev/null 2>&1; then
+                        CLASH_MATCH_GROUP="$match_group" "$BIN_YQ" -i '
+                            .rules = (
+                                (.rules // []) as $rules |
+                                ($rules | map(select(test("^GEOIP,")))) as $geos |
+                                ($rules
+                                    | map(select(test("^GEOIP,")|not)
+                                                | select(test("^MATCH,")|not)
+                                                | select(test("wikipedia\\.org|wikimedia\\.org|wikidata\\.org")|not)
+                                        | select(test("microsoft\\.com|update\\.code\\.visualstudio\\.com|marketplace\\.visualstudio\\.com|gallery\\.vsassets\\.io")|not)
+                                        )
+                                ) as $base |
+                                ($base + [
+                                    "DOMAIN,update.code.visualstudio.com,DIRECT",
+                                    "DOMAIN,marketplace.visualstudio.com,DIRECT",
+                                    "DOMAIN-SUFFIX,gallery.vsassets.io,DIRECT",
+                                        "DOMAIN-SUFFIX,microsoft.com,DIRECT",
+                                        "DOMAIN-SUFFIX,wikipedia.org," + strenv(CLASH_MATCH_GROUP),
+                                        "DOMAIN-SUFFIX,wikimedia.org," + strenv(CLASH_MATCH_GROUP),
+                                        "DOMAIN-SUFFIX,wikidata.org," + strenv(CLASH_MATCH_GROUP)
+                                    ] + $geos + [
+                                        "MATCH," + strenv(CLASH_MATCH_GROUP)
+                                    ])
+                            ) |
+                            .rules |= unique
+                        ' "$tmp_out" 2>/dev/null || true
+                fi
+        fi
+
     _valid_config "$tmp_out" || _error_quit '合并后验证失败(含清洗)'
     _annotate_runtime "$tmp_out"
     mv "$tmp_out" "$CLASH_CONFIG_RUNTIME" 2>/dev/null || _error_quit '替换 runtime 失败'
@@ -526,6 +574,19 @@ function clashtun() {
 }
 
 function clashupdate() {
+    # Redact secrets in URLs before printing to terminal/logs.
+    # Keep the original URL for the actual download, but never echo tokens.
+    _mask_url() {
+        local u="$1"
+        # Mask basic-auth part if present: https://user:pass@host -> https://***@host
+        u=$(printf '%s' "$u" | sed -E 's#^(https?://)[^/@]+@#\1***@#')
+        # Mask common token-like path segments, e.g. /link/<token> or /subscribe/<token>
+        u=$(printf '%s' "$u" | sed -E 's#/(link|subscribe)/[^/?#]{8,}#\/\1\/***#g')
+        # Mask common secret query params
+        u=$(printf '%s' "$u" | sed -E 's/([?&](token|access_token|apikey|api_key|key|secret)=)[^&#]*/\1***/gI')
+        printf '%s' "$u"
+    }
+
     local url=$(cat "$CLASH_CONFIG_URL")
     local is_auto
 
@@ -549,10 +610,15 @@ function clashupdate() {
         url="file://$CLASH_CONFIG_RAW"
     }
 
+    local safe_url
+    safe_url=$(_mask_url "$url")
+
     # 如果是自动更新模式，则设置定时任务
     [ "$is_auto" = true ] && {
-        grep -qs 'clashupdate' "$CLASH_CRON_TAB" || echo "0 0 */2 * * $_SHELL -i -c 'clashupdate $url'" | tee -a "$CLASH_CRON_TAB" >&/dev/null
-        _okcat "已设置定时更新订阅" && return 0
+        # Persist URL (may include token) but avoid writing it into the crontab line.
+        echo "$url" | tee "$CLASH_CONFIG_URL" >&/dev/null
+        grep -qs 'clashupdate' "$CLASH_CRON_TAB" || echo "0 0 */2 * * $_SHELL -i -c 'clashupdate'" | tee -a "$CLASH_CRON_TAB" >&/dev/null
+        _okcat "已设置定时更新订阅：$safe_url" && return 0
     }
 
     _okcat '👌' "正在下载：原配置已备份..."
@@ -561,7 +627,7 @@ function clashupdate() {
     _rollback() {
         _failcat '🍂' "$1"
         cat "$CLASH_CONFIG_RAW_BAK" | tee "$CLASH_CONFIG_RAW" >&/dev/null
-        _failcat '❌' "[$(date +"%Y-%m-%d %H:%M:%S")] 订阅更新失败：$url" 2>&1 | tee -a "${CLASH_UPDATE_LOG}" >&/dev/null
+        _failcat '❌' "[$(date +"%Y-%m-%d %H:%M:%S")] 订阅更新失败：$safe_url" 2>&1 | tee -a "${CLASH_UPDATE_LOG}" >&/dev/null
         _error_quit
     }
 
@@ -577,7 +643,11 @@ function clashupdate() {
     if [ -f "$CLASH_CONFIG_RAW" ]; then
         raw_sha_pre=$(sha256sum "$CLASH_CONFIG_RAW" | awk '{print $1}')
     fi
-    _merge_sanitize_restart && _okcat '🍃' '订阅更新成功'
+    # 合并+清洗+重启失败时，也需要回滚下载的 RAW，避免留下“半更新”状态。
+    if ! ( _merge_sanitize_restart ); then
+        _rollback "合并失败：已回滚配置"
+    fi
+    _okcat '🍃' '订阅更新成功'
     # 差异计算（若存在旧 runtime）
     if [ -f "$pre_runtime_copy" ]; then
         local ts=$(date +%Y%m%d_%H%M%S)
@@ -625,9 +695,12 @@ function clashupdate() {
         local raw_sha line_ts expected
         raw_sha=$(sha256sum "$CLASH_CONFIG_RAW" | awk '{print $1}')
         line_ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-        echo -e "$line_ts\t$raw_sha\t$url" >> "$CLASH_FINGERPRINT_FILE" 2>/dev/null || true
+        # Record masked URL to avoid leaking subscription tokens.
+        echo -e "$line_ts\t$raw_sha\t$safe_url" >> "$CLASH_FINGERPRINT_FILE" 2>/dev/null || true
         if [ -f "$CLASH_EXPECTED_FINGERPRINT_FILE" ]; then
-            expected=$(grep -F "$url" "$CLASH_EXPECTED_FINGERPRINT_FILE" | awk '{print $2}' | head -n1 || true)
+            # Backward-compatible lookup: try masked URL first, then raw URL.
+            expected=$(grep -F "$safe_url" "$CLASH_EXPECTED_FINGERPRINT_FILE" | awk '{print $2}' | head -n1 || true)
+            [ -z "$expected" ] && expected=$(grep -F "$url" "$CLASH_EXPECTED_FINGERPRINT_FILE" | awk '{print $2}' | head -n1 || true)
             if [ -n "$expected" ]; then
                 case "$raw_sha" in
                     $expected*) _okcat '🔐' "订阅指纹匹配 (${expected})" ;;
@@ -645,10 +718,11 @@ function clashupdate() {
         fi
     fi
     echo "$url" | tee "$CLASH_CONFIG_URL" >&/dev/null
-    _okcat '✅' "[$(date +"%Y-%m-%d %H:%M:%S")] 订阅更新成功：$url" | tee -a "${CLASH_UPDATE_LOG}" >&/dev/null
+    _okcat '✅' "[$(date +"%Y-%m-%d %H:%M:%S")] 订阅更新成功：$safe_url" | tee -a "${CLASH_UPDATE_LOG}" >&/dev/null
     # 若近期失败较多, 立即尝试标记高失败节点
     local recent_fail
-    recent_fail=$(journalctl --user -u "$BIN_KERNEL_NAME" --since "5 min ago" --no-pager 2>/dev/null | grep -c 'connect error' || echo 0)
+    recent_fail=$(journalctl --user -u "$BIN_KERNEL_NAME" --since "5 min ago" --no-pager 2>/dev/null | grep -c 'connect error' 2>/dev/null || true)
+    recent_fail=$(echo "${recent_fail:-0}" | tail -n 1)
     if [ "$recent_fail" -gt 10 ]; then
         _okcat '⚠️' "过去5分钟失败: $recent_fail -> 执行降权标记"
         _downgrade_failed_nodes 10 5
@@ -797,7 +871,8 @@ _clash_health() {
     direct8=$(grep -q 'IP-CIDR,8.8.8.8/32,DIRECT' "$CLASH_CONFIG_RUNTIME" && echo ok || echo miss)
     hijack=$(grep -E 'IP-CIDR,(1.1.1.1|8.8.8.8)/32,.*(PROXY|西瓜加速)' "$CLASH_CONFIG_RUNTIME" >/dev/null && echo risk || echo clean)
     # 最近 5 分钟失败节点总数
-    fails=$(journalctl --user -u "$BIN_KERNEL_NAME" --since "5 min ago" --no-pager 2>/dev/null | grep -c 'connect error' || echo 0)
+    fails=$(journalctl --user -u "$BIN_KERNEL_NAME" --since "5 min ago" --no-pager 2>/dev/null | grep -c 'connect error' 2>/dev/null || true)
+    fails=$(echo "${fails:-0}" | tail -n 1)
     # 简单评分模型
     score=100
     [ "$direct1" = miss ] && score=$((score-25))
@@ -830,7 +905,8 @@ _clash_metrics() {
     direct1=$(grep -q 'IP-CIDR,1.1.1.1/32,DIRECT' "$CLASH_CONFIG_RUNTIME" && echo 1 || echo 0)
     direct8=$(grep -q 'IP-CIDR,8.8.8.8/32,DIRECT' "$CLASH_CONFIG_RUNTIME" && echo 1 || echo 0)
     hijack=$(grep -E 'IP-CIDR,(1.1.1.1|8.8.8.8)/32,.*(PROXY|西瓜加速)' "$CLASH_CONFIG_RUNTIME" >/dev/null && echo 1 || echo 0)
-    fails=$(journalctl --user -u "$BIN_KERNEL_NAME" --since "5 min ago" --no-pager 2>/dev/null | grep -c 'connect error' || echo 0)
+    fails=$(journalctl --user -u "$BIN_KERNEL_NAME" --since "5 min ago" --no-pager 2>/dev/null | grep -c 'connect error' 2>/dev/null || true)
+    fails=$(echo "${fails:-0}" | tail -n 1)
     score=100
     [ $direct1 -eq 0 ] && score=$((score-25))
     [ $direct8 -eq 0 ] && score=$((score-25))
@@ -1083,6 +1159,7 @@ _fail_nodes() {
 
 # 入口: 放在所有函数之后，确保定义已加载。
 if [[ "${BASH_SOURCE[0]}" == "$0" ]] && [ ${#__CLASHCTL_DEFERRED_ARGS[@]} -gt 0 ]; then
+    export CLASH_ERROR_MODE=exit
     clashctl "${__CLASHCTL_DEFERRED_ARGS[@]}"
     exit $?
 fi

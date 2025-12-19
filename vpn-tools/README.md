@@ -54,10 +54,14 @@ cd vpn-tools
 ### 🌐 Network Testing
 - **`network_connectivity_test.sh`** - Comprehensive network test (5-8 min)
 - **`quick_vpn_check.sh`** - Instant VPN status (15-30s)
+- **`jp_tailscale_single_node_test.sh`** - JP-Tailscale single-node benchmark (DERP/latency/throughput/concurrency)
+- **`test_vscode_core_domains.sh`** - Compare DIRECT vs proxy success-rate for VS Code core domains
+- **`trace_mihomo_connections.sh`** - Live controller `/connections` tracer (prove VS Code/Copilot traffic is going through mihomo and which rule/chain it hits)
 
 ### 🛠️ Management & Utilities
 - **`launcher.sh`** - Interactive tool launcher
 - **`show_help.sh`** - Help and documentation system
+- **`harden_controller_security.sh`** - Harden controller exposure (set secret, optionally bind controller to localhost)
 
 ## 📚 Documentation
 
@@ -134,6 +138,19 @@ cd vpn-tools
 - All scripts are read-only testing tools
 - No permanent changes are made to your system
 - Safe to run multiple times
+
+## 🧩 VS Code / Copilot: “Fetching …” 卡顿排查
+
+当你在 VS Code / Copilot 里看到类似 `Fetching https://github.com/...` 长时间卡住时，通常是 **请求没有稳定走代理**（直连超时/重试），或者进了 mihomo 但命中 DIRECT 规则导致直连不通。
+
+推荐流程（2 分钟内能定位到“走没走代理/命中了哪条规则”）：
+
+1. 确保 VS Code 显式走本地代理（推荐 override）：
+	- `http.proxy`: `http://127.0.0.1:7890`
+	- `http.proxySupport`: `override`
+2. 运行一次：`./optimize_vscode_copilot.sh`（验证 Copilot/GitHub/OpenAI 端点经 7890 可达）
+3. 复现卡顿的同时运行：`./trace_mihomo_connections.sh --seconds 60`
+	- 输出会显示 `rule=...` / `chains=...`，可直接证明 VS Code/Copilot 流量是否进入 mihomo、最终走 DIRECT 还是 AUTO-SMART/具体链路。
 
 ## 🆘 Getting Help
 

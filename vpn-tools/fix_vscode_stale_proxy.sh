@@ -47,18 +47,35 @@ get_port() {
 }
 
 detect_6209() {
-  # List VS Code processes whose environment still references 127.0.0.1:6209
-  if ! command -v ps >/dev/null 2>&1; then
-    echo "ps not found" >&2
-    return 1
+  # Safely detect VS Code processes whose environment still references 127.0.0.1:6209
+  # NOTE: Avoid `ps e` which can dump full environments (may contain secrets).
+  local pids found any_code
+  any_code=0
+  found=0
+
+  pids=$(pgrep -x code 2>/dev/null || true)
+  if [ -z "$pids" ]; then
+    echo "No VS Code processes found."
+    return 0
   fi
-  local out
-  out=$(ps eww -C code -o pid,cmd 2>/dev/null | grep -E 'http_proxy|https_proxy|all_proxy|NO_PROXY|127.0.0.1:6209' || true)
-  if [ -z "$out" ]; then
-    echo "No VS Code process found with 127.0.0.1:6209 in env."
-  else
-    echo "Found VS Code processes carrying stale proxies (127.0.0.1:6209):"
-    echo "$out"
+  any_code=1
+
+  for pid in $pids; do
+    [ -r "/proc/$pid/environ" ] || continue
+    if tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null | grep -q '127\.0\.0\.1:6209'; then
+      if [ "$found" -eq 0 ]; then
+        echo "Found VS Code processes carrying stale proxies (127.0.0.1:6209):"
+      fi
+      found=1
+      echo "  PID $pid:"
+      tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null \
+        | grep -iE '^(http|https|all|no)_proxy=' \
+        | sed 's/^/    /'
+    fi
+  done
+
+  if [ "$any_code" -eq 1 ] && [ "$found" -eq 0 ]; then
+    echo "No VS Code process found with 127.0.0.1:6209 in proxy env."
   fi
 }
 
