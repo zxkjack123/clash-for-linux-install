@@ -1,4 +1,18 @@
 # Changelog
+## [2.5.5] - 2025-12-22
+
+### ✨ New
+- Added SZAI MinerU endpoint `c-2002916625925693441.szai.scnet.cn:58043` to the SCNET/QDAI DIRECT pin set (kept ahead of `DOMAIN-SUFFIX,cn` style catch-alls).
+
+### 🛠 Fixes
+- Hardened `script/sanitize_runtime.sh` to repair historical `runtime.yaml` rule corruption where multiple rules were accidentally concatenated into a single YAML list item (e.g. `...,DIRECT DOMAIN,...` leading to mihomo parse errors like `proxy [DIRECT DOMAIN] not found`).
+
+### 🔧 Improvements
+- `vpn-tools/network_connectivity_test.sh` now includes coverage for the new SZAI MinerU endpoint.
+
+### ✅ Verification
+- `bash -n` on changed shell scripts
+
 ## [2.5.4] - 2025-12-19
 
 ### ✨ New

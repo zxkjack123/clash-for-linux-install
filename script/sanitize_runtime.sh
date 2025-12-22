@@ -31,6 +31,7 @@ SERVICE="${BIN_KERNEL_NAME:-mihomo}"
 read -r -d '' SCNET_PRIORITY_RULES <<'EOF' || true
 DOMAIN,c-1966322474660876290.qdai.scnet.cn,DIRECT
 DOMAIN,c-1996024701209694210.szai.scnet.cn,DIRECT
+DOMAIN,c-2002916625925693441.szai.scnet.cn,DIRECT
 DOMAIN-SUFFIX,qdai.scnet.cn,DIRECT
 DOMAIN,api.scnet.cn,DIRECT
 DOMAIN-SUFFIX,scnet.cn,DIRECT
@@ -109,6 +110,43 @@ if [ -x "$YQ_BIN" ]; then
   fi
 fi
 
+# 修复历史遗留: 某些脚本/手工合并可能把多条规则拼在同一个 list item 里
+# 典型症状: "...,DIRECT, DOMAIN,..." 或 "...,DIRECT DOMAIN,..." 导致 mihomo 解析报错
+if [ -x "$YQ_BIN" ]; then
+  if "$YQ_BIN" -e '.rules? | length > 0' "$RUNTIME" >/dev/null 2>&1; then
+    # 1) 修复最常见的边界缺失逗号: ",DIRECT DOMAIN,..." -> ",DIRECT, DOMAIN,..."
+    # 2) 若某条规则包含 ", (DOMAIN|IP-CIDR|GEOIP|MATCH)," 作为“第二条规则”的起点，则按 ", " 拆分
+    #    (不会误伤正常规则，因为正常规则内部基本不会出现逗号+空格)
+    "$YQ_BIN" -i '
+      .rules = (
+        (.rules // [])
+        | map(
+            (tostring
+              | sub(",DIRECT DOMAIN,"; ",DIRECT, DOMAIN,")
+              | sub(",DIRECT DOMAIN-SUFFIX,"; ",DIRECT, DOMAIN-SUFFIX,")
+              | sub(",DIRECT DOMAIN-KEYWORD,"; ",DIRECT, DOMAIN-KEYWORD,")
+              | sub(",DIRECT DOMAIN-REGEX,"; ",DIRECT, DOMAIN-REGEX,")
+              | sub(",DIRECT IP-CIDR,"; ",DIRECT, IP-CIDR,")
+              | sub(",DIRECT IP-CIDR6,"; ",DIRECT, IP-CIDR6,")
+              | sub(",DIRECT SRC-IP-CIDR,"; ",DIRECT, SRC-IP-CIDR,")
+              | sub(",DIRECT DST-PORT,"; ",DIRECT, DST-PORT,")
+              | sub(",DIRECT SRC-PORT,"; ",DIRECT, SRC-PORT,")
+              | sub(",DIRECT GEOIP,"; ",DIRECT, GEOIP,")
+              | sub(",DIRECT PROCESS-NAME,"; ",DIRECT, PROCESS-NAME,")
+              | sub(",DIRECT PROCESS-PATH,"; ",DIRECT, PROCESS-PATH,")
+              | sub(",DIRECT RULE-SET,"; ",DIRECT, RULE-SET,")
+              | sub(",DIRECT MATCH,"; ",DIRECT, MATCH,")
+              | split(", ")
+            )
+          )
+        | flatten
+        | map(sub("^\\s+"; "") | sub("\\s+$"; ""))
+        | map(select(length > 0))
+      )
+    ' "$RUNTIME" 2>/dev/null && MODIFIED=true || true
+  fi
+fi
+
 if ! $MODIFIED; then
   vv "文本模式处理"
   TMP="${RUNTIME}.tmp.$$"
@@ -133,7 +171,10 @@ if [ -x "$YQ_BIN" ] && [ -n "$SCNET_PRIORITY_RULES" ]; then
   if "$YQ_BIN" -e '.rules? | length > 0' "$RUNTIME" >/dev/null 2>&1; then
     PRIORITY_RULES="$SCNET_PRIORITY_RULES" "$YQ_BIN" -i '
       .rules = (
-        (env(PRIORITY_RULES) | split("\n") | map(select(length > 0))) as $prio |
+        (strenv(PRIORITY_RULES) | split("\n") | map(select(length > 0)))
+          | map(sub("\\r$"; ""))
+          | map(select(length > 0))
+        as $prio |
         ($prio + ((.rules // []) | reduce .[] as $item (
           [];
           . + (if ($prio | index($item)) then [] else [$item] end)
