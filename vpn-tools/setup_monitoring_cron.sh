@@ -8,7 +8,7 @@
 #   4. 设置自动优化任务
 #
 # 使用方法:
-#   ./setup_monitoring_cron.sh --install   # 安装监控任务
+#   ./setup_monitoring_cron.sh --install   # 安装监控任务(默认仅监控，不自动修复)
 #   ./setup_monitoring_cron.sh --uninstall # 卸载监控任务
 #   ./setup_monitoring_cron.sh --status    # 查看状态
 
@@ -18,10 +18,18 @@ BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PARENT_DIR="$(dirname "$BASE_DIR")"
 CRON_BACKUP="$HOME/.local/share/clash/cron_backup_$(date +%Y%m%d_%H%M%S).txt"
 
+# Safety-first defaults:
+# - Do NOT auto-fix or auto-optimize unless explicitly enabled.
+WITH_AUTOFIX=0
+WITH_OPTIMIZER=0
+
+have() { command -v "$1" >/dev/null 2>&1; }
+
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 
 # 检查是否已安装监控任务
 check_monitoring_installed() {
+    have crontab || return 1
     crontab -l 2>/dev/null | grep -q "network_health_monitor" && return 0
     return 1
 }
@@ -29,6 +37,11 @@ check_monitoring_installed() {
 # 安装监控任务
 install_monitoring() {
     log "开始安装监控任务..."
+
+    if ! have crontab; then
+        log "❌ 未找到 crontab 命令：请先安装 cron (Debian/Ubuntu: cron)" 
+        return 1
+    fi
     
     # 备份现有 crontab
     if crontab -l &>/dev/null; then
@@ -66,23 +79,45 @@ install_monitoring() {
 # ===== Clash 网络监控任务 =====
 # 由 setup_monitoring_cron.sh 自动生成
 # 生成时间: $(date '+%Y-%m-%d %H:%M:%S')
+EOF
 
-# 每10分钟进行一次网络健康检查
-*/10 * * * * $BASE_DIR/network_health_monitor.sh >> $HOME/.local/share/clash/logs/monitor_cron.log 2>&1
+    if [[ $WITH_AUTOFIX -eq 1 ]]; then
+        cat >> "$temp_cron" <<EOF
 
-# 每10分钟运行一次运行时守护检查（自动修复）
+# 每10分钟进行一次网络健康检查（允许自动修复）
+*/10 * * * * $BASE_DIR/network_health_monitor.sh --auto-fix >> $HOME/.local/share/clash/logs/monitor_cron.log 2>&1
+
+# 每10分钟运行一次运行时守护检查（允许自动修复）
 */10 * * * * bash $PARENT_DIR/script/runtime_guard.sh --auto-fix --cron >> $HOME/.local/share/clash/logs/guard_cron.log 2>&1
+EOF
+    else
+        cat >> "$temp_cron" <<EOF
+
+# 每10分钟进行一次网络健康检查（仅监控，不修复）
+*/10 * * * * $BASE_DIR/network_health_monitor.sh --check-only >> $HOME/.local/share/clash/logs/monitor_cron.log 2>&1
+
+# 每10分钟运行一次运行时守护检查（仅检查，不修复）
+*/10 * * * * bash $PARENT_DIR/script/runtime_guard.sh --check --cron >> $HOME/.local/share/clash/logs/guard_cron.log 2>&1
+EOF
+    fi
+
+    if [[ $WITH_OPTIMIZER -eq 1 ]]; then
+        cat >> "$temp_cron" <<EOF
 
 # 每天凌晨3点进行智能规则学习
 0 3 * * * $BASE_DIR/intelligent_rule_optimizer.sh --learn >> $HOME/.local/share/clash/logs/optimizer_cron.log 2>&1
 
 # 每周日凌晨4点进行全面规则分析和优化
 0 4 * * 0 $BASE_DIR/intelligent_rule_optimizer.sh --analyze >> $HOME/.local/share/clash/logs/optimizer_cron.log 2>&1
+EOF
+    fi
+
+    cat >> "$temp_cron" <<EOF
 
 # 每天凌晨2点清理和轮转日志（保留最近30天）
 0 2 * * * find $HOME/.local/share/clash/logs/ -name "*.log" -mtime +30 -delete >> $HOME/.local/share/clash/logs/cleanup.log 2>&1
 
-# 每小时生成一次健康报告快照
+# 每小时生成一次健康报告快照（仅检查）
 0 * * * * $BASE_DIR/network_health_monitor.sh --check-only >> $HOME/.local/share/clash/logs/hourly_check.log 2>&1
 
 # ===== Clash 网络监控任务结束 =====
@@ -101,12 +136,19 @@ EOF
     
     log ""
     log "已安装以下监控任务:"
-    log "  - 每10分钟: 网络健康检查"
-    log "  - 每10分钟: 运行时守护检查（自动修复）"
-    log "  - 每天03:00: 智能规则学习"
-    log "  - 每周日04:00: 全面规则分析"
+    if [[ $WITH_AUTOFIX -eq 1 ]]; then
+        log "  - 每10分钟: 网络健康检查（允许自动修复）"
+        log "  - 每10分钟: 运行时守护检查（允许自动修复）"
+    else
+        log "  - 每10分钟: 网络健康检查（仅监控，不修复）"
+        log "  - 每10分钟: 运行时守护检查（仅检查，不修复）"
+    fi
+    if [[ $WITH_OPTIMIZER -eq 1 ]]; then
+        log "  - 每天03:00: 智能规则学习"
+        log "  - 每周日04:00: 全面规则分析"
+    fi
     log "  - 每天02:00: 日志清理（保留30天）"
-    log "  - 每小时: 健康快照"
+    log "  - 每小时: 健康快照（仅检查）"
     log ""
     log "查看日志:"
     log "  tail -f $HOME/.local/share/clash/logs/monitor_cron.log"
@@ -116,6 +158,11 @@ EOF
 # 卸载监控任务
 uninstall_monitoring() {
     log "开始卸载监控任务..."
+
+    if ! have crontab; then
+        log "❌ 未找到 crontab 命令：无法卸载 (系统未安装 cron?)"
+        return 1
+    fi
     
     if ! check_monitoring_installed; then
         log "未检测到已安装的监控任务"
@@ -143,6 +190,11 @@ uninstall_monitoring() {
 show_status() {
     log "监控任务状态:"
     log ""
+
+    if ! have crontab; then
+        log "❌ 未找到 crontab 命令：无法查看状态 (系统未安装 cron?)"
+        return 1
+    fi
     
     if check_monitoring_installed; then
         log "✅ 监控任务已安装"
@@ -255,6 +307,9 @@ Clash 监控任务调度设置工具
 
 选项:
   --install      安装监控任务到 crontab
+    --with-autofix 与 --install 搭配：允许自动修复（高风险，会切换/重启/改配置）
+    --with-optimizer 与 --install 搭配：启用智能规则学习/分析（可能修改策略/选择）
+    --install-full  等价于: --install --with-autofix --with-optimizer
   --uninstall    卸载监控任务
   --status       查看监控任务状态
   --test         测试监控脚本
@@ -265,11 +320,11 @@ Clash 监控任务调度设置工具
   1. 网络健康检查（每10分钟）
      - 检测AI、开发、流媒体、国内网站的可用性
      - 计算健康分数并告警
-     - 自动触发修复
+      - 默认仅监控；如需自动修复请使用 --with-autofix
 
   2. 运行时守护（每10分钟）
      - 检查配置文件完整性
-     - 自动修复DNS劫持等问题
+      - 默认仅检查；如需自动修复请使用 --with-autofix
      - 确保关键规则存在
 
   3. 智能规则优化（每天、每周）
@@ -282,7 +337,10 @@ Clash 监控任务调度设置工具
      - 避免磁盘空间占用
 
 示例:
-  $0 --install      # 安装所有监控任务
+    $0 --install      # 安装监控任务（默认仅监控，不自动修复）
+    $0 --install --with-autofix      # 安装监控任务 + 允许自动修复
+    $0 --install --with-optimizer    # 安装监控任务 + 启用规则学习/分析
+    $0 --install-full # 安装全套任务（自动修复 + 优化）
   $0 --status       # 查看运行状态
   $0 --test         # 测试所有监控脚本
 
@@ -297,29 +355,73 @@ EOF
 }
 
 # 参数解析
-case "${1:-}" in
-    --install)
+ACTION=""
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --install)
+            ACTION="install"
+            shift
+            ;;
+        --install-full)
+            ACTION="install"
+            WITH_AUTOFIX=1
+            WITH_OPTIMIZER=1
+            shift
+            ;;
+        --with-autofix)
+            WITH_AUTOFIX=1
+            shift
+            ;;
+        --with-optimizer)
+            WITH_OPTIMIZER=1
+            shift
+            ;;
+        --uninstall)
+            ACTION="uninstall"
+            shift
+            ;;
+        --status)
+            ACTION="status"
+            shift
+            ;;
+        --test)
+            ACTION="test"
+            shift
+            ;;
+        --setup)
+            ACTION="setup"
+            shift
+            ;;
+        -h|--help)
+            ACTION="help"
+            shift
+            ;;
+        *)
+            echo "未知参数: $1"
+            echo "使用 --help 查看帮助"
+            exit 1
+            ;;
+    esac
+done
+
+case "${ACTION:-help}" in
+    install)
         setup_directories
         install_monitoring
         ;;
-    --uninstall)
+    uninstall)
         uninstall_monitoring
         ;;
-    --status)
+    status)
         show_status
         ;;
-    --test)
+    test)
         test_monitoring
         ;;
-    --setup)
+    setup)
         setup_directories
         ;;
-    -h|--help|"")
+    help|*)
         show_help
-        ;;
-    *)
-        echo "未知参数: $1"
-        echo "使用 --help 查看帮助"
-        exit 1
         ;;
 esac

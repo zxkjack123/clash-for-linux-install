@@ -13,6 +13,18 @@ RED='\033[0;31m'
 BOLD='\033[1m'
 RESET='\033[0m'
 
+# Load env (optional) and bootstrap controller/secret
+if [[ -f "$BASE_DIR/load_env.sh" ]]; then
+    source "$BASE_DIR/load_env.sh" 2>/dev/null || true
+fi
+
+API="${CLASH_API:-http://127.0.0.1:9090}"
+AUTH_HDR=()
+_hdr="$(clash_auth_header 2>/dev/null || true)"
+[[ -n "${_hdr:-}" ]] && AUTH_HDR=(-H "${_hdr}")
+CURL_CTRL_OPTS=(--noproxy '*' --connect-timeout 2 --max-time 4)
+SERVICE="${BIN_KERNEL_NAME:-mihomo}"
+
 echo -e "${BOLD}${BLUE}"
 cat << "EOF"
 ╔═══════════════════════════════════════════════════════════╗
@@ -60,13 +72,13 @@ check_dependencies() {
 check_clash_service() {
     info "检查 Clash 服务..."
     
-    if ! systemctl --user is-active mihomo &>/dev/null; then
+    if ! systemctl --user is-active "$SERVICE" &>/dev/null; then
         error "Clash 服务未运行"
-        echo "请先启动 Clash: systemctl --user start mihomo"
+        echo "请先启动 Clash: systemctl --user start $SERVICE"
         return 1
     fi
     
-    if ! curl -fsS http://127.0.0.1:9090/version >/dev/null 2>&1; then
+    if ! curl -fsS "${CURL_CTRL_OPTS[@]}" "${AUTH_HDR[@]}" "$API/version" >/dev/null 2>&1; then
         error "Clash API 不可访问"
         return 1
     fi
@@ -125,29 +137,24 @@ show_next_steps() {
     echo ""
     echo -e "  ${BLUE}2.${RESET} 持续监控模式（推荐）："
     echo -e "     ${YELLOW}./network_dashboard.sh --watch${RESET}"
+    echo -e "  ⏰ 每10分钟：网络健康检查（默认仅监控，不自动修复）"
+    echo -e "  ⏰ 每10分钟：运行时守护检查（默认仅检查，不自动修复）"
+    echo -e "  ⏰ 每小时：  健康快照记录（仅检查）"
+    echo -e "  ⏰ 每天02:00：日志清理（保留30天）"
     echo ""
-    echo -e "  ${BLUE}3.${RESET} 配置告警通知："
-    echo -e "     ${YELLOW}nano ~/.local/share/clash/alert_config.conf${RESET}"
-    echo ""
-    echo -e "  ${BLUE}4.${RESET} 运行智能规则优化："
+    echo -e "${BOLD}可选增强（需手动启用）：${RESET}"
+    echo -e "  🔧 允许自动修复：${YELLOW}./setup_monitoring_cron.sh --install --with-autofix${RESET}"
+    echo -e "  📈 启用规则学习/分析：${YELLOW}./setup_monitoring_cron.sh --install --with-optimizer${RESET}"
     echo -e "     ${YELLOW}./intelligent_rule_optimizer.sh --analyze${RESET}"
     echo ""
     echo -e "  ${BLUE}5.${RESET} 查看监控状态："
     echo -e "     ${YELLOW}./setup_monitoring_cron.sh --status${RESET}"
     echo ""
-    echo -e "${BOLD}已安装的自动任务：${RESET}"
-    echo ""
-    echo -e "  ⏰ 每10分钟：网络健康检查 + 自动修复"
-    echo -e "  ⏰ 每小时：  健康快照记录"
-    echo -e "  ⏰ 每天03:00：规则学习优化"
-    echo -e "  ⏰ 每周日04:00：全面性能分析"
-    echo -e "  ⏰ 每天02:00：日志清理（保留30天）"
-    echo ""
     echo -e "${BOLD}查看日志：${RESET}"
     echo -e "  tail -f ~/.local/share/clash/logs/monitor_cron.log"
     echo ""
     echo -e "${BOLD}完整文档：${RESET}"
-    echo -e "  ${YELLOW}cat $(dirname "$BASE_DIR")/NETWORK_OPTIMIZATION_GUIDE.md${RESET}"
+    echo -e "  ${YELLOW}cat $(dirname \"$BASE_DIR\")/docs/network/NETWORK_OPTIMIZATION_GUIDE.md${RESET}"
     echo ""
     echo -e "🎉 ${BOLD}祝您使用愉快！${RESET}"
     echo ""
@@ -174,7 +181,7 @@ main() {
     echo ""
     
     # 5. 询问是否安装定时任务
-    read -p "是否安装定时监控任务？(y/n): " -n 1 -r
+    read -r -n 1 -p "是否安装定时监控任务？(y/n): "
     echo ""
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         install_cron_jobs
@@ -188,7 +195,7 @@ main() {
     show_next_steps
     
     # 7. 询问是否打开仪表盘
-    read -p "是否现在打开网络监控仪表盘？(y/n): " -n 1 -r
+    read -r -n 1 -p "是否现在打开网络监控仪表盘？(y/n): "
     echo ""
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         exec "$BASE_DIR/network_dashboard.sh"

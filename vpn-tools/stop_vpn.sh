@@ -10,16 +10,27 @@ export CLASH_LIB_MODE=1
 . "$ROOT_DIR/script/clashctl.sh" >/dev/null 2>&1 || true
 
 echo "[stop_vpn] Stopping proxy service and removing system proxy..."
-if clashoff >/dev/null 2>&1; then
-  echo "[stop_vpn] ✅ Stopped and system proxy removed"
+if type -t clashctl >/dev/null 2>&1; then
+  if clashctl off >/dev/null 2>&1; then
+    echo "[stop_vpn] ✅ Stopped and system proxy removed"
+  else
+    echo "[stop_vpn] ⚠️ Stop reported issues (service may already be stopped)"
+  fi
+elif type -t clashoff >/dev/null 2>&1; then
+  if clashoff >/dev/null 2>&1; then
+    echo "[stop_vpn] ✅ Stopped and system proxy removed"
+  else
+    echo "[stop_vpn] ⚠️ Stop reported issues (service may already be stopped)"
+  fi
 else
-  echo "[stop_vpn] ⚠️ Stop reported issues (service may already be stopped)"
+  echo "[stop_vpn] ❌ clashctl/clashoff not available. Try running via clashctl.sh or reinstall."
+  exit 1
 fi
 
 # Verify no residue
 residual=0
-for v in http_proxy https_proxy HTTP_PROXY HTTPS_PROXY all_proxy ALL_PROXY; do
-  if [ -n "${!v:-}" ]; then echo "[stop_vpn] ❌ Residual env var: $v=${!v}"; residual=1; fi
+for v in http_proxy https_proxy HTTP_PROXY HTTPS_PROXY all_proxy ALL_PROXY no_proxy NO_PROXY; do
+  if [ -n "${!v:-}" ]; then echo "[stop_vpn] ❌ Residual env var: $v is set"; residual=1; fi
 done
 
 if command -v gsettings >/dev/null 2>&1; then

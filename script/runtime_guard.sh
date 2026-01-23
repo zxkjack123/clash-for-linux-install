@@ -4,13 +4,23 @@
 #   1. 关键结构与规则健康检查 (必须存在 DIRECT 1.1.1.1 与 8.8.8.8; 不应被 PROXY/劫持)
 #   2. 异常时可选自动修复: 生成临时副本 -> sanitize -> 验证 -> 原子替换 -> 可选重启
 #   3. 输出简单 one-line/JSON 状态 (cron / 监控采集)
-#   4. 可选详细报告 (--report) 与外部告警 hook (--alert-cmd)
+#   4. 可选详细报告 (--report) 与外部告警 hook（安全模式：--alert / --alert-script）
 #   5. 采集锁等待时间 (lock wait) 供主 metrics 汇总; FIXED 视为“最近修复”事件
 # 用法:
-#   bash runtime_guard.sh --check            # 仅检查, 退出码: 0=OK 1=ISSUE
-#   bash runtime_guard.sh --auto-fix         # 发现问题自动修复
-#   bash runtime_guard.sh --cron             # 安静模式 (仅一行摘要)
-#   bash runtime_guard.sh --check --json     # JSON 输出
+#   bash runtime_guard.sh --check                 # 仅检查, 退出码: 0=OK 1=ISSUE
+#   bash runtime_guard.sh --auto-fix              # 发现问题自动修复
+#   bash runtime_guard.sh --cron                  # 安静模式 (仅一行摘要)
+#   bash runtime_guard.sh --check --json          # JSON 输出
+#
+# 告警:
+#   # 白名单模式（推荐）：none|log|notify|webhook|script
+#   bash runtime_guard.sh --auto-fix --alert notify
+#
+#   # 外部脚本告警（推荐）：
+#   bash runtime_guard.sh --auto-fix --alert-script /path/to/hook.sh --alert-arg foo --alert-arg bar
+#
+#   # 不安全兼容模式（默认禁用）：
+#   bash runtime_guard.sh --auto-fix --alert-cmd 'echo hi' --allow-unsafe-alert-cmd
 # 设计原则:
 #   - 幂等: 无差异不写文件不重启
 #   - 最小失败面: 修复失败不破坏原 runtime
@@ -31,6 +41,11 @@ REPORT=false
 AUTO_FIX=false
 CRON_MODE=false
 ALERT_CMD=""
+ALERT_MODE="${ALERT_MODE:-none}"   # none|log|notify|webhook|script
+ALERT_SCRIPT="${ALERT_SCRIPT:-}"
+# ALERT_ARGS: newline-separated args (each line is one arg)
+ALERT_ARGS_TEXT="${ALERT_ARGS:-}"
+ALERT_ALLOW_UNSAFE_CMD=false
 QUIET=false
 WHITELIST_FILE="${CLASH_BASE_DIR:-$HOME/.local/share/clash}/guard_rules_whitelist.txt"
 BLACKLIST_FILE="${CLASH_BASE_DIR:-$HOME/.local/share/clash}/guard_rules_blacklist.txt"
@@ -62,7 +77,8 @@ _acquire_lock() {
   $AUTO_FIX && mode="exclusive"
   LOCK_MODE="$mode"
   START_LOCK_ATTEMPT_MS=$(date +%s%3N 2>/dev/null || echo $(($(date +%s)*1000)))
-  eval "exec {LOCK_FD}>\"$LOCK_FILE\""
+  # Avoid eval here: CLASH_LOCK_FILE is user-controlled and eval would allow injection.
+  exec {LOCK_FD}>"$LOCK_FILE"
   if [ "$mode" = "exclusive" ]; then
     flock -w 10 -x "$LOCK_FD" || fail "获取独占锁超时: $LOCK_FILE"
   else
@@ -89,7 +105,36 @@ while [[ $# -gt 0 ]]; do
     --auto-fix) MODE="auto"; AUTO_FIX=true; shift ;;
     --cron) CRON_MODE=true; QUIET=true; shift ;;
     --report) REPORT=true; shift ;;
-    --alert-cmd) ALERT_CMD="$2"; shift 2 ;;
+    --alert-cmd)
+      if [[ $# -lt 2 ]]; then
+        echo "[guard] ERROR: --alert-cmd requires a command" >&2
+        exit 1
+      fi
+      # Backward-compat / UNSAFE: only allowed when explicitly enabled.
+      ALERT_CMD="$2"; shift 2 ;;
+    --allow-unsafe-alert-cmd)
+      ALERT_ALLOW_UNSAFE_CMD=true; shift ;;
+    --alert)
+      if [[ $# -lt 2 ]]; then
+        echo "[guard] ERROR: --alert requires one of: none|log|notify|webhook|script" >&2
+        exit 1
+      fi
+      ALERT_MODE="$2"; shift 2 ;;
+    --alert-script)
+      if [[ $# -lt 2 ]]; then
+        echo "[guard] ERROR: --alert-script requires a path" >&2
+        exit 1
+      fi
+      ALERT_MODE="script"
+      ALERT_SCRIPT="$2"; shift 2 ;;
+    --alert-arg)
+      if [[ $# -lt 2 ]]; then
+        echo "[guard] ERROR: --alert-arg requires a value" >&2
+        exit 1
+      fi
+      # Preserve exact arg value; do not word-split.
+      ALERT_ARGS_TEXT+="${ALERT_ARGS_TEXT:+$'\n'}$2"
+      shift 2 ;;
     --quiet) QUIET=true; shift ;;
     --baseline) BASELINE_REPORT=true; shift ;;
     --json) JSON_OUT=true; shift ;;
@@ -98,6 +143,11 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# If a script is provided via env, assume script mode unless explicitly disabled.
+if [[ -n "${ALERT_SCRIPT:-}" && ( -z "${ALERT_MODE:-}" || "${ALERT_MODE}" == "none" ) ]]; then
+  ALERT_MODE="script"
+fi
+
 _acquire_lock
 
 say(){ $QUIET || echo "$*"; }
@@ -105,6 +155,74 @@ health_line(){ echo "$*"; }
 fail(){ say "[guard][FAIL] $*"; exit 1; }
 warn(){ say "[guard][WARN] $*"; }
 ok(){ say "[guard][OK] $*"; }
+
+_build_alert_message() {
+  # Keep message short and safe (no secrets).
+  local msg
+  msg="runtime_guard FIXED: issues=${ISSUES[*]:-unknown} runtime=$RUNTIME service=$SERVICE"
+  printf '%s' "$msg"
+}
+
+_run_alert_hook() {
+  local mode="${ALERT_MODE:-none}"
+  local msg
+  msg=$(_build_alert_message)
+
+  case "$mode" in
+    ''|none)
+      return 0
+      ;;
+    log)
+      echo "[guard][ALERT] $msg" >&2
+      return 0
+      ;;
+    notify|webhook)
+      # Use the repo's alert tool if present; it can be configured to send desktop/webhook/email.
+      local alert_tool
+      alert_tool="$BASE_DIR/../vpn-tools/alert_notification.sh"
+      if [ -x "$alert_tool" ]; then
+        "$alert_tool" WARNING "$msg" >/dev/null 2>&1 || true
+        return 0
+      fi
+      echo "[guard][WARN] alert_notification.sh not found/executable: $alert_tool" >&2
+      return 0
+      ;;
+    script)
+      if [[ -z "${ALERT_SCRIPT:-}" ]]; then
+        echo "[guard][WARN] ALERT_MODE=script but ALERT_SCRIPT is empty" >&2
+        return 0
+      fi
+      if [[ ! -f "$ALERT_SCRIPT" ]]; then
+        echo "[guard][WARN] ALERT_SCRIPT not found: $ALERT_SCRIPT" >&2
+        return 0
+      fi
+      if [[ ! -x "$ALERT_SCRIPT" ]]; then
+        echo "[guard][WARN] ALERT_SCRIPT not executable: $ALERT_SCRIPT" >&2
+        return 0
+      fi
+
+      # Parse newline-separated args safely.
+      local -a args=()
+      if [[ -n "${ALERT_ARGS_TEXT:-}" ]]; then
+        # shellcheck disable=SC2206
+        mapfile -t args < <(printf '%s' "$ALERT_ARGS_TEXT")
+      fi
+
+      # Provide context via env vars (avoid printing secrets).
+      GUARD_TIMESTAMP="$TS" \
+      GUARD_STATUS="FIXED" \
+      GUARD_RUNTIME="$RUNTIME" \
+      GUARD_SERVICE="$SERVICE" \
+      GUARD_ISSUES="${ISSUES[*]:-}" \
+        "$ALERT_SCRIPT" "${args[@]}" >/dev/null 2>&1 || true
+      return 0
+      ;;
+    *)
+      echo "[guard][WARN] Unknown ALERT_MODE: $mode" >&2
+      return 0
+      ;;
+  esac
+}
 
 
 [ -f "$RUNTIME" ] || { if $JSON_OUT; then printf '{"timestamp":"%s","status":"ERROR","message":"runtime missing"}' "$(date +%Y%m%d_%H%M%S)"; echo; fi; fail "runtime 不存在: $RUNTIME"; }
@@ -209,7 +327,19 @@ fi
 
 mv "$TMP_FIX" "$RUNTIME" || fail "替换 runtime 失败"
 systemctl --user restart "$SERVICE" >/dev/null 2>&1 && { $JSON_OUT || ok "已自愈并重启"; } || { $JSON_OUT || warn "重启失败, 请手动检查"; }
-[ -n "$ALERT_CMD" ] && eval "$ALERT_CMD" >/dev/null 2>&1 || true
+
+# Alerts (safe-by-default): prefer --alert/--alert-script or env ALERT_MODE/ALERT_SCRIPT.
+_run_alert_hook || true
+
+# Backward-compat UNSAFE hook: only run if explicitly allowed.
+if [[ -n "${ALERT_CMD:-}" ]]; then
+  if $ALERT_ALLOW_UNSAFE_CMD || [[ "${ALLOW_UNSAFE_ALERT_CMD:-}" == "1" ]]; then
+    # Intentionally unsafe; user-supplied string.
+    eval "$ALERT_CMD" >/dev/null 2>&1 || true
+  else
+    warn "检测到 --alert-cmd/ALERT_CMD，但默认已禁用（为安全起见）。如确需使用，请加 --allow-unsafe-alert-cmd 或设置 ALLOW_UNSAFE_ALERT_CMD=1"
+  fi
+fi
 
 _guard_metrics_write clash_guard_last_fix_timestamp "$(date +%s)"
 _guard_metrics_write clash_guard_lock_wait_seconds "${LOCK_WAIT_SECONDS:-0}"
@@ -220,4 +350,3 @@ if $JSON_OUT; then
   printf '{"timestamp":"%s","status":"FIXED","issues":["%s"],"autoFix":true,"lockMode":"%s","lockWaitSeconds":%s}' "$TS" "${ISSUES[*]}" "$LOCK_MODE" "${LOCK_WAIT_SECONDS:-0}"; echo
 fi
 exit 0
-  rm -f "$TMP_FIX"

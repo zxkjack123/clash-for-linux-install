@@ -5,9 +5,9 @@
 ## 1. 手动执行
 
 ```bash
-cd /home/gw/opt/clash-for-linux-install
+cd /path/to/clash-for-linux-install
 ./script/refresh_subscription_direct.sh        # 默认读取 .env 内的 CLASH_SUBSCRIPTION_URL
-./script/refresh_subscription_direct.sh "https://example.com/subscribe?token=xxx"  # 覆盖订阅地址
+./script/refresh_subscription_direct.sh "https://example.com/subscribe?token=***"  # 覆盖订阅地址（示例；请勿在文档/日志中暴露真实 token）
 ```
 
 > 该脚本会自动 `source .env`，然后以 `env -u https_proxy -u http_proxy ...` 的方式调用 `script/update_clash_subscription.sh`，避免因系统代理导致的 `SSL_ERROR_SYSCALL`。
@@ -21,7 +21,7 @@ cd /home/gw/opt/clash-for-linux-install
    cp systemd/clash-subscription-refresh.timer ~/.config/systemd/user/
    ```
 2. 根据需要修改以下内容：
-   - `WorkingDirectory`、`ExecStart`：若仓库不在 `~/opt/clash-for-linux-install`，请调整路径。
+   - `WorkingDirectory`、`ExecStart`：请按你的仓库实际路径调整。
    - `OnCalendar`：默认每日 04:30 执行，可改成 `hourly`、`*-*-* 03:00:00` 等任意 systemd 时间表达式。
    - `RUN_OPTIMIZE_AFTER_REFRESH`：1 表示订阅更新后自动执行 `vpn-tools/optimize_all_network.sh`，0 表示仅刷新订阅。
    - `OPTIMIZE_DELAY`：在执行全量深度优化前等待的秒数（默认 900 秒 ≈15 分钟，给订阅/节点预热时间）。

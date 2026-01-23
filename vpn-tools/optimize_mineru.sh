@@ -24,6 +24,13 @@
 
 set -u -o pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Load env (optional) and bootstrap controller/secret (env override -> legacy compat -> runtime.yaml -> default)
+# shellcheck source=/dev/null
+. "${SCRIPT_DIR}/load_env.sh" 2>/dev/null || true
+
+clash_env_bootstrap 2>/dev/null || true
+
 GROUP_DEFAULT="西瓜加速"
 TARGET_DOMAINS=("sso.openxlab.org.cn" "mineru.net")
 CONTROLLER="127.0.0.1:9090"
@@ -65,10 +72,14 @@ info(){ echo "[INFO] $*" >&2; }
 # URL 编码
 urlencode(){
   local raw="$1"
+  if declare -F clash_urlencode >/dev/null 2>&1; then
+    clash_urlencode "$raw"
+    return 0
+  fi
   if command -v python3 >/dev/null 2>&1; then
-    python3 - <<'PYEOF'
-import sys,urllib.parse
-print(urllib.parse.quote(sys.argv[1]))
+    python3 - "$raw" <<'PYEOF'
+import sys, urllib.parse
+print(urllib.parse.quote(sys.argv[1], safe=''))
 PYEOF
   else
     local i c out=""
@@ -78,21 +89,6 @@ PYEOF
     done
     echo "$out"
   fi
-}
-
-detect_secret(){
-  local files=("$HOME/.local/share/clash/runtime.yaml" "resources/config.yaml")
-  for f in "${files[@]}"; do
-    [ -f "$f" ] || continue
-    local line
-    line=$(grep -m1 '^secret:' "$f" 2>/dev/null || true)
-    if [ -n "$line" ]; then
-      local val
-      val=$(echo "$line" | awk -F':' '{print $2}' | awk '{print $1}')
-      if [ -n "$val" ]; then SECRET="$val"; return 0; fi
-    fi
-  done
-  return 1
 }
 
 is_success_code(){ [[ $1 =~ ^[23][0-9][0-9]$ ]]; }
@@ -120,15 +116,52 @@ parse_args(){
 
 parse_args "$@"
 
-if [ -z "$SECRET" ]; then
-  detect_secret || { err "未找到控制器 secret, 请使用 --secret 或设置 CLASH_SECRET"; exit 1; }
+# Honor --secret override for this run.
+if [ -n "${SECRET:-}" ]; then
+  export CLASH_SECRET="$SECRET"
+fi
+
+# If secret still unset, try best-effort auto-detect (auth may be disabled).
+if [ -z "$SECRET" ] && declare -F clash_detect_secret >/dev/null 2>&1; then
+  SECRET="$(clash_detect_secret 2>/dev/null || true)"
 fi
 
 ENC_GROUP=$(urlencode "$GROUP")
-API="http://$CONTROLLER"
-group_json=$(curl -s -H "Authorization: Bearer $SECRET" "$API/proxies/$ENC_GROUP" || true)
-if [[ "$group_json" == *"Unauthorized"* || -z "$group_json" ]]; then
-  err "获取分组失败: $GROUP ($CONTROLLER)"
+API="${CLASH_API:-http://$CONTROLLER}"
+
+ctrl_get() {
+  if declare -F clash_api_get >/dev/null 2>&1; then
+    clash_api_get "$1" 2>/dev/null || true
+  else
+    curl -fsS --noproxy '*' --connect-timeout 2 --max-time 4 "$1" 2>/dev/null || true
+  fi
+}
+
+ctrl_put_json() {
+  local url="$1" payload="$2"
+  if declare -F clash_api_put_json >/dev/null 2>&1; then
+    clash_api_put_json "$url" "$payload" >/dev/null 2>&1 || true
+  else
+    curl -s --noproxy '*' --connect-timeout 2 --max-time 4 -X PUT -H 'Content-Type: application/json' --data "$payload" "$url" >/dev/null || true
+  fi
+}
+
+group_json=$(ctrl_get "$API/proxies/$ENC_GROUP")
+
+# If default legacy group missing, try to auto-pick a Selector group.
+if { [[ -z "$group_json" ]] || printf '%s' "$group_json" | grep -qiE 'unauthorized|not found'; } && [[ "$GROUP" == "$GROUP_DEFAULT" ]]; then
+  if declare -F clash_pick_selector_group >/dev/null 2>&1; then
+    picked="$(clash_pick_selector_group "西瓜加速" "速云梯" "GLOBAL" "自动选择" "PROXY" 2>/dev/null || true)"
+    if [[ -n "$picked" ]]; then
+      GROUP="$picked"
+      ENC_GROUP=$(urlencode "$GROUP")
+      group_json=$(ctrl_get "$API/proxies/$ENC_GROUP")
+    fi
+  fi
+fi
+
+if [[ -z "$group_json" ]] || printf '%s' "$group_json" | grep -qi 'unauthorized'; then
+  err "获取分组失败: $GROUP ($CONTROLLER) (secret may be required)"
   exit 1
 fi
 
@@ -163,8 +196,7 @@ JSON_ITEMS=""
 
 switch_node(){
   local node="$1"
-  curl -s -X PUT -H "Authorization: Bearer $SECRET" -H 'Content-Type: application/json' \
-    -d '{"name":"'"$node"'"}' "$API/proxies/$ENC_GROUP" >/dev/null || return 1
+  ctrl_put_json "$API/proxies/$ENC_GROUP" '{"name":"'"$node"'"}' || return 1
   sleep "$SLEEP_AFTER_SWITCH"
   return 0
 }
@@ -172,7 +204,7 @@ switch_node(){
 test_domain(){
   local domain="$1"
   local out code ttotal
-  out=$(curl -x "http://127.0.0.1:7890" -s -o /dev/null -w '%{http_code},%{time_total}' -m "$TIMEOUT" "https://$domain/" 2>&1 || true)
+  out=$(curl -x "http://127.0.0.1:7890" -s -o /dev/null -w '%{http_code},%{time_total}' --connect-timeout 4 --max-time "$TIMEOUT" "https://$domain/" 2>&1 || true)
   code=${out%%,*}
   ttotal=${out##*,}
   [[ $code =~ ^[0-9]{3}$ ]] || code=000

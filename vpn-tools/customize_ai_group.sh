@@ -22,19 +22,42 @@
 #
 set -euo pipefail
 
-API="http://127.0.0.1:9090"
+# Optional env bootstrap (controller URL + secret)
+SCRIPT_DIR="$(cd "${BASH_SOURCE[0]%/*}" && pwd)"
+if [[ -f "$SCRIPT_DIR/load_env.sh" ]]; then
+	# shellcheck source=/dev/null
+	source "$SCRIPT_DIR/load_env.sh" 2>/dev/null || true
+fi
+
+API="${CLASH_API:-http://127.0.0.1:9090}"
 GROUP="AI"
+
+AUTH_HDR=()
+_hdr="$(clash_auth_header 2>/dev/null || true)"
+[[ -n "${_hdr:-}" ]] && AUTH_HDR=(-H "${_hdr}")
+
+urlencode() {
+	local s="$1"
+	if command -v python3 >/dev/null 2>&1; then
+		python3 - "$s" <<'PY'
+import sys, urllib.parse
+print(urllib.parse.quote(sys.argv[1], safe=''))
+PY
+	else
+		printf '%s' "$s"
+	fi
+}
 
 have_jq() { command -v jq >/dev/null 2>&1; }
 err() { echo "[ERROR] $*" >&2; }
 info() { echo "[INFO] $*" >&2; }
 
 check_controller() {
-	if ! curl -fsS "$API/version" >/dev/null 2>&1; then
+	if ! curl -fsS --noproxy '*' --connect-timeout 2 --max-time 3 "${AUTH_HDR[@]}" "$API/version" >/dev/null 2>&1; then
 		err "Cannot reach Clash controller at $API (set CLASH_API?)"; exit 1; fi
 }
 
-get_group_json() { curl -fsS "$API/proxies/$GROUP"; }
+get_group_json() { curl -fsS --noproxy '*' --connect-timeout 2 --max-time 4 "${AUTH_HDR[@]}" "$API/proxies/$GROUP"; }
 
 list_nodes() {
 	local filter="${FILTER:-}" json
@@ -61,7 +84,7 @@ apply_node() {
 		err "Node '$node' not in group list"; exit 2; fi
 	if [[ $node == "$(current_node)" ]]; then
 		info "Node '$node' already active (no change)"; return 0; fi
-	if curl -fsS -X PUT "$API/proxies/$GROUP" -H 'Content-Type: application/json' -d '{"name":"'"$node"'"}' >/dev/null; then
+	if curl -fsS --noproxy '*' --connect-timeout 2 --max-time 6 -X PUT "${AUTH_HDR[@]}" "$API/proxies/$GROUP" -H 'Content-Type: application/json' -d '{"name":"'"$node"'"}' >/dev/null; then
 		info "Applied node: $node"; return 0
 	else
 		err "Failed to apply node $node"; return 2
@@ -74,7 +97,9 @@ apply_node() {
 test_latency() {
 	local node="$1" timeout_ms="${LATENCY_TIMEOUT_MS:-3000}" url="${TEST_URL:-https://www.gstatic.com/generate_204}" r
 	# Try delay endpoint; some forks require url & timeout params
-	r=$(curl -fsS --max-time $(( (timeout_ms/1000)+2 )) "$API/proxies/$node/delay?timeout=$timeout_ms&url=$url" 2>/dev/null || true)
+	local node_enc
+	node_enc="$(urlencode "$node")"
+	r=$(curl -fsS --noproxy '*' --connect-timeout 2 --max-time $(( (timeout_ms/1000)+2 )) "${AUTH_HDR[@]}" "$API/proxies/$node_enc/delay?timeout=$timeout_ms&url=$url" 2>/dev/null || true)
 	if [[ $r =~ ([0-9]{1,5})ms ]]; then
 		printf '%s' "${BASH_REMATCH[1]}"
 	else

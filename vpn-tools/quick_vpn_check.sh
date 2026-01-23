@@ -11,22 +11,13 @@
 #
 set -euo pipefail
 
-API=${CLASH_API:-http://127.0.0.1:9090}
-# Secret resolution order:
-# 1. Explicit env CLASH_API_SECRET
-# 2. resources/mixin.yaml secret: value
-# 3. config.yaml secret: value
-# If still empty, auth may be disabled – we'll probe both auth / no-auth.
-API_SECRET="${CLASH_API_SECRET:-}"
-if [[ -z $API_SECRET ]]; then
-	for f in "$(dirname "$0")/../resources/mixin.yaml" "$(dirname "$0")/../resources/config.yaml" "$(dirname "$0")/../config.yaml"; do
-		if [[ -z $API_SECRET && -f $f ]]; then
-			# Use awk so missing secret lines do not trip set -e
-			s=$(awk '/^secret:/ {print $2; exit}' "$f" 2>/dev/null || true)
-			[[ -n $s ]] && API_SECRET="$s"
-		fi
-	done
-fi
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Load env (optional) and bootstrap controller/secret (env override -> legacy compat -> runtime.yaml -> default)
+# shellcheck source=/dev/null
+. "${SCRIPT_DIR}/load_env.sh" 2>/dev/null || true
+
+API="${CLASH_API:-http://127.0.0.1:9090}"
+SECRET="${CLASH_SECRET:-}"
 PROXY_HOST=127.0.0.1
 HTTP_PORT=7890
 SOCKS_PORT=7891
@@ -36,6 +27,7 @@ TIMEOUT=6
 have() { command -v "$1" >/dev/null 2>&1; }
 json_escape() { sed 's/\\/\\\\/g; s/"/\\"/g'; }
 timed_curl() { curl -s -o /dev/null -w '%{http_code},%{time_total}' --connect-timeout "$TIMEOUT" --max-time "$((TIMEOUT+2))" "$@" 2>/dev/null || echo "000,$TIMEOUT"; }
+curl_body() { curl -sS --connect-timeout "$TIMEOUT" --max-time "$((TIMEOUT+3))" "$@" 2>/dev/null || true; }
 
 declare -A RESULTS
 # Scoring baseline components: controller + ports(2) + proxy_http + youtube + github_web + github_api + copilot_edge = 8
@@ -57,17 +49,17 @@ test_step() {
 }
 
 echo "=== Quick VPN Check ($(date '+%F %T')) ===" >&2
-[[ -n $API_SECRET ]] && echo "(Detected controller secret)" >&2
+[[ -n $SECRET ]] && echo "(Detected controller secret)" >&2
 
 # Controller (capture nuanced auth states)
 ctrl_code=""; ctrl_code_nosecret=""; ctrl_latency=""; ctrl_latency_nosecret=""
-if [[ -n $API_SECRET ]]; then
-	ctrl_raw=$(curl -s -o /dev/null -w '%{http_code},%{time_total}' -H "Authorization: Bearer $API_SECRET" "$API/version" 2>/dev/null || true)
+if [[ -n $SECRET ]]; then
+	ctrl_raw=$(timed_curl --noproxy '*' -H "Authorization: Bearer $SECRET" "$API/version")
 	ctrl_code=${ctrl_raw%%,*}; ctrl_latency=${ctrl_raw##*,}
 fi
-if [[ -z $ctrl_code || $ctrl_code == 401 || $ctrl_code == 403 || -z $API_SECRET ]]; then
+if [[ -z $ctrl_code || $ctrl_code == 401 || $ctrl_code == 403 || -z $SECRET ]]; then
 	# Try without secret
-	ctrl_raw2=$(curl -s -o /dev/null -w '%{http_code},%{time_total}' "$API/version" 2>/dev/null || true)
+	ctrl_raw2=$(timed_curl --noproxy '*' "$API/version")
 	ctrl_code_nosecret=${ctrl_raw2%%,*}; ctrl_latency_nosecret=${ctrl_raw2##*,}
 fi
 
@@ -193,19 +185,19 @@ RESULTS[copilot_proxy]="$status($code,$t)"
 [[ $MODE == text ]] && printf "%-28s %s\n" "Copilot Proxy" "${RESULTS[copilot_proxy]}"
 
 # Geo check (which exit IP)
-geo_json=$(curl -s --proxy http://$PROXY_HOST:$HTTP_PORT https://ipapi.co/json 2>/dev/null || true)
+geo_json=$(curl_body --proxy http://$PROXY_HOST:$HTTP_PORT https://ipapi.co/json)
 country=$(echo "$geo_json" | sed -n 's/.*"country_name":"\([^"]*\)".*/\1/p')
 ip=$(echo "$geo_json" | sed -n 's/.*"ip":"\([^"]*\)".*/\1/p')
 if [[ -z $ip ]]; then
 	# Fallback to ipinfo.io
-	alt=$(curl -s --proxy http://$PROXY_HOST:$HTTP_PORT https://ipinfo.io/json 2>/dev/null || true)
+	alt=$(curl_body --proxy http://$PROXY_HOST:$HTTP_PORT https://ipinfo.io/json)
 	ip=$(echo "$alt" | sed -n 's/.*"ip":"\([^"]*\)".*/\1/p')
 	cc=$(echo "$alt" | sed -n 's/.*"country":"\([^"]*\)".*/\1/p')
 	[[ -z $country && -n $cc ]] && country=$cc
 fi
 if [[ -z $ip ]]; then
 	# Final fallback to Cloudflare trace
-	cf=$(curl -s --proxy http://$PROXY_HOST:$HTTP_PORT https://cloudflare.com/cdn-cgi/trace 2>/dev/null || true)
+	cf=$(curl_body --proxy http://$PROXY_HOST:$HTTP_PORT https://cloudflare.com/cdn-cgi/trace)
 	ip=$(echo "$cf" | awk -F= '/^ip=/{print $2; exit}')
 	cc=$(echo "$cf" | awk -F= '/^loc=/{print $2; exit}')
 	[[ -z $country && -n $cc ]] && country=$cc

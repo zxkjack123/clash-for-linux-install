@@ -36,10 +36,10 @@
 - 没有基于性能的规则推荐
 - 不能从历史数据学习
 
-❌ **告警机制不完善**
-- 没有系统化的告警通知
-- 缺少多渠道通知支持
-- 问题发现不及时
+✅ **告警机制已补齐（可扩展）**
+- `vpn-tools/alert_notification.sh`：多级告警 + 去重（避免告警风暴）+ 历史记录
+- `script/runtime_guard.sh`：支持安全告警 hook（`--alert` / `--alert-script`），默认不执行任意 shell 字符串
+- 可结合 cron/监控脚本实现持续巡检与通知
 
 ❌ **可视化能力弱**
 - 缺少直观的状态展示
@@ -410,7 +410,7 @@ AI服务:
 ### 快速开始（3分钟）
 
 ```bash
-cd /home/gw/opt/clash-for-linux-install/vpn-tools
+cd /path/to/clash-for-linux-install/vpn-tools
 
 # 方式1: 一键启动（推荐）
 ./quick_start_monitoring.sh
@@ -523,7 +523,7 @@ vpn-tools/
 ### 文档文件
 
 ```
-/home/gw/opt/clash-for-linux-install/
+/path/to/clash-for-linux-install/
 ├── NETWORK_OPTIMIZATION_GUIDE.md  ⭐ 完整优化指南
 └── vpn-tools/
     └── MONITORING_README.md       ⭐ 监控系统说明

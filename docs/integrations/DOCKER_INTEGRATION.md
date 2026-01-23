@@ -1,63 +1,41 @@
-# Docker Integration Guide for Clash
+# Docker Integration Guide for Clash/Mihomo
 
 ## Summary
 
-Clash has been successfully configured to allow connections from Docker containers. Both the proxy service and the web dashboard are now accessible from within Docker containers.
+On Linux, the safest/easiest way to let Docker containers use Clash/Mihomo is **host networking** for test containers:
 
-## Configuration Changes Made
+- Keep the proxy/controller bound to localhost (`127.0.0.1`) by default.
+- Run containers with `--network host` so they can reach `127.0.0.1` on the host.
 
-### 1. Clash Configuration Updates
+Only use bridged networking access (`<HOST_IP>:7890/9090`) when you *must*, and then require a controller `secret` + firewall rules.
 
-#### Main Config (`/home/gw/opt/clash-for-linux-install/resources/config.yaml`)
-- ✅ `external-controller: "0.0.0.0:9090"` - Web dashboard accessible from all interfaces
-- ✅ `allow-lan: true` - LAN access enabled
-- ✅ `bind-address: "*"` - Proxy binds to all interfaces
+## Notes on config files
 
-#### Mixin Config (`/home/gw/opt/clash-for-linux-install/resources/mixin.yaml`)
-- ✅ `allow-lan: true` - LAN access enabled for Docker containers
-- ✅ `bind-address: "0.0.0.0"` - Explicit binding to all interfaces
-
-#### Runtime Config (`/home/gw/.local/share/clash/runtime.yaml`)
-- ✅ Updated to reflect allow-lan: true
-
-### 2. Firewall Rules Added
-
-The following iptables rules have been configured to allow Docker container access:
-
-```bash
-# Allow Docker networks to access Clash proxy (7890) and dashboard (9090)
-iptables -I DOCKER-USER -s 172.16.0.0/12 -d 172.28.130.97 -p tcp --dport 7890 -j ACCEPT
-iptables -I DOCKER-USER -s 172.16.0.0/12 -d 172.28.130.97 -p tcp --dport 9090 -j ACCEPT
-iptables -I INPUT -s 172.16.0.0/12 -d 172.28.130.97 -p tcp --dport 7890 -j ACCEPT
-iptables -I INPUT -s 172.16.0.0/12 -d 172.28.130.97 -p tcp --dport 9090 -j ACCEPT
-```
-
-**Rules saved to:** `/etc/iptables/rules.v4` for persistence across reboots.
-
-### 3. Service Status
-
-- ✅ Clash (mihomo) service is running
-- ✅ Port 7890 (proxy) listening on `:::7890` (all interfaces)
-- ✅ Port 9090 (dashboard) listening on `:::9090` (all interfaces)
+- `~/.local/share/clash/runtime.yaml` is the effective runtime config generated/used by the service.
+- `/path/to/clash-for-linux-install/resources/mixin.yaml` is the recommended place to control safe defaults.
+- The controller address/secret can vary by deployment; prefer **auto-detection** (e.g. scripts under `vpn-tools/` source `vpn-tools/load_env.sh`).
 
 ## Usage for Docker Containers
 
-### Method 1: Using Host IP Address
+### Method 1: Using Network Mode Host (recommended on Linux)
 ```bash
-# For containers needing proxy access
-docker run --rm curlimages/curl:latest curl -x http://172.28.130.97:7890 http://example.com
+docker run --rm --network host curlimages/curl:latest \
+   curl -x http://127.0.0.1:7890 http://example.com
 
-# For accessing the dashboard
-docker run --rm curlimages/curl:latest curl http://172.28.130.97:9090/version
+docker run --rm --network host curlimages/curl:latest \
+   curl http://127.0.0.1:9090/version
+
+# If your controller has a secret enabled, add:
+#   -H "Authorization: Bearer <your-secret>"
 ```
 
-### Method 2: Using host.docker.internal (recommended)
+### Method 2: Using host.docker.internal (bridge mode)
 ```bash
 # Add host alias and use proxy
-docker run --rm --add-host=host.docker.internal:172.28.130.97 curlimages/curl:latest curl -x http://host.docker.internal:7890 http://example.com
+docker run --rm --add-host=host.docker.internal:host-gateway curlimages/curl:latest curl -x http://host.docker.internal:7890 http://example.com
 
 # Access dashboard
-docker run --rm --add-host=host.docker.internal:172.28.130.97 curlimages/curl:latest curl http://host.docker.internal:9090/version
+docker run --rm --add-host=host.docker.internal:host-gateway curlimages/curl:latest curl http://host.docker.internal:9090/version
 ```
 
 ### Method 3: In Docker Compose
@@ -67,11 +45,11 @@ services:
   your-app:
     image: your-image
     environment:
-      - HTTP_PROXY=http://172.28.130.97:7890
-      - HTTPS_PROXY=http://172.28.130.97:7890
-      - NO_PROXY=localhost,127.0.0.1
+         - HTTP_PROXY=http://HOST_IP:7890
+         - HTTPS_PROXY=http://HOST_IP:7890
+         - NO_PROXY=localhost,127.0.0.1
     extra_hosts:
-      - "host.docker.internal:172.28.130.97"
+         - "host.docker.internal:host-gateway"
 ```
 
 ### Method 4: Using Network Mode Host
@@ -86,22 +64,29 @@ The following tests confirm successful configuration:
 
 1. **Dashboard Access Test:**
    ```bash
-   docker run --rm curlimages/curl:latest curl http://172.28.130.97:9090/version
+   docker run --rm --network host curlimages/curl:latest curl http://127.0.0.1:9090/version
    # Returns: {"meta":true,"version":"v1.19.2"}
    ```
 
 2. **Proxy Functionality Test:**
    ```bash
-   docker run --rm curlimages/curl:latest curl -x http://172.28.130.97:7890 http://httpbin.org/ip
+   docker run --rm --network host curlimages/curl:latest curl -x http://127.0.0.1:7890 http://httpbin.org/ip
    # Returns: {"origin": "85.234.83.184"} (shows proxy IP)
+   ```
+
+3. **End-to-end script test (recommended):**
+   ```bash
+   cd /path/to/clash-for-linux-install
+   DOCKER_NET_MODE=host bash vpn-tools/test_docker_proxy.sh
+   # For bridge mode:
+   # DOCKER_NET_MODE=bridge bash vpn-tools/test_docker_proxy.sh
    ```
 
 ## Security Notes
 
-- ⚠️ Clash is now accessible from all Docker networks (172.16.0.0/12)
-- ⚠️ If you have containers you don't trust, consider more restrictive firewall rules
-- ⚠️ The dashboard (port 9090) is accessible without authentication
-- ✅ Only private Docker networks can access Clash (not external networks)
+- ✅ Prefer keeping the controller on localhost (`127.0.0.1:9090`).
+- ⚠️ If you expose the controller (e.g., `0.0.0.0:9090`) you should set a `secret` and restrict access with firewall rules.
+- ⚠️ If you have containers you don't trust, avoid bridged access to the proxy/controller ports.
 
 ## Troubleshooting
 
@@ -109,13 +94,13 @@ The following tests confirm successful configuration:
 
 1. **Check service status:**
    ```bash
-   bash /home/gw/opt/clash-for-linux-install/vpn-tools/restart_clash_service.sh
+   bash /path/to/clash-for-linux-install/vpn-tools/restart_clash_service.sh
    ```
 
 2. **Verify ports are listening:**
    ```bash
-   sudo netstat -tlnp | grep -E ":(7890|9090)"
-   # Should show: :::7890 and :::9090
+   sudo ss -tlnp | grep -E ":(7890|9090)"
+   # Bind address may be 127.0.0.1 (safe default) or 0.0.0.0/host IP (bridge mode).
    ```
 
 3. **Check firewall rules:**
@@ -131,30 +116,19 @@ The following tests confirm successful configuration:
 
 ## Rollback Instructions
 
-If you need to restrict access back to localhost only:
+If you previously enabled bridge-mode exposure and want to restrict access back to localhost only:
 
-1. **Update configs:**
-   ```bash
-   sed -i 's/allow-lan: true/allow-lan: false/' /home/gw/opt/clash-for-linux-install/resources/mixin.yaml
-   sed -i 's/external-controller: "0.0.0.0:9090"/external-controller: "127.0.0.1:9090"/' /home/gw/opt/clash-for-linux-install/resources/config.yaml
-   ```
+1. Edit `/path/to/clash-for-linux-install/resources/mixin.yaml` and restore safe values, for example:
+   - `allow-lan: false`
+   - `bind-address: "127.0.0.1"`
+   - keep controller on localhost unless you truly need remote access
 
-2. **Remove firewall rules:**
-   ```bash
-   sudo iptables -D DOCKER-USER -s 172.16.0.0/12 -d 172.28.130.97 -p tcp --dport 7890 -j ACCEPT
-   sudo iptables -D DOCKER-USER -s 172.16.0.0/12 -d 172.28.130.97 -p tcp --dport 9090 -j ACCEPT
-   sudo iptables -D INPUT -s 172.16.0.0/12 -d 172.28.130.97 -p tcp --dport 7890 -j ACCEPT
-   sudo iptables -D INPUT -s 172.16.0.0/12 -d 172.28.130.97 -p tcp --dport 9090 -j ACCEPT
-   ```
+2. Re-merge + restart:
+   - Preferred: run `clashctl mixin -e` and save/exit (it merges and restarts automatically)
+   - Or use the helper: `bash /path/to/clash-for-linux-install/vpn-tools/restart_clash_service.sh`
 
-3. **Restart service:**
-   ```bash
-   bash /home/gw/opt/clash-for-linux-install/vpn-tools/restart_clash_service.sh
-   ```
+3. Remove any temporary firewall rules you added.
 
 ---
 
-**Configuration completed on:** August 14, 2025  
-**Host IP:** 172.28.130.97  
-**Clash Version:** v1.19.2  
-**Status:** ✅ Fully functional for Docker container access
+**Tip:** For production-like setups, prefer keeping the controller/proxy bound to localhost and use Docker host networking for ad-hoc containers.

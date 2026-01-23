@@ -38,7 +38,7 @@
 
 ### 方案 2: 使用修复脚本重启 VSCode
 ```bash
-cd /home/gw/opt/clash-for-linux-install/vpn-tools
+cd /path/to/clash-for-linux-install/vpn-tools
 bash fix_vscode_stale_proxy.sh --launch-here
 ```
 
@@ -49,7 +49,7 @@ bash fix_vscode_stale_proxy.sh --launch-here
 ### 方案 3: 手动优化 Copilot 连接
 ```bash
 # 1. 运行优化脚本
-cd /home/gw/opt/clash-for-linux-install/vpn-tools
+cd /path/to/clash-for-linux-install/vpn-tools
 bash optimize_vscode_copilot.sh
 
 # 2. 测试连接
@@ -61,7 +61,7 @@ curl -I --max-time 10 https://api.githubcopilot.com/healthz
 ### 方案 4: 切换到更稳定的节点 (如果方案 1-3 无效)
 ```bash
 # 手动测试其他美国节点
-cd /home/gw/opt/clash-for-linux-install/vpn-tools
+cd /path/to/clash-for-linux-install/vpn-tools
 bash optimize_ai_enhanced.sh
 
 # 或者尝试美国节点
@@ -82,18 +82,20 @@ curl -X PUT -H "Content-Type: application/json" \
 }
 ```
 
+> 注意：`http.proxyStrictSSL=false` 会降低安全性，建议仅用于临时排障；问题解决后请恢复默认值。
+
 ## 预防措施
 
 ### 1. 定期优化网络
 ```bash
 # 添加到 crontab (每2小时优化一次)
-0 */2 * * * /home/gw/opt/clash-for-linux-install/vpn-tools/optimize_ai.sh
+0 */2 * * * /path/to/clash-for-linux-install/vpn-tools/optimize_ai.sh
 ```
 
 ### 2. 监控网络健康
 ```bash
 # 查看实时网络状态
-cd /home/gw/opt/clash-for-linux-install/vpn-tools
+cd /path/to/clash-for-linux-install/vpn-tools
 bash network_dashboard.sh
 ```
 
@@ -142,13 +144,13 @@ curl -s http://127.0.0.1:9090/proxies | jq '.proxies."西瓜加速".now'
 curl -I --max-time 10 https://api.githubcopilot.com/healthz
 
 # 优化 AI 节点
-cd /home/gw/opt/clash-for-linux-install/vpn-tools && bash optimize_ai.sh
+cd /path/to/clash-for-linux-install/vpn-tools && bash optimize_ai.sh
 
 # 优化 VSCode Copilot
-cd /home/gw/opt/clash-for-linux-install/vpn-tools && bash optimize_vscode_copilot.sh
+cd /path/to/clash-for-linux-install/vpn-tools && bash optimize_vscode_copilot.sh
 
 # 全网络优化
-cd /home/gw/opt/clash-for-linux-install/vpn-tools && bash optimize_all_network.sh
+cd /path/to/clash-for-linux-install/vpn-tools && bash optimize_all_network.sh
 ```
 
 ## 推荐操作顺序
@@ -160,8 +162,8 @@ cd /home/gw/opt/clash-for-linux-install/vpn-tools && bash optimize_all_network.s
 4. 测试 Copilot 是否正常工作
 
 **如果仍有问题** (10分钟内解决):
-1. 运行: `bash /home/gw/opt/clash-for-linux-install/vpn-tools/optimize_vscode_copilot.sh`
-2. 使用: `bash /home/gw/opt/clash-for-linux-install/vpn-tools/fix_vscode_stale_proxy.sh --launch-here`
+1. 运行: `bash /path/to/clash-for-linux-install/vpn-tools/optimize_vscode_copilot.sh`
+2. 使用: `bash /path/to/clash-for-linux-install/vpn-tools/fix_vscode_stale_proxy.sh --launch-here`
 
 **长期维护**:
 - 设置定时任务优化网络
@@ -176,13 +178,14 @@ VSCode → http://127.0.0.1:7890 (Clash) → 西瓜加速节点 → api.githubco
 ```
 
 ### 关键配置文件
-- Clash 配置: `/home/gw/opt/clash-for-linux-install/resources/config.yaml`
-- Clash 运行时: `/home/gw/.local/share/clash/runtime.yaml`
-- 代理环境变量: `/etc/profile.d/clash.sh` 或 `~/.bashrc`
+- Clash 配置: `/path/to/clash-for-linux-install/resources/config.yaml`
+- Clash 运行时: `~/.local/share/clash/runtime.yaml`
+- 系统代理：由 `clash-proxy-env.service`（systemd user service）应用到桌面环境
+- Shell 环境变量：默认不注入（避免卡顿/误伤），如需请参考 `docs/development/CLASH_PROXY_STARTUP_BEST_PRACTICES.md`
 
 ### 诊断日志位置
-- Clash 日志: `/home/gw/.local/share/clash/logs/`
-- 优化日志: `/home/gw/.local/share/clash/logs/optimize_*.log`
+- Clash 日志: `~/.local/share/clash/logs/`
+- 优化日志: `~/.local/share/clash/logs/optimize_*.log`
 
 ---
 

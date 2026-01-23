@@ -18,7 +18,7 @@ vim .env
 
 ```bash
 # 硅基流动 API Key (可选)
-SILICONFLOW_API_KEY="sk-atwkktinmmpzxvnkqzxfpxfclyoadtuffkigytgqwblyjybj"
+SILICONFLOW_API_KEY="sk-xxxxxxxxxxxxxxxx"
 ```
 
 ### 3. 验证配置
@@ -49,11 +49,13 @@ echo "API Key: ${SILICONFLOW_API_KEY:0:20}..."
 
 ### Clash 配置
 
-| 配置项       | 默认值                  | 说明               |
-| ------------ | ----------------------- | ------------------ |
-| `CLASH_API`  | `http://127.0.0.1:9090` | Clash API 地址     |
-| `API_SECRET` | (空)                    | Clash API 认证密钥 |
-| `PROXY`      | `http://127.0.0.1:7890` | HTTP 代理地址      |
+| 配置项         | 默认值                  | 说明                                                                                                                       |
+| -------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `CLASH_API`    | `http://127.0.0.1:9090` | Controller API 地址（多数脚本会从 `~/.local/share/clash/runtime.yaml` 自动探测 `external-controller`；仅在需要覆盖时设置） |
+| `CLASH_SECRET` | (空)                    | Controller Secret / API 认证密钥（多数脚本会从 `runtime.yaml` 自动读取；仅在需要覆盖时设置）                               |
+| `PROXY`        | `http://127.0.0.1:7890` | HTTP 代理地址                                                                                                              |
+
+> 兼容说明：旧版本文档/脚本可能使用 `API_SECRET` 或 `CLASH_API_SECRET`，当前推荐统一使用 `CLASH_SECRET`。
 
 ### 通知配置
 
@@ -134,7 +136,7 @@ clash-for-linux-install/
 ```bash
 # 1. 创建 .env 文件
 cat > .env <<'EOF'
-SILICONFLOW_API_KEY="sk-xxxxxxxx"
+SILICONFLOW_API_KEY="sk-xxxxxxxxxxxxxxxx"
 CLASH_API="http://127.0.0.1:9090"
 EOF
 

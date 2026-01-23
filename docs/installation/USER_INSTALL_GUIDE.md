@@ -7,7 +7,7 @@ This modified version installs Clash as a user service instead of a system servi
 1. **Installation Location**: `~/.local/share/clash` (user directory instead of `/opt/clash`)
 2. **Service Type**: User systemd service instead of system service
 3. **No sudo required**: Most operations no longer require password input
-4. **Auto-start**: Proxy automatically starts when you open a new terminal
+4. **Auto-start**: Kernel + system proxy can start automatically on login (and at boot if lingering is enabled)
 5. **Service Stability** (2025-08-13): Fixed startup timeout issues and improved reliability
 
 ## Installation
@@ -27,18 +27,20 @@ If you run it with sudo, it will properly install for the actual user (not root)
 - Service management is done via `systemctl --user`
 
 ### Automatic Proxy Activation
-- The proxy automatically starts when you login or open a new terminal
-- Your shell environment variables are set automatically
-- No manual intervention needed for daily use
+- The kernel service (`mihomo`/`clash`) can start automatically on login via `systemctl --user`
+- System proxy (GNOME/KDE) and Git proxy are applied by `clash-proxy-env.service`
+- **Note**: Shell environment variables like `http_proxy` are **not** injected into every new bash/zsh shell by default.
+	If you want terminal apps to automatically see `http_proxy`/`ALL_PROXY`, use the lightweight snippet in:
+	`docs/development/CLASH_PROXY_STARTUP_BEST_PRACTICES.md`
 
 ### Service Management
 ```bash
-# Check service status
-clash status
+# Recommended control entrypoint (works even if your shell has no functions loaded)
+bash ~/.local/share/clash/script/clashctl.sh status
 
 # Start/stop service
-clash on
-clash off
+bash ~/.local/share/clash/script/clashctl.sh on
+bash ~/.local/share/clash/script/clashctl.sh off
 
 # View service logs
 systemctl --user status mihomo
@@ -71,7 +73,16 @@ If the proxy doesn't start automatically:
 1. Check if the user service is enabled: `systemctl --user is-enabled mihomo`
 2. Check service status: `systemctl --user status mihomo`
 3. View service logs: `journalctl --user -u mihomo -f`
-4. Manually start: `clash on`
+4. Manually start: `bash ~/.local/share/clash/script/clashctl.sh on`
+
+If you prefer a shorter command, create a symlink once:
+
+```bash
+mkdir -p ~/.local/bin
+ln -sf ~/.local/share/clash/script/clashctl.sh ~/.local/bin/clashctl
+```
+
+Then you can use `clashctl on/off/status`.
 
 If you need to enable boot-time startup:
 ```bash

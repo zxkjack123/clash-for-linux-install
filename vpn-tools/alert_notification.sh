@@ -45,28 +45,41 @@ have() { command -v "$1" >/dev/null 2>&1; }
 
 # 告警去重检查
 is_rate_limited() {
-    local alert_key="$ALERT_LEVEL|$ALERT_MESSAGE"
-    local current_time=$(date +%s)
-    
-    # 检查最近是否发送过相同告警
-    if grep -q "^$alert_key|" "$RATE_LIMIT_FILE" 2>/dev/null; then
-        local last_time=$(grep "^$alert_key|" "$RATE_LIMIT_FILE" | tail -n1 | cut -d'|' -f3)
+    local current_time
+    current_time=$(date +%s)
+
+    # NOTE:
+    # - RATE_LIMIT_FILE uses a simple pipe-delimited format:
+    #     level|message|unix_ts
+    # - ALERT_MESSAGE may contain regex/meta chars; avoid grep patterns.
+    # - ALERT_MESSAGE may contain '|'/newlines; sanitize for the key file.
+    local msg_key="$ALERT_MESSAGE"
+    msg_key=${msg_key//$'\n'/ }
+    msg_key=${msg_key//|/ }
+
+    # Find the latest timestamp for this level+message.
+    local last_time=""
+    if [[ -s "$RATE_LIMIT_FILE" ]]; then
+        last_time=$(awk -F'|' -v lvl="$ALERT_LEVEL" -v msg="$msg_key" '$1==lvl && $2==msg {t=$3} END{print t}' "$RATE_LIMIT_FILE" 2>/dev/null || true)
+    fi
+    if [[ -n "${last_time:-}" && "$last_time" =~ ^[0-9]+$ ]]; then
         local time_diff=$((current_time - last_time))
-        
         if [ "$time_diff" -lt "$RATE_LIMIT_SECONDS" ]; then
             return 0  # 在频率限制内
         fi
     fi
-    
+
     # 更新发送时间
-    echo "$alert_key|$current_time" >> "$RATE_LIMIT_FILE"
-    
+    printf '%s|%s|%s\n' "$ALERT_LEVEL" "$msg_key" "$current_time" >> "$RATE_LIMIT_FILE"
+
     # 清理旧记录（保留最近1小时）
     local cutoff_time=$((current_time - 3600))
-    grep -v "^.*|[0-9]\+$" "$RATE_LIMIT_FILE" > "${RATE_LIMIT_FILE}.tmp" || true
-    awk -F'|' -v cutoff="$cutoff_time" '$2 >= cutoff' "${RATE_LIMIT_FILE}.tmp" > "$RATE_LIMIT_FILE" 2>/dev/null || true
-    rm -f "${RATE_LIMIT_FILE}.tmp"
-    
+    local tmp_file="${RATE_LIMIT_FILE}.tmp"
+    awk -F'|' -v cutoff="$cutoff_time" 'NF>=3 && $3 ~ /^[0-9]+$/ && $3 >= cutoff {print}' "$RATE_LIMIT_FILE" > "$tmp_file" 2>/dev/null || true
+    if [ -f "$tmp_file" ]; then
+        mv -f "$tmp_file" "$RATE_LIMIT_FILE" 2>/dev/null || rm -f "$tmp_file"
+    fi
+
     return 1  # 不在频率限制内
 }
 
@@ -137,6 +150,7 @@ EOF
     curl -s -X POST "$WEBHOOK_URL" \
         -H "Content-Type: application/json" \
         -d "$payload" \
+        --connect-timeout 3 \
         --max-time 5 >/dev/null 2>&1 || true
 }
 

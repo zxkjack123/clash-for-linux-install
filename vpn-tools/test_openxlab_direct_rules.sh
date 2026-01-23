@@ -7,7 +7,43 @@
 #   Reloads config and verifies that OpenXLab domains use direct connection
 #
 # USAGE:
-#   ./test_openxlab_direct_rules.sh
+#   ./test_openxlab_direct_rules.sh                # safe checks only (no reload, no browser)
+#   ./test_openxlab_direct_rules.sh --reload       # reload config via controller
+#   ./test_openxlab_direct_rules.sh --open         # launch browser
+#   ./test_openxlab_direct_rules.sh --reload --open
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+CONFIG_PATH="${ROOT_DIR}/resources/config.yaml"
+
+# Optional .env + controller/secret auto-detection
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/load_env.sh" 2>/dev/null || true
+clash_env_bootstrap 2>/dev/null || true
+
+API_BASE="${CLASH_API:-http://127.0.0.1:9090}"
+AUTH_ARGS=()
+if [[ -n "${CLASH_SECRET:-}" ]]; then
+    AUTH_ARGS=(-H "Authorization: Bearer ${CLASH_SECRET}")
+fi
+
+RELOAD=0
+OPEN=0
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --reload|--apply) RELOAD=1; shift;;
+        --open) OPEN=1; shift;;
+        -h|--help)
+            grep -E '^#' "$0" | head -n 60
+            exit 0
+            ;;
+        *) echo "Unknown arg: $1" >&2; exit 2;;
+    esac
+done
+
+CTRL_CURL_OPTS=(--noproxy '*' --connect-timeout 2 --max-time 8)
 
 echo "🔄 Testing OpenXLab Direct Connection Rules"
 echo "==========================================="
@@ -27,23 +63,33 @@ echo "• www.openxlab.org.cn (www subdomain)"
 echo "• mineru.net (MinerU main site)"
 echo ""
 
-echo "🔄 Reloading Clash configuration..."
-# Reload the configuration
-reload_result=$(curl -X PUT http://127.0.0.1:9090/configs \
-    -H "Content-Type: application/json" \
-    -d '{"path":"/home/gw/opt/clash-for-linux-install/resources/config.yaml"}' \
-    2>/dev/null)
+if [[ $RELOAD -eq 1 ]]; then
+    echo "🔄 Reloading Clash configuration..."
+    # Reload the configuration
+    set +e
+    reload_result=$(curl -fsS "${CTRL_CURL_OPTS[@]}" -X PUT "${API_BASE}/configs" \
+        "${AUTH_ARGS[@]}" \
+        -H "Content-Type: application/json" \
+        -d "{\"path\":\"${CONFIG_PATH}\"}" \
+        2>/dev/null)
+    reload_rc=$?
+    set -e
 
-if [ $? -eq 0 ]; then
-    echo -e "${GREEN}✅ Configuration reloaded successfully${NC}"
+    if [ ${reload_rc} -eq 0 ]; then
+        echo -e "${GREEN}✅ Configuration reloaded successfully${NC}"
+    else
+        echo -e "${RED}❌ Failed to reload configuration${NC}"
+        echo "(Hint) If controller auth is enabled, ensure CLASH_SECRET is set." >&2
+        exit 1
+    fi
+
+    echo ""
+    echo "⏳ Waiting for configuration to take effect..."
+    sleep 3
 else
-    echo -e "${RED}❌ Failed to reload configuration${NC}"
-    exit 1
+    echo -e "${YELLOW}ℹ️ Preview mode: skipping controller reload. Re-run with --reload to apply.${NC}"
+    echo ""
 fi
-
-echo ""
-echo "⏳ Waiting for configuration to take effect..."
-sleep 3
 
 echo ""
 echo "🧪 Testing OpenXLab domains with new DIRECT rules:"
@@ -88,14 +134,14 @@ echo "================================="
 
 # Check if rules are loaded correctly by testing rule matching
 echo -n "📋 Checking if openxlab.org.cn rule is active: "
-if grep -q "openxlab.org.cn,DIRECT" /home/gw/opt/clash-for-linux-install/resources/config.yaml; then
+if grep -q "openxlab.org.cn,DIRECT" "${CONFIG_PATH}"; then
     echo -e "${GREEN}✅ Rule found in config${NC}"
 else
     echo -e "${RED}❌ Rule not found${NC}"
 fi
 
 echo -n "📋 Checking if sso.openxlab.org.cn rule is active: "
-if grep -q "sso.openxlab.org.cn,DIRECT" /home/gw/opt/clash-for-linux-install/resources/config.yaml; then
+if grep -q "sso.openxlab.org.cn,DIRECT" "${CONFIG_PATH}"; then
     echo -e "${GREEN}✅ Rule found in config${NC}"
 else
     echo -e "${RED}❌ Rule not found${NC}"
@@ -113,18 +159,22 @@ echo ""
 echo "💡 These domains should now bypass the proxy and connect directly."
 echo ""
 
-echo "🚀 Quick browser test:"
-# Try to launch browser with one of the URLs
-if command -v firefox >/dev/null 2>&1; then
-    echo "🦊 Launching Firefox with OpenXLab..."
-    firefox --new-tab "https://openxlab.org.cn/" >/dev/null 2>&1 &
-    echo "✅ Firefox launched - OpenXLab should load directly"
-elif command -v google-chrome >/dev/null 2>&1; then
-    echo "🌐 Launching Chrome with OpenXLab..."
-    google-chrome --new-tab "https://openxlab.org.cn/" >/dev/null 2>&1 &
-    echo "✅ Chrome launched - OpenXLab should load directly"
+if [[ $OPEN -eq 1 ]]; then
+    echo "🚀 Quick browser test:"
+    # Try to launch browser with one of the URLs
+    if command -v firefox >/dev/null 2>&1; then
+        echo "🦊 Launching Firefox with OpenXLab..."
+        firefox --new-tab "https://openxlab.org.cn/" >/dev/null 2>&1 &
+        echo "✅ Firefox launched - OpenXLab should load directly"
+    elif command -v google-chrome >/dev/null 2>&1; then
+        echo "🌐 Launching Chrome with OpenXLab..."
+        google-chrome --new-tab "https://openxlab.org.cn/" >/dev/null 2>&1 &
+        echo "✅ Chrome launched - OpenXLab should load directly"
+    else
+        echo "📋 No browser found. Please manually visit: https://openxlab.org.cn/"
+    fi
 else
-    echo "📋 No browser found. Please manually visit: https://openxlab.org.cn/"
+    echo "ℹ️ Browser launch skipped (use --open to launch automatically)."
 fi
 
 echo ""

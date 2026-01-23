@@ -8,31 +8,40 @@
 set -euo pipefail
 
 URL="${1:-}"
-GROUP_LABEL="${2:-西瓜加速}"
+GROUP_LABEL="${2:-}"
 [ -z "$URL" ] && { echo "Usage: $0 <url> [group-name]" >&2; exit 2; }
 
-API_HOST="127.0.0.1"
-API_PORT="9090"
-API_BASE="http://${API_HOST}:${API_PORT}"
+# Optional env bootstrap (controller URL + secret)
+SCRIPT_DIR="$(cd "${BASH_SOURCE[0]%/*}" && pwd)"
+if [[ -f "$SCRIPT_DIR/load_env.sh" ]]; then
+  # shellcheck source=/dev/null
+  source "$SCRIPT_DIR/load_env.sh" 2>/dev/null || true
+fi
 
-# Read secret and proxy port from runtime if available
-SECRET=""
+if declare -F clash_require_cmd >/dev/null 2>&1; then
+  clash_require_cmd curl "required for controller/proxy probing"
+  clash_optional_cmd jq "optional (better JSON parsing)" || true
+  clash_optional_cmd python3 "optional (better URL encoding)" || true
+fi
+
+API_BASE="${CLASH_API:-http://127.0.0.1:9090}"
+
+if [[ -z "${GROUP_LABEL:-}" ]] && declare -F clash_pick_selector_group >/dev/null 2>&1; then
+  GROUP_LABEL="$(clash_pick_selector_group "西瓜加速" "速云梯" "GLOBAL" "自动选择" "PROXY" 2>/dev/null || true)"
+fi
+GROUP_LABEL=${GROUP_LABEL:-GLOBAL}
+
+# Read proxy port from runtime if available (for local proxy probing)
 PROXY_PORT="7890"
-RUNTIME_YAML="$HOME/.local/share/clash/runtime.yaml"
-if command -v yq >/dev/null 2>&1 && [ -f "$RUNTIME_YAML" ]; then
-  SECRET=$(yq -r '.secret // ""' "$RUNTIME_YAML" 2>/dev/null || echo "")
-  PROXY_PORT=$(yq -r '."mixed-port" // .port // 7890' "$RUNTIME_YAML" 2>/dev/null || echo 7890)
-  # Prefer controller port from external-controller when available
-  _ui=$(yq -r '."external-controller" // "127.0.0.1:9090"' "$RUNTIME_YAML" 2>/dev/null || echo "127.0.0.1:9090")
-  _port=${_ui##*:}
-  if [[ "${_port}" =~ ^[0-9]+$ ]]; then
-    API_PORT="${_port}"
-    API_BASE="http://${API_HOST}:${API_PORT}"
-  fi
+RUNTIME_YAML="$(clash_runtime_file 2>/dev/null || echo "$HOME/.local/share/clash/runtime.yaml")"
+yq_bin="$(clash_yq_bin 2>/dev/null || true)"
+if [[ -n "$yq_bin" && -f "$RUNTIME_YAML" ]]; then
+  PROXY_PORT=$($yq_bin -r '."mixed-port" // .port // 7890' "$RUNTIME_YAML" 2>/dev/null || echo 7890)
 fi
 
 AUTH_HDR=()
-[ -n "$SECRET" ] && AUTH_HDR=(-H "Authorization: Bearer $SECRET")
+_hdr="$(clash_auth_header 2>/dev/null || true)"
+[[ -n "${_hdr:-}" ]] && AUTH_HDR=(-H "${_hdr}")
 
 have_jq=1
 command -v jq >/dev/null 2>&1 || have_jq=0
@@ -41,7 +50,9 @@ command -v jq >/dev/null 2>&1 || have_jq=0
 echo "# Group: $GROUP_LABEL"
 
 group_enc="$GROUP_LABEL"
-if command -v python3 >/dev/null 2>&1; then
+if declare -F clash_urlencode >/dev/null 2>&1; then
+  group_enc=$(clash_urlencode "$GROUP_LABEL")
+elif command -v python3 >/dev/null 2>&1; then
   group_enc=$(python3 - "$GROUP_LABEL" <<'PY'
 import sys, urllib.parse
 print(urllib.parse.quote(sys.argv[1], safe=''))
@@ -50,19 +61,29 @@ PY
 fi
 
 # Verify controller is reachable
-if ! curl -s --max-time 2 "$API_BASE/version" >/dev/null; then
-  echo "[ERR] Clash controller not reachable at $API_BASE" >&2
-  exit 2
+if declare -F clash_api_get >/dev/null 2>&1; then
+  clash_api_get "$API_BASE/version" >/dev/null 2>&1 || { echo "[ERR] Clash controller not reachable at $API_BASE" >&2; exit 2; }
+else
+  curl -fsS --noproxy '*' --connect-timeout 2 --max-time 3 "${AUTH_HDR[@]}" "$API_BASE/version" >/dev/null || { echo "[ERR] Clash controller not reachable at $API_BASE" >&2; exit 2; }
 fi
 
 # Fetch group info
-group_json=$(curl -s --max-time 3 "$API_BASE/proxies/$group_enc" "${AUTH_HDR[@]}" || true)
+if declare -F clash_api_get >/dev/null 2>&1; then
+  group_json=$(clash_api_get "$API_BASE/proxies/$group_enc" 2>/dev/null || true)
+else
+  group_json=$(curl -s --noproxy '*' --connect-timeout 2 --max-time 3 "$API_BASE/proxies/$group_enc" "${AUTH_HDR[@]}" || true)
+fi
 if [ -z "$group_json" ] || echo "$group_json" | grep -q 'Not Found'; then
   echo "[ERR] Cannot get group $GROUP_LABEL from controller at $API_BASE" >&2
   exit 3
 fi
 
-now_name=$(echo "$group_json" | jq -r '.now // ""' 2>/dev/null || echo "")
+now_name=""
+if command -v jq >/dev/null 2>&1; then
+  now_name=$(echo "$group_json" | jq -r '.now // ""' 2>/dev/null || echo "")
+else
+  now_name=$(echo "$group_json" | sed -n 's/.*"now":"\([^"]*\)".*/\1/p' | head -n1)
+fi
 [ -n "$now_name" ] && echo "# Current: $now_name" || echo "# Current: unknown"
 
 # Collect all nodes
@@ -112,7 +133,11 @@ probe() {
   local name="$1"; shift || true
   local data
   data=$(json_payload "$name")
-  curl -s -X PUT "$API_BASE/proxies/$group_enc" -H 'Content-Type: application/json' "${AUTH_HDR[@]}" --data "$data" >/dev/null || true
+  if declare -F clash_api_put_json >/dev/null 2>&1; then
+    clash_api_put_json "$API_BASE/proxies/$group_enc" "$data" >/dev/null 2>&1 || true
+  else
+    curl -s --noproxy '*' --connect-timeout 2 --max-time 4 -X PUT "$API_BASE/proxies/$group_enc" -H 'Content-Type: application/json' "${AUTH_HDR[@]}" --data "$data" >/dev/null || true
+  fi
   sleep 1
   local res code t
   res=$(curl -I -s -o /dev/null -w '%{http_code},%{time_total}' --connect-timeout 6 --max-time 10 --proxy "http://127.0.0.1:${PROXY_PORT}" "$URL" || echo "000,10.000")
@@ -133,7 +158,11 @@ printf '\n# Summary\n'
 if [ -n "$best_name" ]; then
   echo "Best working node: $best_name  (time=${best_time}s)"
   data=$(json_payload "$best_name")
-  curl -s -X PUT "$API_BASE/proxies/$group_enc" -H 'Content-Type: application/json' "${AUTH_HDR[@]}" --data "$data" >/dev/null || true
+  if declare -F clash_api_put_json >/dev/null 2>&1; then
+    clash_api_put_json "$API_BASE/proxies/$group_enc" "$data" >/dev/null 2>&1 || true
+  else
+    curl -s --noproxy '*' --connect-timeout 2 --max-time 4 -X PUT "$API_BASE/proxies/$group_enc" -H 'Content-Type: application/json' "${AUTH_HDR[@]}" --data "$data" >/dev/null || true
+  fi
   echo "Applied selection to group: $GROUP_LABEL"
 else
   echo "No working node found for $URL via proxy in tested set ($limit)."

@@ -109,7 +109,7 @@ AI服务详情:
 ## 技术细节
 
 ### 修改的文件
-**文件**: `/home/gw/opt/clash-for-linux-install/vpn-tools/network_health_monitor.sh`
+**文件**: `/path/to/clash-for-linux-install/vpn-tools/network_health_monitor.sh`
 
 **最终代码** (第104-110行):
 ```bash
@@ -204,7 +204,7 @@ test_url() {
 
 添加方法：
 ```bash
-nano /home/gw/opt/clash-for-linux-install/vpn-tools/network_health_monitor.sh
+nano /path/to/clash-for-linux-install/vpn-tools/network_health_monitor.sh
 
 # 修改第106行，添加第5个服务：
 local services=(
@@ -220,7 +220,7 @@ local services=(
 
 ### 完整健康检查
 ```bash
-cd /home/gw/opt/clash-for-linux-install/vpn-tools
+cd /path/to/clash-for-linux-install/vpn-tools
 ./network_health_monitor.sh
 ```
 

@@ -25,8 +25,39 @@ ZIP_YQ="${ZIP_BASE_DIR}/yq_linux_amd64.tar.gz"
 ZIP_SUBCONVERTER=$(echo ${ZIP_BASE_DIR}/subconverter*)
 ZIP_UI="${ZIP_BASE_DIR}/yacd.tar.xz"
 
-# Use user's home directory for installation
-USER_HOME="${HOME:-$(eval echo ~$USER)}"
+# Use user's home directory for installation.
+# Avoid eval where possible; fall back only if necessary for very minimal systems.
+USER_HOME="${HOME:-}"
+if [ -z "${USER_HOME}" ]; then
+    _u_candidate="${SUDO_USER:-${USER:-}}"
+    if command -v getent >/dev/null 2>&1; then
+        USER_HOME=$(getent passwd "${_u_candidate}" 2>/dev/null | cut -d: -f6 || true)
+    fi
+fi
+if [ -z "${USER_HOME}" ]; then
+    # Fallback: parse /etc/passwd without using eval (avoid injection via USER).
+    _u_candidate="${SUDO_USER:-${USER:-}}"
+    if [ -n "${_u_candidate}" ] && [ -r /etc/passwd ]; then
+        # Only use a safe username-like string.
+        if [[ "${_u_candidate}" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
+            USER_HOME=$(awk -F: -v u="${_u_candidate}" '($1==u){print $6; exit}' /etc/passwd 2>/dev/null || true)
+        fi
+    fi
+fi
+if [ -z "${USER_HOME}" ]; then
+    # Last resort: rely on shell's tilde expansion for the *current* user (no eval).
+    USER_HOME=$(cd ~ 2>/dev/null && pwd || true)
+fi
+if [ -z "${USER_HOME}" ]; then
+    # Conservative fallback for common layouts.
+    _u_candidate="${SUDO_USER:-${USER:-}}"
+    if [ -n "${_u_candidate}" ] && [[ "${_u_candidate}" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
+        [ -d "/home/${_u_candidate}" ] && USER_HOME="/home/${_u_candidate}"
+        [ -z "${USER_HOME}" ] && [ -d "/Users/${_u_candidate}" ] && USER_HOME="/Users/${_u_candidate}"
+    fi
+    [ -z "${USER_HOME}" ] && [ -d /root ] && USER_HOME=/root
+fi
+unset _u_candidate 2>/dev/null || true
 CLASH_BASE_DIR="${USER_HOME}/.local/share/clash"
 CLASH_SCRIPT_DIR="${CLASH_BASE_DIR}/$(basename $SCRIPT_BASE_DIR)"
 CLASH_CONFIG_URL="${CLASH_BASE_DIR}/url"
@@ -262,10 +293,11 @@ function _valid_env() {
 
 function _valid_config() {
     [ -e "$1" ] && [ "$(wc -l <"$1")" -gt 1 ] && {
-        local cmd msg
-        cmd="$BIN_KERNEL -d $(dirname "$1") -f $1 -t"
-        msg=$(eval "$cmd") || {
-            eval "$cmd"
+        local msg
+        local -a cmd
+        cmd=("$BIN_KERNEL" -d "$(dirname "$1")" -f "$1" -t)
+        msg=$("${cmd[@]}" 2>&1) || {
+            printf '%s\n' "$msg" >&2
             echo "$msg" | grep -qs "unsupport proxy type" && _error_quit "不支持的代理协议，请安装 mihomo 内核"
         }
     }
@@ -298,12 +330,19 @@ _download_clash() {
 
     _okcat '⏳' "正在下载：clash：${arch} 架构..."
     local clash_zip="${ZIP_BASE_DIR}/$(basename $url)"
+    # Avoid long hangs on stalled downloads.
+    local max_time=${CLASH_KERNEL_DOWNLOAD_MAX_TIME:-300}
+    local speed_time=${CLASH_KERNEL_DOWNLOAD_SPEED_TIME:-15}
+    local speed_limit=${CLASH_KERNEL_DOWNLOAD_SPEED_LIMIT:-1024}
     curl \
         --progress-bar \
         --show-error \
         --fail \
         --insecure \
         --connect-timeout 15 \
+        --max-time "$max_time" \
+        --speed-time "$speed_time" \
+        --speed-limit "$speed_limit" \
         --retry 1 \
         --output "$clash_zip" \
         "$url"

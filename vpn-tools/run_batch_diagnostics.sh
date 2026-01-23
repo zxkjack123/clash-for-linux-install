@@ -75,7 +75,7 @@ collect_full(){
 }
 
 dedup_stream(){ awk '!(NR>1 && $0==prev){print}{prev=$0}'; }
-summarize_file(){ local label="$1" path="$2"; [[ -s $path ]] || return 0; echo "### $label"; echo; echo '```'; sed -e '1,120p' "$path" | dedup_stream; echo '```'; echo; }
+summarize_file(){ local label="$1" path="$2"; [[ -s $path ]] || return 0; echo "### $label"; echo; echo '```'; sed -n '1,120p' "$path" | dedup_stream; echo '```'; echo; }
 
 build_report(){
 	{

@@ -22,8 +22,23 @@ RUNTIME_FILE="$HOME/.local/share/clash/runtime.yaml"
 RULES_DB="$HOME/.local/share/clash/rules_optimization.db"
 ANALYSIS_LOG="$HOME/.local/share/clash/logs/rule_analysis.log"
 
+# Optional .env + controller/secret auto-detection
+if [[ -f "$BASE_DIR/load_env.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "$BASE_DIR/load_env.sh" 2>/dev/null || true
+fi
+clash_env_bootstrap 2>/dev/null || true
+
 API=${CLASH_API:-http://127.0.0.1:9090}
-PROXY=${PROXY:-http://127.0.0.1:7890}
+
+# Node source selector group (auto-pick by default; override with NODE_GROUP=...)
+NODE_GROUP=${NODE_GROUP:-}
+if [[ -z "${NODE_GROUP:-}" ]] && declare -F clash_pick_selector_group >/dev/null 2>&1; then
+    NODE_GROUP="$(clash_pick_selector_group "西瓜加速" "速云梯" "GLOBAL" "自动选择" "PROXY" 2>/dev/null || true)"
+fi
+
+# Controller delay probe timeout (ms)
+DELAY_TIMEOUT_MS=${DELAY_TIMEOUT_MS:-6000}
 
 MODE="analyze"
 VERBOSE=false
@@ -33,6 +48,32 @@ mkdir -p "$(dirname "$RULES_DB")" "$(dirname "$ANALYSIS_LOG")"
 have() { command -v "$1" >/dev/null 2>&1; }
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$ANALYSIS_LOG"; }
 vlog() { $VERBOSE && log "$*" || true; }
+
+if declare -F clash_require_cmd >/dev/null 2>&1; then
+    clash_require_cmd curl "required for controller API"
+    clash_optional_cmd jq "optional (faster JSON parsing)" || true
+fi
+
+api_get() {
+    if declare -F clash_api_get >/dev/null 2>&1; then
+        clash_api_get "$1" 2>/dev/null
+    else
+        curl -fsS --noproxy '*' --connect-timeout 2 --max-time 4 "$API${1}" 2>/dev/null
+    fi
+}
+
+urlenc() {
+    if declare -F clash_urlencode >/dev/null 2>&1; then
+        clash_urlencode "$1"
+    elif have python3; then
+        python3 - "$1" <<'PY'
+import sys, urllib.parse
+print(urllib.parse.quote(sys.argv[1], safe=''))
+PY
+    else
+        printf '%s' "$1"
+    fi
+}
 
 # 网站分类定义
 declare -A SITE_CATEGORIES
@@ -51,42 +92,45 @@ SITE_CATEGORIES=(
 # 获取可用节点列表
 get_available_nodes() {
     local group="$1"
+    local enc
+    enc=$(urlenc "$group")
     if ! have jq; then
-        curl -fsS "$API/proxies/$group" 2>/dev/null | \
+        api_get "/proxies/$enc" 2>/dev/null | \
             grep -oP '(?<="all":\[)[^\]]+' | tr ',' '\n' | tr -d '"' | grep -v '^$'
         return
     fi
     
-    curl -fsS "$API/proxies/$group" 2>/dev/null | jq -r '.all[]' 2>/dev/null || true
+    api_get "/proxies/$enc" 2>/dev/null | jq -r '.all[]' 2>/dev/null || true
 }
 
 # 测试节点到特定域名的性能
 test_node_performance() {
-    local node="$1" domain="$2" group="${3:-西瓜加速}"
+    local node="$1" domain="$2" _group_unused="${3:-}"
     
     vlog "测试节点 $node 访问 $domain"
-    
-    # 切换到指定节点
-    curl -s -X PUT "$API/proxies/$group" \
-        -H 'Content-Type: application/json' \
-        -d "{\"name\":\"$node\"}" >/dev/null 2>&1 || return 1
-    
-    sleep 2
-    
-    # 测试性能
-    local start_ms end_ms duration http_code success=0
-    start_ms=$(date +%s%3N 2>/dev/null || echo $(($(date +%s) * 1000)))
-    
-    http_code=$(curl -s -o /dev/null -w '%{http_code}' \
-        --connect-timeout 5 --max-time 10 \
-        --proxy "$PROXY" "https://$domain" 2>/dev/null || echo "000")
-    
-    end_ms=$(date +%s%3N 2>/dev/null || echo $(($(date +%s) * 1000)))
-    duration=$((end_ms - start_ms))
-    
-    [[ "$http_code" =~ ^[23] ]] && success=1
-    
-    echo "$node|$domain|$duration|$http_code|$success"
+
+    # Use controller delay API (no group switching; safer for ongoing sessions).
+    local enc_node enc_url resp delay success=0
+    enc_node=$(urlenc "$node")
+    enc_url=$(urlenc "https://$domain")
+    resp=$(api_get "/proxies/${enc_node}/delay?url=${enc_url}&timeout=${DELAY_TIMEOUT_MS}" 2>/dev/null || true)
+
+    delay=""
+    if [[ -n "$resp" ]]; then
+        if have jq; then
+            delay=$(printf '%s' "$resp" | jq -r '.delay // empty' 2>/dev/null || true)
+        else
+            delay=$(printf '%s' "$resp" | sed -n 's/.*"delay"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' | head -n1)
+        fi
+    fi
+
+    if [[ "$delay" =~ ^[0-9]+$ ]] && (( delay > 0 )); then
+        success=1
+    else
+        delay=9999
+    fi
+
+    echo "$node|$domain|$delay|DELAY|$success"
 }
 
 # 分析每个类别的最佳节点
@@ -99,14 +143,18 @@ analyze_category() {
     
     # 获取可用节点
     local nodes
-    mapfile -t nodes < <(get_available_nodes "西瓜加速" | head -n 10)
+    if [[ -z "${NODE_GROUP:-}" ]]; then
+        log "  错误: 未找到可用的 Selector 分组 (请设置 NODE_GROUP)"
+        return 1
+    fi
+    mapfile -t nodes < <(get_available_nodes "$NODE_GROUP" | head -n 10)
     
     if [ ${#nodes[@]} -eq 0 ]; then
         log "  错误: 无可用节点"
         return 1
     fi
     
-    log "  可用节点数: ${#nodes[@]}"
+    log "  可用节点数: ${#nodes[@]} (group=$NODE_GROUP)"
     
     # 为每个节点打分
     declare -A node_scores
@@ -120,7 +168,7 @@ analyze_category() {
         # 测试该节点访问该类别的多个域名
         IFS=',' read -ra domain_list <<< "$domains"
         for domain in "${domain_list[@]:0:3}"; do  # 只测试前3个域名以节省时间
-            result=$(test_node_performance "$node" "$domain" || echo "$node|$domain|9999|000|0")
+            result=$(test_node_performance "$node" "$domain" || echo "$node|$domain|9999|DELAY|0")
             IFS='|' read -r n d lat code succ <<< "$result"
             
             ((test_count++))

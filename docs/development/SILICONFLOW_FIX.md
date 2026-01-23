@@ -38,7 +38,7 @@ https://siliconflow.cn/
 
 ```bash
 # 1. 编辑监控脚本
-cd /home/gw/opt/clash-for-linux-install/vpn-tools
+cd /path/to/clash-for-linux-install/vpn-tools
 nano network_health_monitor.sh
 
 # 2. 找到第107行左右的这一行：
@@ -60,7 +60,7 @@ nano network_health_monitor.sh
 如果您确定正确的地址，可以使用这个命令一键替换：
 
 ```bash
-cd /home/gw/opt/clash-for-linux-install/vpn-tools
+cd /path/to/clash-for-linux-install/vpn-tools
 
 # 替换为V1端点
 sed -i 's|https://api.siliconflow.cn/|https://api.siliconflow.cn/v1|g' network_health_monitor.sh
@@ -121,7 +121,7 @@ chmod +x test_siliconflow.sh
 如果暂时无法确定正确地址，可以临时从监控中移除硅基流动：
 
 ```bash
-cd /home/gw/opt/clash-for-linux-install/vpn-tools
+cd /path/to/clash-for-linux-install/vpn-tools
 nano network_health_monitor.sh
 
 # 找到并注释掉这一行（在前面加#）：
@@ -136,7 +136,7 @@ nano network_health_monitor.sh
 修复后，运行健康检查验证：
 
 ```bash
-cd /home/gw/opt/clash-for-linux-install/vpn-tools
+cd /path/to/clash-for-linux-install/vpn-tools
 ./network_health_monitor.sh
 
 # 查看AI服务部分的输出
@@ -165,7 +165,7 @@ cd /home/gw/opt/clash-for-linux-install/vpn-tools
 ### 示例1: 使用官网首页
 
 ```bash
-cd /home/gw/opt/clash-for-linux-install/vpn-tools
+cd /path/to/clash-for-linux-install/vpn-tools
 nano network_health_monitor.sh
 
 # 第107行修改为：
@@ -175,7 +175,7 @@ nano network_health_monitor.sh
 ### 示例2: 使用V1端点
 
 ```bash
-cd /home/gw/opt/clash-for-linux-install/vpn-tools
+cd /path/to/clash-for-linux-install/vpn-tools
 nano network_health_monitor.sh
 
 # 第107行修改为：

@@ -7,7 +7,9 @@ The goal:
 
 - Clash kernel + system proxy come up automatically after login (and optionally at boot via `loginctl enable-linger`).
 - All terminals see a consistent proxy environment **without running heavy logic on every shell startup**.
-- Developers can still use `clash`, `clashon`, `clashoff`, etc. on demand.
+- Developers can still control the service/proxy **on demand** via `clashctl` (or `bash ~/.local/share/clash/script/clashctl.sh ...`).
+  If you choose to source the helper scripts in an interactive shell, `clashon`/`clashoff` functions are also available
+  (and can affect the *current* shell environment).
 
 This replaces the older pattern where `~/.bashrc` directly sourced `common.sh`/`clashctl.sh` and ran `watch_proxy`
 (or even `clashon`) in every interactive shell.
@@ -58,8 +60,12 @@ We recommend the following model:
    - cheaply exporting `http_proxy` / `HTTPS_PROXY` / `ALL_PROXY` from a small state file (no `yq`, no `systemctl`), or
    - doing nothing at all if you prefer purely system‑level proxy behaviour.
 
-3. **On‑demand control** (e.g. `clash`, `clashon`, `clashoff`) remains available, but the heavy logic only runs
+3. **On‑demand control** (e.g. `clashctl on/off/status`) remains available, but the heavy logic only runs
    when you explicitly call these commands, not on every new shell.
+
+  > Practical note: running `bash ~/.local/share/clash/script/clashctl.sh on/off` updates **system proxy** (GNOME/KDE)
+  > and Git proxy, but it cannot export `http_proxy` into the *parent* shell. For terminal env vars, prefer the
+  > lightweight state-file snippet in section 5.
 
 This is friendlier to IDEs (VS Code, JetBrains), SSH one‑liners, and any workflow that spawns many short‑lived shells.
 
@@ -190,7 +196,7 @@ This gives you a fast startup path that still honours the dynamic mixed port cho
 
 ## 6. Optional: lazy‑load Clash CLI helpers
 
-If you still want `clash`, `clashon`, `clashoff`, etc. available in every shell without paying the cost of sourcing
+If you still want `clashctl` helpers available in every shell without paying the cost of sourcing
 all helper scripts up front, you can use **lazy stubs**:
 
 ```bash

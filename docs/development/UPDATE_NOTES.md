@@ -120,7 +120,7 @@ Google Meet  # Google视频会议
 **使用方法**：
 ```bash
 # 方法1: 直接运行脚本
-cd /home/gw/opt/clash-for-linux-install/vpn-tools
+cd /path/to/clash-for-linux-install/vpn-tools
 ./optimize_all_network.sh
 
 # 方法2: 从仪表盘运行（新增选项7）
@@ -186,7 +186,7 @@ cd /home/gw/opt/clash-for-linux-install/vpn-tools
 
 ## 修改的文件
 
-### 1. `/home/gw/opt/clash-for-linux-install/vpn-tools/network_health_monitor.sh`
+### 1. `/path/to/clash-for-linux-install/vpn-tools/network_health_monitor.sh`
 
 **修改位置**: 行102-110 (check_ai_services函数)
 ```bash
@@ -224,7 +224,7 @@ local services=(
 )
 ```
 
-### 2. `/home/gw/opt/clash-for-linux-install/vpn-tools/network_dashboard.sh`
+### 2. `/path/to/clash-for-linux-install/vpn-tools/network_dashboard.sh`
 
 **修改位置**: 行287-292 (show_quick_actions函数)
 ```bash
@@ -246,7 +246,7 @@ echo -e "  ${GREEN}[7]${RESET} ${BOLD}一键优化全网络${RESET}      ${CYAN}
     ;;
 ```
 
-### 3. `/home/gw/opt/clash-for-linux-install/vpn-tools/optimize_all_network.sh` (新增)
+### 3. `/path/to/clash-for-linux-install/vpn-tools/optimize_all_network.sh` (新增)
 
 **文件大小**: 约10KB
 **行数**: 约350行
@@ -260,7 +260,7 @@ echo -e "  ${GREEN}[7]${RESET} ${BOLD}一键优化全网络${RESET}      ${CYAN}
 
 ```bash
 # 编辑监控脚本
-nano /home/gw/opt/clash-for-linux-install/vpn-tools/network_health_monitor.sh
+nano /path/to/clash-for-linux-install/vpn-tools/network_health_monitor.sh
 
 # 找到第107行左右，修改URL
 "https://api.siliconflow.cn/|硅基流动"
@@ -271,7 +271,7 @@ nano /home/gw/opt/clash-for-linux-install/vpn-tools/network_health_monitor.sh
 ### 快速测试新功能
 
 ```bash
-cd /home/gw/opt/clash-for-linux-install/vpn-tools
+cd /path/to/clash-for-linux-install/vpn-tools
 
 # 1. 测试新的健康检查
 ./network_health_monitor.sh
@@ -295,7 +295,7 @@ ls -lt ~/.local/share/clash/logs/optimize_all_*.log | head -1
 crontab -e
 
 # 添加以下行（每天早上8点自动优化）
-0 8 * * * /home/gw/opt/clash-for-linux-install/vpn-tools/optimize_all_network.sh >> ~/optimize.log 2>&1
+0 8 * * * /path/to/clash-for-linux-install/vpn-tools/optimize_all_network.sh >> ~/optimize.log 2>&1
 ```
 
 ## 性能对比

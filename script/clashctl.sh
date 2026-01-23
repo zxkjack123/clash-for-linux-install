@@ -291,14 +291,24 @@ function clashproxy() {
         _okcat '已关闭系统代理'
         ;;
     status)
-        local system_proxy_status=$("$BIN_YQ" '.system-proxy.enable' "$CLASH_CONFIG_MIXIN" 2>/dev/null)
+        local system_proxy_status
+        system_proxy_status=$("$BIN_YQ" '.system-proxy.enable' "$CLASH_CONFIG_MIXIN" 2>/dev/null)
         [ "$system_proxy_status" = "false" ] && {
             _failcat "系统代理：关闭"
             return 1
         }
+
+        # Compute proxy URLs from runtime (works even when called as an executable, where $http_proxy may be empty)
+        _get_proxy_port
+        local auth http_proxy_addr socks_proxy_addr
+        auth=$("$BIN_YQ" '.authentication[0] // ""' "$CLASH_CONFIG_RUNTIME" 2>/dev/null)
+        [ -n "$auth" ] && auth="$auth@"
+        http_proxy_addr="http://${auth}127.0.0.1:${MIXED_PORT}"
+        socks_proxy_addr="socks5h://${auth}127.0.0.1:${MIXED_PORT}"
+
         _okcat "系统代理：开启
-http_proxy： $http_proxy
-socks_proxy：$all_proxy"
+http_proxy： ${http_proxy_addr}
+socks_proxy：${socks_proxy_addr}"
         ;;
     *)
         cat <<EOF
@@ -514,20 +524,27 @@ _cleanup_probe_fields() {
 function clashsecret() {
     case "$#" in
     0)
-        _okcat "当前密钥：$("$BIN_YQ" '.secret // ""' "$CLASH_CONFIG_RUNTIME")"
-        guard                  运行 runtime 守护巡检
-        health                 输出综合健康评分
+        # Never print secrets. Only report whether a secret is set.
+        local _sec _len
+        _sec="$("$BIN_YQ" -r '.secret // ""' "$CLASH_CONFIG_RUNTIME" 2>/dev/null || echo "")"
+        _len=${#_sec}
+        if [ "$_len" -gt 0 ]; then
+            _okcat "当前密钥：已设置（长度：${_len}）"
+        else
+            _failcat "当前密钥：未设置"
+        fi
         ;;
     1)
-        "$BIN_YQ" -i ".secret = \"$1\"" "$CLASH_CONFIG_MIXIN" || {
+        # Avoid YAML injection by writing via strenv.
+        CLASH_SECRET_NEW="$1" "$BIN_YQ" -i '.secret = strenv(CLASH_SECRET_NEW)' "$CLASH_CONFIG_MIXIN" || {
             _failcat "密钥更新失败，请重新输入"
             return 1
         }
-    _merge_sanitize_restart
+        _merge_sanitize_restart
         _okcat "密钥更新成功，已重启生效"
         ;;
     *)
-        _failcat "密钥不要包含空格或使用引号包围"
+        _failcat "用法：clashsecret [NEW_SECRET]"
         ;;
     esac
 }
@@ -804,7 +821,8 @@ function clashctl() {
         ;;
     metrics)
         # metrics [--cron-install <interval-min>]  (写入 metrics 文件)
-        if [ "$1" = "--cron-install" ]; then
+        shift
+        if [ "${1:-}" = "--cron-install" ]; then
             shift
             local interval=${1:-5}
             grep -qs 'clash metrics' "$CLASH_CRON_TAB" || echo "*/${interval} * * * * $_SHELL -i -c 'clash metrics'" >> "$CLASH_CRON_TAB"
@@ -817,12 +835,12 @@ function clashctl() {
         cat <<EOF
 
 Usage:
-    clash COMMAND  [OPTION]
+    clashctl COMMAND  [OPTION]
 
 Commands:
     on                      开启代理
     off                     关闭代理
-    proxy    [on|off]       系统代理
+    proxy    [on|off|status] 系统代理
     ui                      面板地址
     status                  内核状况
     tun      [on|off]       Tun 模式
@@ -925,7 +943,7 @@ _clash_metrics() {
     local traffic_json conn_json proxies_json up_bytes=0 down_bytes=0 active_conn=0 groups_on_fail=0
     local have_jq=0
     command -v jq >/dev/null 2>&1 && have_jq=1
-    traffic_json=$(curl -s --max-time 1 "${api_base}/traffic" "${auth_header[@]}" || echo '{}')
+    traffic_json=$(curl -s --noproxy '*' --connect-timeout 1 --max-time 1 "${api_base}/traffic" "${auth_header[@]}" || echo '{}')
     if [ $have_jq -eq 1 ]; then
         up_bytes=$(echo "$traffic_json" | jq -r '.up // 0' 2>/dev/null || echo 0)
         down_bytes=$(echo "$traffic_json" | jq -r '.down // 0' 2>/dev/null || echo 0)
@@ -933,13 +951,13 @@ _clash_metrics() {
         up_bytes=$(echo "$traffic_json" | grep -Eo '"up":[0-9]+' | head -n1 | cut -d: -f2 || echo 0)
         down_bytes=$(echo "$traffic_json" | grep -Eo '"down":[0-9]+' | head -n1 | cut -d: -f2 || echo 0)
     fi
-    conn_json=$(curl -s --max-time 1 "${api_base}/connections" "${auth_header[@]}" || echo '{}')
+    conn_json=$(curl -s --noproxy '*' --connect-timeout 1 --max-time 1 "${api_base}/connections" "${auth_header[@]}" || echo '{}')
     if [ $have_jq -eq 1 ]; then
         active_conn=$(echo "$conn_json" | jq -r '.connections | length' 2>/dev/null || echo 0)
     else
         active_conn=$(echo "$conn_json" | grep -Eo '"connections":\[[^]]*\]' | sed -E 's/.*\[(.*)\].*/\1/' | grep -c '{' 2>/dev/null || echo 0)
     fi
-    proxies_json=$(curl -s --max-time 1 "${api_base}/proxies" "${auth_header[@]}" || echo '{}')
+    proxies_json=$(curl -s --noproxy '*' --connect-timeout 1 --max-time 1 "${api_base}/proxies" "${auth_header[@]}" || echo '{}')
     if [ $have_jq -eq 1 ]; then
         groups_on_fail=$(echo "$proxies_json" | jq '[.proxies | to_entries[] | select(.value.type=="Selector" and (.value.now|test("\\[FAIL\\]"))) ] | length' 2>/dev/null || echo 0)
     else
@@ -1080,14 +1098,14 @@ _downgrade_failed_nodes() {
             [ -n "$secret" ] && hdr=(-H "Authorization: Bearer $secret")
             local proxies_json have_jq=0
             command -v jq >/dev/null 2>&1 && have_jq=1
-            proxies_json=$(curl -s --max-time 2 "${api_base}/proxies" "${hdr[@]}" || echo '{}')
+            proxies_json=$(curl -s --noproxy '*' --connect-timeout 1 --max-time 2 "${api_base}/proxies" "${hdr[@]}" || echo '{}')
             if [ $have_jq -eq 1 ]; then
                 echo "$proxies_json" | jq -r '.proxies | to_entries[] | select(.value.type=="Selector") | [.key, .value.now] | @tsv' 2>/dev/null | while IFS=$'\t' read -r name current; do
                     # 构造候选列表 (排除 FAIL 后第一个)
                     local first_good
                     first_good=$(echo "$proxies_json" | jq -r --arg n "$name" '.proxies[$n].all | map(select(test("\\[FAIL\\]")==false))[0] // ""')
                     [ -n "$first_good" ] && [ "$first_good" != "$current" ] && \
-                        curl -s -X PUT "${api_base}/proxies/${name}" -H 'Content-Type: application/json' "${hdr[@]}" \
+                        curl -s --noproxy '*' --connect-timeout 2 --max-time 4 -X PUT "${api_base}/proxies/${name}" -H 'Content-Type: application/json' "${hdr[@]}" \
                             --data "{\"name\":\"$first_good\"}" >/dev/null 2>&1 && _infocat "Selector $name 切换 $current -> $first_good"
                 done
             else
@@ -1108,7 +1126,7 @@ _downgrade_failed_nodes() {
                         fi
                     done
                     if [ -n "$first_good" ] && [ "$current" != "$first_good" ]; then
-                        curl -s -X PUT "${api_base}/proxies/${name}" -H 'Content-Type: application/json' "${hdr[@]}" \
+                        curl -s --noproxy '*' --connect-timeout 2 --max-time 4 -X PUT "${api_base}/proxies/${name}" -H 'Content-Type: application/json' "${hdr[@]}" \
                             --data "{\"name\":\"$first_good\"}" >/dev/null 2>&1 && \
                             _infocat "Selector $name 切换 $current -> $first_good"
                     fi
@@ -1158,7 +1176,10 @@ _fail_nodes() {
 }
 
 # 入口: 放在所有函数之后，确保定义已加载。
-if [[ "${BASH_SOURCE[0]}" == "$0" ]] && [ ${#__CLASHCTL_DEFERRED_ARGS[@]} -gt 0 ]; then
+# When executed as a script, behave like a CLI:
+# - with args: run the requested subcommand
+# - without args: print usage (handled by clashctl's default case)
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
     export CLASH_ERROR_MODE=exit
     clashctl "${__CLASHCTL_DEFERRED_ARGS[@]}"
     exit $?

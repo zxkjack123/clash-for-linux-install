@@ -17,7 +17,7 @@ log(){ printf '[%s] %s\n' "$(date '+%F %T')" "$*" | tee -a "$LOG_FILE"; }
 # Load .env if present (export variables so that CLI overrides still win)
 if [[ -f "${ENV_FILE}" ]]; then
   set -a
-  # shellcheck source=/home/gw/opt/clash-for-linux-install/.env
+  # shellcheck source=../.env
   source "${ENV_FILE}"
   set +a
 fi

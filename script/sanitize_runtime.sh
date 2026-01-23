@@ -28,6 +28,11 @@ TARGET_FILE=""
 YQ_BIN="${BIN_YQ:-$HOME/.local/share/clash/bin/yq}"
 SERVICE="${BIN_KERNEL_NAME:-mihomo}"
 
+# Fallback to system yq if the bundled path is not available.
+if [ ! -x "$YQ_BIN" ] && command -v yq >/dev/null 2>&1; then
+  YQ_BIN="$(command -v yq)"
+fi
+
 read -r -d '' SCNET_PRIORITY_RULES <<'EOF' || true
 DOMAIN,c-1966322474660876290.qdai.scnet.cn,DIRECT
 DOMAIN,c-1996024701209694210.szai.scnet.cn,DIRECT
@@ -41,6 +46,14 @@ EOF
 DRY=false
 RESTART=false
 VERBOSE=false
+
+# Google Scholar often rate-limits/blocks shared DC egress IPs with
+# "We're sorry... automated queries".
+# Strategy (safe-by-default):
+#   - Only add Scholar rules when we can confirm the target proxy-group exists.
+#   - Place them at the top of rules so they override broad DOMAIN-SUFFIX,google.com rules.
+# Override target group with: CLASH_GOOGLE_SCHOLAR_TARGET="<group-name>"
+CLASH_GOOGLE_SCHOLAR_TARGET="${CLASH_GOOGLE_SCHOLAR_TARGET:-}"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dry) DRY=true; shift ;;
@@ -59,12 +72,61 @@ vv(){ $VERBOSE && echo "[debug] $*" >&2 || true; }
 [[ -n "$TARGET_FILE" ]] && RUNTIME="$TARGET_FILE"
 [[ -f "$RUNTIME" ]] || { echo "[ERR] runtime 不存在: $RUNTIME" >&2; exit 1; }
 
+# Detect a safe Scholar target group (only if yq is available)
+GOOGLE_SCHOLAR_TARGET=""
+GOOGLE_SCHOLAR_PRIORITY_RULES=""
+if [ -x "$YQ_BIN" ]; then
+  if [ -n "$CLASH_GOOGLE_SCHOLAR_TARGET" ]; then
+    # honor explicit override only if it exists in proxy-groups
+    if CLASH_GOOGLE_SCHOLAR_TARGET="$CLASH_GOOGLE_SCHOLAR_TARGET" "$YQ_BIN" -e '((.["proxy-groups"] // []) | map(.name) | contains([strenv(CLASH_GOOGLE_SCHOLAR_TARGET)]))' "$RUNTIME" >/dev/null 2>&1; then
+      GOOGLE_SCHOLAR_TARGET="$CLASH_GOOGLE_SCHOLAR_TARGET"
+    else
+      vv "CLASH_GOOGLE_SCHOLAR_TARGET 指定的分组不存在: $CLASH_GOOGLE_SCHOLAR_TARGET (将忽略)"
+    fi
+  fi
+  if [ -z "$GOOGLE_SCHOLAR_TARGET" ]; then
+    # Best-effort auto pick (never guess a non-existent group)
+    GOOGLE_SCHOLAR_TARGET=$("$YQ_BIN" -r '
+      ((.["proxy-groups"] // []) | map(.name)) as $names |
+      if ($names | index("AUTO-SMART")) != null then "AUTO-SMART"
+      elif ($names | index("速云梯")) != null then "速云梯"
+      elif ($names | index("PROXY")) != null then "PROXY"
+      else ""
+      end
+    ' "$RUNTIME" 2>/dev/null || echo "")
+  fi
+  if [ -n "$GOOGLE_SCHOLAR_TARGET" ]; then
+    # Keep rules minimal/specific to avoid affecting other Google services.
+    GOOGLE_SCHOLAR_PRIORITY_RULES=$'DOMAIN,scholar.google.com,'"$GOOGLE_SCHOLAR_TARGET"$'\nDOMAIN-SUFFIX,scholar.googleusercontent.com,'"$GOOGLE_SCHOLAR_TARGET"
+  fi
+fi
+
+# Fallback (no yq): try to detect a safe existing group by plain text.
+# IMPORTANT: Do not inject a rule referencing a non-existent group (mihomo will fail to start).
+if [ -z "$GOOGLE_SCHOLAR_TARGET" ]; then
+  if [ -n "$CLASH_GOOGLE_SCHOLAR_TARGET" ] && grep -qF "name: $CLASH_GOOGLE_SCHOLAR_TARGET" "$RUNTIME" 2>/dev/null; then
+    GOOGLE_SCHOLAR_TARGET="$CLASH_GOOGLE_SCHOLAR_TARGET"
+  else
+    for cand in AUTO-SMART 速云梯 PROXY; do
+      if grep -qF "name: $cand" "$RUNTIME" 2>/dev/null; then
+        GOOGLE_SCHOLAR_TARGET="$cand"
+        break
+      fi
+    done
+  fi
+fi
+
+if [ -z "$GOOGLE_SCHOLAR_PRIORITY_RULES" ] && [ -n "$GOOGLE_SCHOLAR_TARGET" ]; then
+  GOOGLE_SCHOLAR_PRIORITY_RULES=$'DOMAIN,scholar.google.com,'"$GOOGLE_SCHOLAR_TARGET"$'\nDOMAIN-SUFFIX,scholar.googleusercontent.com,'"$GOOGLE_SCHOLAR_TARGET"
+fi
+
 # 预扫描统计
 HIJACK_1=$(grep -E "IP-CIDR,1.1.1.1/32,.*(西瓜加速|PROXY|Proxy|proxy).*no-resolve" -n "$RUNTIME" || true)
 HIJACK_8=$(grep -E "IP-CIDR,8.8.8.8/32,.*(西瓜加速|PROXY|Proxy|proxy).*no-resolve" -n "$RUNTIME" || true)
 HAS_DIRECT_1=$(grep -E "IP-CIDR,1.1.1.1/32,DIRECT,no-resolve" -n "$RUNTIME" || true)
 HAS_DIRECT_8=$(grep -E "IP-CIDR,8.8.8.8/32,DIRECT,no-resolve" -n "$RUNTIME" || true)
 FALLBACK_HAS_IP=$(grep -E "^ *fallback:.*(1.1.1.1|8.8.8.8)" -n "$RUNTIME" || true)
+HAS_SCHOLAR_RULE=$(grep -E "^ *- +DOMAIN,scholar\\.google\\.com," -n "$RUNTIME" || true)
 
 vv "Hijack1: ${HIJACK_1:-<none>}"
 vv "Hijack8: ${HIJACK_8:-<none>}"
@@ -78,6 +140,11 @@ if $DRY; then
   [[ -z "$HAS_DIRECT_1" ]] && echo "将补充: IP-CIDR,1.1.1.1/32,DIRECT,no-resolve (置顶)"
   [[ -z "$HAS_DIRECT_8" ]] && echo "将补充: IP-CIDR,8.8.8.8/32,DIRECT,no-resolve (置顶)"
   [[ -n "$FALLBACK_HAS_IP" ]] && echo "将从 dns.fallback 移除裸 IP: 1.1.1.1 / 8.8.8.8"
+  if [ -n "$GOOGLE_SCHOLAR_PRIORITY_RULES" ]; then
+    [[ -z "$HAS_SCHOLAR_RULE" ]] && echo "将补充(高优先级): DOMAIN,scholar.google.com,${GOOGLE_SCHOLAR_TARGET}"
+  else
+    echo "提示: 未能确定 Google Scholar 的安全分组 (yq 不可用或缺少可用分组)，将不注入 Scholar 规则"
+  fi
   [[ -z "$HIJACK_1$HIJACK_8$FALLBACK_HAS_IP" && -n "$HAS_DIRECT_1$HAS_DIRECT_8" ]] && echo "无修改 (已清洁)"
   exit 0
 fi
@@ -181,6 +248,45 @@ if [ -x "$YQ_BIN" ] && [ -n "$SCNET_PRIORITY_RULES" ]; then
         )))
       )
     ' "$RUNTIME" 2>/dev/null && MODIFIED=true || true
+  fi
+fi
+
+# Google Scholar: ensure rules are placed before broad Google suffix rules.
+# Only inject when the target proxy-group exists (see auto-detection above).
+if [ -x "$YQ_BIN" ] && [ -n "$GOOGLE_SCHOLAR_PRIORITY_RULES" ]; then
+  if "$YQ_BIN" -e '.rules? | length > 0' "$RUNTIME" >/dev/null 2>&1; then
+    PRIORITY_RULES="$GOOGLE_SCHOLAR_PRIORITY_RULES" "$YQ_BIN" -i '
+      .rules = (
+        (strenv(PRIORITY_RULES) | split("\n") | map(select(length > 0)))
+          | map(sub("\\r$"; ""))
+          | map(select(length > 0))
+        as $prio |
+        (
+          (.rules // [])
+          | map(
+              select((test("^DOMAIN,scholar\\.google\\.com,")) | not)
+              | select((test("^DOMAIN-SUFFIX,scholar\\.googleusercontent\\.com,")) | not)
+            )
+        ) as $rest |
+        ($prio + $rest)
+      )
+    ' "$RUNTIME" 2>/dev/null && MODIFIED=true || true
+  fi
+fi
+
+# Text-only fallback: inject Scholar rules at the top of rules: (if yq isn't available).
+if [ ! -x "$YQ_BIN" ] && [ -n "$GOOGLE_SCHOLAR_PRIORITY_RULES" ]; then
+  # Remove any existing Scholar rules (regardless of target) to avoid duplicates/conflicts.
+  sed -i -E \
+    -e '/^\s*-\s*DOMAIN,scholar\.google\.com,/d' \
+    -e '/^\s*-\s*DOMAIN-SUFFIX,scholar\.googleusercontent\.com,/d' \
+    "$RUNTIME" 2>/dev/null || true
+
+  if ! grep -qE '^\s*-\s*DOMAIN,scholar\.google\.com,' "$RUNTIME" 2>/dev/null; then
+    # Insert right after rules: so it overrides broad DOMAIN-SUFFIX,google.com rules.
+    sed -i "/^rules:/a \  - DOMAIN-SUFFIX,scholar.googleusercontent.com,${GOOGLE_SCHOLAR_TARGET}" "$RUNTIME" 2>/dev/null || true
+    sed -i "/^rules:/a \  - DOMAIN,scholar.google.com,${GOOGLE_SCHOLAR_TARGET}" "$RUNTIME" 2>/dev/null || true
+    MODIFIED=true
   fi
 fi
 

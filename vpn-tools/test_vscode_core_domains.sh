@@ -66,6 +66,7 @@ probe() {
   else
     read -r code time < <(
       curl -sS -o /dev/null -w "%{http_code} %{time_total}" \
+        --noproxy '*' \
         --connect-timeout "$DIRECT_CONNECT_TIMEOUT" \
         --max-time "$DIRECT_MAX_TIME" \
         "$url" 2>/dev/null \

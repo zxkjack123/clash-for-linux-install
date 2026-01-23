@@ -6,7 +6,7 @@
 
 **错误示例** ❌:
 ```bash
-api_key="sk-avdenocgxjqjdpuqraipuoqhwnrevydosnprqtflabcxhkrj"
+api_key="sk-EXAMPLE_DO_NOT_USE"
 ```
 
 **正确做法** ✅:
@@ -86,7 +86,7 @@ pip3 install git-filter-repo
 git filter-repo --invert-paths --path AI_SERVICES_UPDATE.md
 
 # 或者替换 API key 为占位符
-git filter-repo --replace-text <(echo 'sk-avdenocgxjqjdpuqraipuoqhwnrevydosnprqtflabcxhkrj==>YOUR_API_KEY_HERE')
+git filter-repo --replace-text <(echo 'sk-EXAMPLE_DO_NOT_USE==>YOUR_API_KEY_HERE')
 
 # 强制推送到远程 (危险操作!)
 git push origin --force --all
@@ -103,7 +103,7 @@ wget https://repo1.maven.org/maven2/com/madgag/bfg/1.14.0/bfg-1.14.0.jar
 java -jar bfg-1.14.0.jar --delete-files AI_SERVICES_UPDATE.md
 
 # 或替换文本
-echo 'sk-avdenocgxjqjdpuqraipuoqhwnrevydosnprqtflabcxhkrj' > passwords.txt
+echo 'sk-EXAMPLE_DO_NOT_USE' > passwords.txt
 java -jar bfg-1.14.0.jar --replace-text passwords.txt
 
 # 清理并推送

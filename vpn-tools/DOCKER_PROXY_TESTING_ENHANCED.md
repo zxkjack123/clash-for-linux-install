@@ -45,8 +45,13 @@ Tests both proxy and direct connections for Chinese services:
 
 ### Run Full Test Suite
 ```bash
-cd /home/gw/opt/clash-for-linux-install/vpn-tools
-./test_docker_proxy.sh
+cd /path/to/clash-for-linux-install/vpn-tools
+
+# Recommended on Linux (works with secure localhost-only controller)
+DOCKER_NET_MODE=host ./test_docker_proxy.sh
+
+# Alternative: bridged networking (requires controller/proxy to listen on non-loopback)
+DOCKER_NET_MODE=bridge ./test_docker_proxy.sh
 ```
 
 ### Focus on Specific Test Categories
@@ -82,11 +87,15 @@ cd /home/gw/opt/clash-for-linux-install/vpn-tools
 ### Clash Configuration
 The following settings must be enabled in your Clash configuration:
 ```yaml
-allow-lan: true
-bind-address: "0.0.0.0"
-external-controller: "0.0.0.0:9090"
 mixed-port: 7890
+# Security default: keep the controller on localhost.
+external-controller: "127.0.0.1:9090"
 ```
+
+On Linux, the easiest secure way to let Docker reach the host proxy/controller is to run the test container with host networking (no need to expose `0.0.0.0`):
+
+- Prefer: Docker `--network host`
+- Only if you *must* access from bridged networks: expose to `0.0.0.0` **and** set a controller `secret` + firewall rules.
 
 ### Automatic Port Detection & Overrides
 
@@ -102,27 +111,38 @@ CLASH_PROXY_PORT=7891 CLASH_API_PORT=9900 ./test_docker_proxy.sh
 Ensure Docker containers can access Clash:
 ```bash
 # Allow Docker networks to access Clash ports
-sudo iptables -I DOCKER-USER -s 172.16.0.0/12 -d 172.28.130.97 -p tcp --dport 7890 -j ACCEPT
-sudo iptables -I DOCKER-USER -s 172.16.0.0/12 -d 172.28.130.97 -p tcp --dport 9090 -j ACCEPT
+sudo iptables -I DOCKER-USER -s 172.16.0.0/12 -d <HOST_IP> -p tcp --dport 7890 -j ACCEPT
+sudo iptables -I DOCKER-USER -s 172.16.0.0/12 -d <HOST_IP> -p tcp --dport 9090 -j ACCEPT
 ```
 
 ## Troubleshooting
 
 ### Common Issues
-1. **Connection Refused**: Check if Clash is binding to 0.0.0.0 instead of 127.0.0.1
+1. **Connection Refused (bridge mode)**: If your controller/proxy is bound to `127.0.0.1`, containers in bridged mode cannot reach it. Prefer `DOCKER_NET_MODE=host`.
 2. **Timeout Errors**: Verify firewall rules allow Docker-to-host communication
-3. **API Errors**: Ensure external-controller is accessible from Docker containers
+3. **API Errors (401 Unauthorized)**: If `runtime.yaml` has `secret`, API calls must include `Authorization: Bearer <secret>` (the test script handles this automatically).
 
 ### Debug Commands
 ```bash
 # Check port bindings
-netstat -tln | grep -E ":(7890|9090)"
+ss -tln | grep -E ":(7890|9090)"
 
-# Test API access from container
-docker run --rm curlimages/curl:latest curl -s http://172.28.130.97:9090/version
+# Test API access from container (Linux host networking)
+docker run --rm --network host curlimages/curl:latest \
+	curl -s http://127.0.0.1:9090/version
 
-# Test proxy connectivity
-docker run --rm curlimages/curl:latest curl -s -x http://172.28.130.97:7890 http://httpbin.org/ip
+# If controller secret is enabled, add:
+#   -H "Authorization: Bearer <CLASH_SECRET>"
+
+# Test proxy connectivity (Linux host networking)
+docker run --rm --network host curlimages/curl:latest \
+	curl -s -x http://127.0.0.1:7890 http://httpbin.org/ip
+
+# Bridged mode examples (replace <HOST_IP> with your host LAN IP)
+docker run --rm curlimages/curl:latest \
+	curl -s http://<HOST_IP>:9090/version
+docker run --rm curlimages/curl:latest \
+	curl -s -x http://<HOST_IP>:7890 http://httpbin.org/ip
 ```
 
 ## Performance Notes

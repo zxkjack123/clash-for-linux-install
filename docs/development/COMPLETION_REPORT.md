@@ -39,7 +39,7 @@
 ```
 **改进**: 成功率提升到75%（3/4），更贴合国内使用场景
 
-**文件**: `/home/gw/opt/clash-for-linux-install/vpn-tools/network_health_monitor.sh`  
+**文件**: `/path/to/clash-for-linux-install/vpn-tools/network_health_monitor.sh`  
 **修改行**: 第104-110行（check_ai_services函数）
 
 ---
@@ -61,7 +61,7 @@
 ```
 **改进**: 保持3个服务，但全部是您常用的类型
 
-**文件**: `/home/gw/opt/clash-for-linux-install/vpn-tools/network_health_monitor.sh`  
+**文件**: `/path/to/clash-for-linux-install/vpn-tools/network_health_monitor.sh`  
 **修改行**: 第161-166行（check_streaming_services函数）
 
 ---
@@ -69,7 +69,7 @@
 ### 3. 新增一键优化功能 🚀
 
 #### 创建的新脚本
-**文件**: `/home/gw/opt/clash-for-linux-install/vpn-tools/optimize_all_network.sh`  
+**文件**: `/path/to/clash-for-linux-install/vpn-tools/optimize_all_network.sh`  
 **大小**: ~10KB  
 **行数**: ~350行
 
@@ -123,7 +123,7 @@
 ### 4. 仪表盘集成
 
 #### 修改的文件
-**文件**: `/home/gw/opt/clash-for-linux-install/vpn-tools/network_dashboard.sh`
+**文件**: `/path/to/clash-for-linux-install/vpn-tools/network_dashboard.sh`
 
 #### 新增快捷键
 ```
@@ -229,7 +229,7 @@ AI服务:     75% 成功率 | 1589ms 平均延迟    ← 提升50%成功率
 
 #### 方案A: 自动测试并修复（推荐）
 ```bash
-cd /home/gw/opt/clash-for-linux-install/vpn-tools
+cd /path/to/clash-for-linux-install/vpn-tools
 ./test_siliconflow_api.sh
 # 脚本会测试所有可能的地址并询问是否自动修复
 ```
@@ -238,14 +238,14 @@ cd /home/gw/opt/clash-for-linux-install/vpn-tools
 如果您知道正确的API地址，例如 `https://siliconflow.cn/`：
 
 ```bash
-cd /home/gw/opt/clash-for-linux-install/vpn-tools
+cd /path/to/clash-for-linux-install/vpn-tools
 sed -i 's|https://api.siliconflow.cn/|https://siliconflow.cn/|g' network_health_monitor.sh
 ./network_health_monitor.sh  # 验证修复
 ```
 
 #### 方案C: 查看修复文档
 ```bash
-cat /home/gw/opt/clash-for-linux-install/SILICONFLOW_FIX.md
+cat /path/to/clash-for-linux-install/SILICONFLOW_FIX.md
 ```
 
 ### 2. 整体延迟偏高
@@ -274,7 +274,7 @@ AI服务平均延迟:   1589ms  (建议<1000ms)
 
 #### 1. 查看当前网络状态
 ```bash
-cd /home/gw/opt/clash-for-linux-install/vpn-tools
+cd /path/to/clash-for-linux-install/vpn-tools
 ./network_dashboard.sh
 ```
 
@@ -294,7 +294,7 @@ cd /home/gw/opt/clash-for-linux-install/vpn-tools
 ./test_siliconflow_api.sh
 
 # 或查看修复指南
-cat /home/gw/opt/clash-for-linux-install/SILICONFLOW_FIX.md
+cat /path/to/clash-for-linux-install/SILICONFLOW_FIX.md
 ```
 
 ### 日常使用
@@ -337,7 +337,7 @@ ls -lt ~/.local/share/clash/logs/health_report_*.md | head -1
 # 手动添加一键优化
 crontab -e
 # 添加：每天早上8点自动优化
-0 8 * * * /home/gw/opt/clash-for-linux-install/vpn-tools/optimize_all_network.sh
+0 8 * * * /path/to/clash-for-linux-install/vpn-tools/optimize_all_network.sh
 ```
 
 ---
@@ -509,7 +509,7 @@ AI服务 (4个)
 
 ```bash
 # 显示仪表盘
-cd /home/gw/opt/clash-for-linux-install/vpn-tools
+cd /path/to/clash-for-linux-install/vpn-tools
 ./network_dashboard.sh
 
 # 一键优化
@@ -519,7 +519,7 @@ cd /home/gw/opt/clash-for-linux-install/vpn-tools
 ./test_siliconflow_api.sh
 
 # 查看文档
-cat /home/gw/opt/clash-for-linux-install/QUICK_START.md
+cat /path/to/clash-for-linux-install/QUICK_START.md
 ```
 
 ---

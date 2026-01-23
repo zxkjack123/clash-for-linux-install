@@ -9,27 +9,20 @@ ROOT_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 
 echo "=== VSCode Copilot 网络优化 ($(date '+%Y-%m-%d %H:%M:%S')) ==="
 
-# Runtime/controller info (support secret + non-default port)
-RUNTIME_FILE="${CLASH_CONFIG_RUNTIME:-$HOME/.local/share/clash/runtime.yaml}"
-YQ_BIN="${BIN_YQ:-$HOME/.local/share/clash/bin/yq}"
+# Load env (optional) and bootstrap controller/secret
+# shellcheck source=/dev/null
+. "${SCRIPT_DIR}/load_env.sh" 2>/dev/null || true
 
-UI_PORT=9090
-API_SECRET=""
-if [ -x "$YQ_BIN" ] && [ -f "$RUNTIME_FILE" ]; then
-    ui_addr=$($YQ_BIN -r '."external-controller" // "127.0.0.1:9090"' "$RUNTIME_FILE" 2>/dev/null || echo '127.0.0.1:9090')
-    ui_addr=$(printf '%s' "$ui_addr" | tr -d "\"'")
-    UI_PORT=${ui_addr##*:}
-    API_SECRET=$($YQ_BIN -r '.secret // ""' "$RUNTIME_FILE" 2>/dev/null || echo '')
-    API_SECRET=$(printf '%s' "$API_SECRET" | tr -d "\"'")
-fi
-
+API="${CLASH_API:-http://127.0.0.1:9090}"
+API="${API%/}"
 AUTH_HDR=()
-[ -n "$API_SECRET" ] && AUTH_HDR=(-H "Authorization: Bearer $API_SECRET")
+_hdr="$(clash_auth_header 2>/dev/null || true)"
+[[ -n "${_hdr:-}" ]] && AUTH_HDR=(-H "${_hdr}")
 
 # 1. 检查 Clash 服务状态
 echo ""
 echo "📡 检查 Clash 服务..."
-if ! curl -s --max-time 2 "${AUTH_HDR[@]}" "http://127.0.0.1:${UI_PORT}/version" >/dev/null 2>&1; then
+if ! curl -fsS --noproxy '*' --connect-timeout 2 --max-time 4 "${AUTH_HDR[@]}" "${API}/version" >/dev/null 2>&1; then
     echo "❌ Clash 服务未运行"
     echo "   (提示) 如果你已启用 controller secret，请确保本脚本能读取 runtime.yaml 中的 secret。"
     exit 1
@@ -73,7 +66,7 @@ test_endpoint "OpenAI API (proxy)" "https://api.openai.com/v1/models"
 # If Copilot endpoints fail via proxy, check direct path and recommend VS Code relaunch with NO_PROXY bypass
 echo ""
 echo "🔍 Copilot endpoint bypass check (direct vs proxy) ..."
-direct_copilot=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 4 --max-time 6 https://api.githubcopilot.com/healthz || echo 000)
+direct_copilot=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 4 --max-time 6 --noproxy '*' https://api.githubcopilot.com/healthz || echo 000)
 proxy_copilot=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 6 --max-time 10 --proxy "$PROXY_URL" https://api.githubcopilot.com/healthz || echo 000)
 echo "  Direct: $direct_copilot  |  Proxy: $proxy_copilot"
 if [[ "$proxy_copilot" == "000" || "$proxy_copilot" == "408" ]] && [[ "$direct_copilot" =~ ^(200|204|301|302|404)$ ]]; then

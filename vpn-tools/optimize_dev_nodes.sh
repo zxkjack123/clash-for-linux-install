@@ -12,8 +12,8 @@ set -euo pipefail
 
 TIMEOUT=${TIMEOUT:-6}
 PROXY=${PROXY:-http://127.0.0.1:7890}
-SOURCE_GROUP=${SOURCE_GROUP:-速云梯}
-APPLY_GROUPS=${APPLY_GROUPS:-GLOBAL,速云梯}
+SOURCE_GROUP=${SOURCE_GROUP:-}
+APPLY_GROUPS=${APPLY_GROUPS:-}
 CANDIDATE_LIMIT=${CANDIDATE_LIMIT:-10}
 SLEEP_AFTER_SWITCH=${SLEEP_AFTER_SWITCH:-2}
 
@@ -31,43 +31,42 @@ TARGETS=(
 
 have() { command -v "$1" >/dev/null 2>&1; }
 
-# --- Controller detection ----------------------------------------------------
-detect_controller() {
-	local runtime="${CLASH_CONFIG_RUNTIME:-$HOME/.local/share/clash/runtime.yaml}"
-	local candidate="" host="" port="" default="http://127.0.0.1:9090"
-	[[ -f "$runtime" ]] || { echo "$default"; return; }
-	if have yq; then
-		candidate=$(yq '."external-controller" // ""' "$runtime" 2>/dev/null || true)
-	fi
-	if [[ -z "$candidate" ]]; then
-		candidate=$(grep -E '^ *external-controller:' "$runtime" 2>/dev/null | tail -n1 | cut -d':' -f2- | tr -d ' "' || true)
-	fi
-	candidate=${candidate//$'\n'/}
-	candidate=${candidate//\"/}
-	candidate=${candidate//\'/}
-	candidate=${candidate//[[:space:]]/}
-	[[ -z "$candidate" ]] && { echo "$default"; return; }
-	if [[ "$candidate" == http*://* ]]; then
-		echo "$candidate"
-		return
-	fi
-	host=${candidate%:*}
-	port=${candidate##*:}
-	[[ -z "$port" ]] && port=9090
-	case "$host" in
-		""|"0.0.0.0"|"::") host=127.0.0.1 ;;
-		*) : ;;
-	esac
-	echo "http://${host}:${port}"
-}
+if declare -F clash_require_cmd >/dev/null 2>&1; then
+	clash_require_cmd curl "required for controller and probe requests"
+	clash_optional_cmd jq "optional (better JSON parsing)" || true
+	clash_optional_cmd python3 "optional (better URL encoding)" || true
+fi
 
-API=${CLASH_API:-$(detect_controller)}
-export CLASH_API="$API"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Load env (optional) and bootstrap controller/secret (env override -> legacy compat -> runtime.yaml -> default)
+# shellcheck source=/dev/null
+. "${SCRIPT_DIR}/load_env.sh" 2>/dev/null || true
+
+clash_env_bootstrap 2>/dev/null || true
+API="${CLASH_API:-http://127.0.0.1:9090}"
+
+# Auto-pick a selector group when SOURCE_GROUP/APPLY_GROUPS are not provided.
+if [[ -z "${SOURCE_GROUP:-}" ]] && declare -F clash_pick_selector_group >/dev/null 2>&1; then
+	SOURCE_GROUP="$(clash_pick_selector_group "速云梯" "西瓜加速" "GLOBAL" "自动选择" "PROXY" 2>/dev/null || true)"
+fi
+if [[ -z "${SOURCE_GROUP:-}" ]]; then
+	echo "ERROR: 无法自动选择可用的 Selector 分组 (请设置 SOURCE_GROUP)" >&2
+	exit 1
+fi
+if [[ -z "${APPLY_GROUPS:-}" ]]; then
+	if [[ "$SOURCE_GROUP" == "GLOBAL" ]]; then
+		APPLY_GROUPS="GLOBAL"
+	else
+		APPLY_GROUPS="GLOBAL,$SOURCE_GROUP"
+	fi
+fi
 
 # --- Helpers -----------------------------------------------------------------
 urlencode() {
 	local raw="$1"
-	if have python3; then
+	if declare -F clash_urlencode >/dev/null 2>&1; then
+		clash_urlencode "$raw"
+	elif have python3; then
 		python3 - "$raw" <<'PY'
 import sys, urllib.parse
 print(urllib.parse.quote(sys.argv[1], safe=''))
@@ -91,7 +90,11 @@ PY
 fetch_proxy_json() {
 	local name="$1" encoded
 	encoded=$(urlencode "$name")
-	curl -fsS "$API/proxies/${encoded}" 2>/dev/null || true
+	if declare -F clash_api_get >/dev/null 2>&1; then
+		clash_api_get "/proxies/${encoded}" 2>/dev/null || true
+	else
+		curl -fsS --noproxy '*' --connect-timeout 2 --max-time 4 "$API/proxies/${encoded}" 2>/dev/null || true
+	fi
 }
 
 get_proxy_type() {
@@ -122,7 +125,11 @@ switch_group_node() {
 	local group="$1" node="$2" payload encoded
 	encoded=$(urlencode "$group")
 	payload=$(printf '{"name":"%s"}' "$node")
-	curl -s -X PUT "$API/proxies/${encoded}" -H 'Content-Type: application/json' -d "$payload" >/dev/null
+	if declare -F clash_api_put_json >/dev/null 2>&1; then
+		clash_api_put_json "/proxies/${encoded}" "$payload" >/dev/null 2>&1 || true
+	else
+		curl -s --noproxy '*' --connect-timeout 2 --max-time 4 -X PUT "$API/proxies/${encoded}" -H 'Content-Type: application/json' -d "$payload" >/dev/null || true
+	fi
 }
 
 test_endpoint() {

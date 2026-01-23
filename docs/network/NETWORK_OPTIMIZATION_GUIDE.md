@@ -23,7 +23,7 @@
 ### 一键部署监控系统
 
 ```bash
-cd /home/gw/opt/clash-for-linux-install/vpn-tools
+cd /path/to/clash-for-linux-install/vpn-tools
 
 # 1. 设置可执行权限
 chmod +x network_health_monitor.sh
@@ -340,7 +340,8 @@ RATE_LIMIT_SECONDS=300
 ./network_health_monitor.sh
 
 # 4. 运行时修复
-bash ../script/runtime_guard.sh --auto-fix
+# 可选加：--alert notify（安全告警模式，会调用 vpn-tools/alert_notification.sh）
+bash ../script/runtime_guard.sh --auto-fix --alert notify
 ```
 
 ### 定期维护
@@ -462,7 +463,7 @@ rules:
 
 **解决**：
 ```bash
-cd /home/gw/opt/clash-for-linux-install/vpn-tools
+cd /path/to/clash-for-linux-install/vpn-tools
 chmod +x *.sh
 ```
 
@@ -533,7 +534,8 @@ bash ../script/runtime_guard.sh --check --report
 ./optimize_ai.sh
 
 # 5. 运行时修复
-bash ../script/runtime_guard.sh --auto-fix
+# 可选加：--alert notify（安全告警模式，会调用 vpn-tools/alert_notification.sh）
+bash ../script/runtime_guard.sh --auto-fix --alert notify
 ```
 
 ### 日志文件位置
@@ -605,7 +607,7 @@ scrape_configs:
     static_configs:
       - targets: ['localhost']
         labels:
-          __metrics_path__: /home/gw/.local/share/clash/metrics/health_metrics.json
+          __metrics_path__: ~/.local/share/clash/metrics/health_metrics.json
 ```
 
 ---

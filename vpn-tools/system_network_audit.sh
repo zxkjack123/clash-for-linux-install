@@ -29,7 +29,15 @@ MODE=standard
 OUT=""
 DO_BANDWIDTH=0
 PROXY=http://127.0.0.1:7890
-CTRL=http://127.0.0.1:9090
+
+# Optional env bootstrap (controller URL + secret)
+SCRIPT_DIR="$(cd "${BASH_SOURCE[0]%/*}" && pwd)"
+if [[ -f "$SCRIPT_DIR/load_env.sh" ]]; then
+  # shellcheck source=/dev/null
+  source "$SCRIPT_DIR/load_env.sh" 2>/dev/null || true
+fi
+
+CTRL="${CLASH_API:-http://127.0.0.1:9090}"
 SECRET="${CLASH_SECRET:-}"
 TIMEOUT=5
 PING_HOSTS=(1.1.1.1 8.8.8.8 47.117.160.189 www.google.com sso.openxlab.org.cn)
@@ -54,8 +62,17 @@ section(){ echo; printf '===== %s =====\n' "$1"; }
 have(){ command -v "$1" >/dev/null 2>&1; }
 now(){ date '+%F %T'; }
 
-curl_silent(){ curl -sS "$@"; }
-ctrl_req(){ local path="$1"; curl -fsS -m 3 -H "Authorization: Bearer $SECRET" "$CTRL$path" 2>/dev/null || echo FAIL; }
+curl_silent(){
+  local t="${TIMEOUT:-5}"
+  local mt=$((t+4))
+  curl -sS --connect-timeout "$t" --max-time "$mt" "$@"
+}
+ctrl_req(){
+  local path="$1"
+  local hdr=()
+  [[ -n "${SECRET:-}" ]] && hdr=(-H "Authorization: Bearer $SECRET")
+  curl -fsS --noproxy '*' --connect-timeout 2 --max-time 3 "${hdr[@]}" "$CTRL$path" 2>/dev/null || echo FAIL
+}
 
 collect_env(){
   section "环境与时间"

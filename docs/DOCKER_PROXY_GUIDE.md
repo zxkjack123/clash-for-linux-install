@@ -1,139 +1,94 @@
-# Docker容器使用Clash代理指南
+# Docker 容器使用 Clash/Mihomo 代理指南
 
-## 配置摘要
+本仓库默认更偏向**安全默认**：代理端口通常只监听在 `127.0.0.1`（避免把本机代理暴露到局域网）。
 
-✅ **Clash代理已配置为允许LAN访问**
-- 监听地址: `0.0.0.0:7890` (所有网络接口)
-- 宿主机IP: `$(hostname -I | awk '{print $1}')`
-- 配置文件已更新:
-  - `/home/gw/.local/share/clash/runtime.yaml` (运行时配置)
-  - `/home/gw/opt/clash-for-linux-install/resources/config.yaml` (源配置)
+因此，Docker 容器要用代理时，首选 **Linux host networking**；只有在必须 bridge 模式时，才考虑显式暴露端口，并配合防火墙。
 
-## 使用方法
+## 推荐（Linux）：host networking（无需开启 allow-lan）
 
-### 方法1: 使用环境变量 (推荐)
+原理：容器与宿主机共享网络栈，容器里访问 `127.0.0.1:7890` 就等于访问宿主机的代理端口。
+
+### docker run
 
 ```bash
-HOST_IP=$(hostname -I | awk '{print $1}')
-
-# HTTP代理
-docker run --rm \
-  -e HTTP_PROXY=http://${HOST_IP}:7890 \
-  -e HTTPS_PROXY=http://${HOST_IP}:7890 \
-  your-image
-
-# 完整示例
-docker run --rm \
-  -e HTTP_PROXY=http://${HOST_IP}:7890 \
-  -e HTTPS_PROXY=http://${HOST_IP}:7890 \
+docker run --rm --network host \
+  -e HTTP_PROXY=http://127.0.0.1:7890 \
+  -e HTTPS_PROXY=http://127.0.0.1:7890 \
   -e NO_PROXY=localhost,127.0.0.1 \
-  curlimages/curl curl https://api.github.com
+  curlimages/curl:latest curl -fsS https://api.github.com
 ```
 
-### 方法2: 使用host.docker.internal
-
-```bash
-docker run --rm \
-  --add-host=host.docker.internal:host-gateway \
-  -e HTTP_PROXY=http://host.docker.internal:7890 \
-  -e HTTPS_PROXY=http://host.docker.internal:7890 \
-  your-image
-```
-
-### 方法3: Docker Compose配置
+### docker compose（仅 Linux）
 
 ```yaml
 version: '3.8'
 services:
   your-service:
     image: your-image
+    network_mode: host
     environment:
-      HTTP_PROXY: http://172.28.130.97:7890
-      HTTPS_PROXY: http://172.28.130.97:7890
+      HTTP_PROXY: http://127.0.0.1:7890
+      HTTPS_PROXY: http://127.0.0.1:7890
       NO_PROXY: localhost,127.0.0.1
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
 ```
 
-### 方法4: 构建时使用代理
+## 可选：bridge 模式（需要显式暴露端口，风险更高）
+
+bridge 模式下，容器无法直接访问宿主机的 `127.0.0.1`。你通常需要：
+
+1) 让 Clash/Mihomo 的 proxy 端口监听在可被容器访问的地址（例如 `0.0.0.0` 或宿主机局域网 IP）；
+2) 用防火墙限制只允许 Docker 网段访问 `7890`。
+
+> ⚠️ 不建议把 `7890` 直接暴露给整个局域网。
+
+### docker run（bridge + host.docker.internal）
 
 ```bash
-docker build \
-  --build-arg HTTP_PROXY=http://${HOST_IP}:7890 \
-  --build-arg HTTPS_PROXY=http://${HOST_IP}:7890 \
-  -t your-image .
-```
-
-## 测试代理连接
-
-```bash
-# 快速测试
-HOST_IP=$(hostname -I | awk '{print $1}')
 docker run --rm \
-  -e HTTP_PROXY=http://${HOST_IP}:7890 \
-  curlimages/curl curl -s http://httpbin.org/ip
-
-# 使用测试脚本
-cd /home/gw/opt/clash-for-linux-install/vpn-tools
-bash test_docker_proxy.sh
+  --add-host=host.docker.internal:host-gateway \
+  -e HTTP_PROXY=http://host.docker.internal:7890 \
+  -e HTTPS_PROXY=http://host.docker.internal:7890 \
+  -e NO_PROXY=localhost,127.0.0.1 \
+  curlimages/curl:latest curl -fsS https://api.github.com
 ```
 
-## 验证配置
+### 防火墙建议（示例）
 
 ```bash
-# 检查Clash监听端口
-ss -tlnp | grep 7890
-# 应该显示: *:7890 (而不是 127.0.0.1:7890)
-
-# 检查allow-lan配置
-grep "allow-lan" /home/gw/.local/share/clash/runtime.yaml
-# 应该显示: allow-lan: true
+# 仅允许 Docker 私网访问 7890（网段请按实际 Docker network 调整）
+sudo iptables -I DOCKER-USER -s 172.16.0.0/12 -p tcp --dport 7890 -j ACCEPT
+sudo iptables -I DOCKER-USER -p tcp --dport 7890 -j DROP
 ```
 
-## 常见问题
+## 验证
 
-### Q: 容器无法访问代理?
-A: 确认以下几点:
-1. Clash服务正在运行: `ps aux | grep mihomo`
-2. 端口监听在所有接口: `ss -tlnp | grep 7890` 应显示 `*:7890`
-3. 防火墙没有阻止7890端口
-4. 使用正确的宿主机IP地址
+在宿主机检查端口监听（显示 `127.0.0.1:7890` 或 `*:7890` 都可能是正常，取决于你的配置/模式）：
 
-### Q: 某些容器需要直连?
-A: 使用NO_PROXY环境变量排除某些域名:
 ```bash
--e NO_PROXY=localhost,127.0.0.1,.local,.internal,openxlab.org.cn
+ss -tlnp | grep ':7890'
 ```
 
-### Q: 需要恢复只监听本地?
-A: 修改配置并重启:
-```bash
-sed -i 's/^allow-lan: true/allow-lan: false/' /home/gw/.local/share/clash/runtime.yaml
-kill -HUP $(pgrep mihomo)
-```
+容器侧验证：
 
-## 安全建议
+- host networking：`--network host` 后直接用 `127.0.0.1:7890`。
+- bridge：用 `host.docker.internal:7890` 或 `<HOST_IP>:7890`（仅在端口确实对外监听时）。
 
-⚠️ **重要**: 启用LAN访问后，局域网内其他设备也可以使用此代理。如果这不是你想要的:
+## 恢复安全默认（建议）
 
-1. 使用防火墙限制访问:
-```bash
-# 只允许Docker网桥访问
-sudo iptables -A INPUT -p tcp --dport 7890 -s 172.17.0.0/16 -j ACCEPT
-sudo iptables -A INPUT -p tcp --dport 7890 -j DROP
-```
+如你之前为了 bridge 模式临时放开了监听，建议事后恢复为仅本机：
 
-2. 或使用bind-address限制监听接口:
-在config.yaml中添加:
-```yaml
-bind-address: "172.17.0.1"  # Docker网桥IP
-```
+- `allow-lan: false`
+- `bind-address: "127.0.0.1"`
+
+然后重新合并/重启生效（安装后推荐使用 `clashctl`）：
+
+> `clashctl mixin -e` 会打开 mixin 配置并在保存后自动合并 + 重启。
 
 ## 相关工具
 
-- `test_docker_proxy.sh` - 完整的Docker代理测试套件
-- `docker_proxy_demo.sh` - Docker代理使用演示
-- `quick_vpn_check.sh` - VPN和代理快速检查
+- `vpn-tools/test_docker_proxy.sh`：Docker 代理完整测试（支持 controller `secret`）
+- `vpn-tools/docker_proxy_demo.sh`：Docker 代理演示
+- `vpn-tools/quick_vpn_check.sh`：VPN/代理快速检查
 
 ---
-更新日期: 2025-11-18
+更新日期: 2026-01-19

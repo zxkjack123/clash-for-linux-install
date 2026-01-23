@@ -20,6 +20,20 @@
 echo "🔄 Restarting Clash/Mihomo Service with Updated Configuration"
 echo "==========================================================="
 
+set -euo pipefail
+
+APPLY=0
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --apply|--yes) APPLY=1; shift;;
+        -h|--help)
+            echo "Usage: $0 [--apply]" >&2
+            echo "  --apply  Actually back up config and restart mihomo.service" >&2
+            exit 0;;
+        *) echo "Unknown arg: $1" >&2; exit 2;;
+    esac
+done
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -32,6 +46,17 @@ NC='\033[0m'
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 
+# Optional env bootstrap (controller URL + secret)
+if [[ -f "$ROOT_DIR/vpn-tools/load_env.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "$ROOT_DIR/vpn-tools/load_env.sh" 2>/dev/null || true
+fi
+
+API="${CLASH_API:-http://127.0.0.1:9090}"
+AUTH_HDR=()
+_hdr="$(clash_auth_header 2>/dev/null || true)"
+[[ -n "${_hdr:-}" ]] && AUTH_HDR=(-H "${_hdr}")
+
 # Configuration paths
 CONFIG_DIR="$ROOT_DIR/resources"
 CONFIG_FILE="$CONFIG_DIR/config.yaml"
@@ -43,24 +68,28 @@ echo "• Main config: $CONFIG_FILE"
 echo "• Mixin config: $MIXIN_FILE"
 echo ""
 
-# Step 1: Create backup
+# Step 1: Create backup (apply mode only)
 echo "💾 Creating configuration backup..."
-mkdir -p "$BACKUP_DIR"
-timestamp=$(date +"%Y%m%d_%H%M%S")
-
-if [ -f "$CONFIG_FILE" ]; then
-    cp "$CONFIG_FILE" "$BACKUP_DIR/config_${timestamp}.yaml"
-    echo -e "${GREEN}✅ Main config backed up${NC}"
+if [[ $APPLY -ne 1 ]]; then
+    echo -e "${YELLOW}ℹ️ Preview mode: skipping backup creation (use --apply to proceed).${NC}"
 else
-    echo -e "${RED}❌ Main config file not found${NC}"
-    exit 1
-fi
+    mkdir -p "$BACKUP_DIR"
+    timestamp=$(date +"%Y%m%d_%H%M%S")
 
-if [ -f "$MIXIN_FILE" ]; then
-    cp "$MIXIN_FILE" "$BACKUP_DIR/mixin_${timestamp}.yaml"
-    echo -e "${GREEN}✅ Mixin config backed up${NC}"
-else
-    echo -e "${YELLOW}⚠️ Mixin config file not found${NC}"
+    if [ -f "$CONFIG_FILE" ]; then
+        cp "$CONFIG_FILE" "$BACKUP_DIR/config_${timestamp}.yaml"
+        echo -e "${GREEN}✅ Main config backed up${NC}"
+    else
+        echo -e "${RED}❌ Main config file not found${NC}"
+        exit 1
+    fi
+
+    if [ -f "$MIXIN_FILE" ]; then
+        cp "$MIXIN_FILE" "$BACKUP_DIR/mixin_${timestamp}.yaml"
+        echo -e "${GREEN}✅ Mixin config backed up${NC}"
+    else
+        echo -e "${YELLOW}⚠️ Mixin config file not found${NC}"
+    fi
 fi
 
 echo ""
@@ -104,7 +133,7 @@ else
 fi
 
 # Check if API is accessible
-if curl -s http://127.0.0.1:9090/version >/dev/null 2>&1; then
+if curl -fsS --noproxy '*' --connect-timeout 2 --max-time 3 "${AUTH_HDR[@]}" "$API/version" >/dev/null 2>&1; then
     echo -e "${GREEN}✅ Clash API is accessible${NC}"
     API_STATUS="accessible"
 else
@@ -113,6 +142,12 @@ else
 fi
 
 echo ""
+
+if [[ $APPLY -ne 1 ]]; then
+    echo -e "${CYAN}🧪 Preview summary:${NC} service=$CURRENT_STATUS, controller=$API_STATUS"
+    echo -e "${CYAN}To actually restart mihomo.service, re-run with: --apply${NC}"
+    exit 0
+fi
 
 # Step 4: Restart the service
 echo "🔄 Restarting mihomo service..."
@@ -167,7 +202,7 @@ retries=0
 max_retries=10
 
 while [ $retries -lt $max_retries ]; do
-    if curl -s http://127.0.0.1:9090/version >/dev/null 2>&1; then
+    if curl -fsS --noproxy '*' --connect-timeout 2 --max-time 3 "${AUTH_HDR[@]}" "$API/version" >/dev/null 2>&1; then
         echo -e "${GREEN}✅ Clash API is accessible${NC}"
         break
     else
@@ -200,8 +235,8 @@ echo "================================="
 
 # Test current proxy groups
 echo "📊 Current proxy groups:"
-AI_NODE=$(curl -s http://127.0.0.1:9090/proxies/AI | jq -r '.now' 2>/dev/null || echo "Unknown")
-STREAMING_NODE=$(curl -s http://127.0.0.1:9090/proxies/Streaming | jq -r '.now' 2>/dev/null || echo "Unknown")
+AI_NODE=$(curl -fsS --noproxy '*' --connect-timeout 2 --max-time 4 "${AUTH_HDR[@]}" "$API/proxies/AI" 2>/dev/null | jq -r '.now' 2>/dev/null || echo "Unknown")
+STREAMING_NODE=$(curl -fsS --noproxy '*' --connect-timeout 2 --max-time 4 "${AUTH_HDR[@]}" "$API/proxies/Streaming" 2>/dev/null | jq -r '.now' 2>/dev/null || echo "Unknown")
 echo "🤖 AI Group: $AI_NODE"
 echo "🎬 Streaming Group: $STREAMING_NODE"
 
@@ -220,14 +255,12 @@ domains=(
 for domain in "${domains[@]}"; do
     echo -n "📍 Testing $domain: "
     
-    response=$(timeout 8 curl -s -o /dev/null -w "%{http_code},%{time_total}" \
+    if response=$(timeout 8 curl -s -o /dev/null -w "%{http_code},%{time_total}" \
         --connect-timeout 5 --max-time 8 \
-        "https://$domain/" 2>/dev/null)
-    
-    if [ $? -eq 0 ]; then
-        http_code=$(echo $response | cut -d',' -f1)
-        time_total=$(echo $response | cut -d',' -f2)
-        
+        "https://$domain/" 2>/dev/null); then
+        http_code=$(echo "$response" | cut -d',' -f1)
+        time_total=$(echo "$response" | cut -d',' -f2)
+
         if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 400 ]; then
             echo -e "${GREEN}✅ OK${NC} (HTTP $http_code, ${time_total}s)"
         else
@@ -253,11 +286,9 @@ ai_domains=(
 for domain in "${ai_domains[@]}"; do
     echo -n "🧠 Testing $domain: "
     
-    response=$(timeout 8 curl -s -o /dev/null -w "%{http_code}" \
+    if response=$(timeout 8 curl -s -o /dev/null -w "%{http_code}" \
         --connect-timeout 5 --max-time 8 \
-        "https://$domain/" 2>/dev/null)
-    
-    if [ $? -eq 0 ]; then
+        "https://$domain/" 2>/dev/null); then
         if [ "$response" -ge 200 ] && [ "$response" -lt 400 ]; then
             echo -e "${GREEN}✅ OK${NC} (HTTP $response)"
         else

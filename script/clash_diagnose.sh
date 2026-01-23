@@ -33,6 +33,16 @@ for a in "$@"; do
   esac
 done
 
+# When JSON mode is enabled, keep stdout clean for machine parsing:
+# - human-readable report -> stderr
+# - JSON summary -> original stdout (fd 3)
+JSON_OUT_FD=1
+if [ $JSON -eq 1 ]; then
+  exec 3>&1
+  exec 1>&2
+  JSON_OUT_FD=3
+fi
+
 log(){ printf '[diag] %s\n' "$*" >&2; }
 dbg(){ [ $VERBOSE -eq 1 ] && log "DEBUG: $*" || true; }
 
@@ -190,7 +200,7 @@ if [ $JSON -eq 1 ]; then
   # append exit_status
   if [ $first -eq 0 ]; then json_out+=","; fi
   json_out+="\"exit_status\":$STATUS}"
-  printf '%s\n' "$json_out"
+  printf '%s\n' "$json_out" >&"$JSON_OUT_FD"
 fi
 
 exit $STATUS

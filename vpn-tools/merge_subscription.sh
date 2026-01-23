@@ -3,12 +3,12 @@
 set -euo pipefail
 CURRENT="resources/config.yaml"
 NEW_FILE=""; SUB_URL=""; OUTPUT=""; APPLY=0
-AUTO_APPEND=0; GROUPS="西瓜加速,自动选择,故障转移"
+AUTO_APPEND=0; GROUPS="GLOBAL,自动选择,故障转移"
 log(){ printf '[%s] %s\n' "$(date +%H:%M:%S)" "$*" >&2; }; fail(){ log "ERROR: $*"; exit 3; }
 while [[ $# -gt 0 ]]; do case $1 in --current) CURRENT="$2"; shift 2;; --new) NEW_FILE="$2"; shift 2;; --url) SUB_URL="$2"; shift 2;; --output) OUTPUT="$2"; shift 2;; --apply) APPLY=1; shift;; --auto-append-new) AUTO_APPEND=1; shift;; --groups) GROUPS="$2"; shift 2;; -h|--help) grep -E '^# ' "$0"|sed 's/^# \?//'; exit 0;; *) fail "未知参数: $1";; esac; done
 [[ -f $CURRENT ]] || fail "当前配置不存在: $CURRENT"
 TMP_DIR=$(mktemp -d /tmp/merge_sub_clean.XXXXXX); trap 'rm -rf "$TMP_DIR"' EXIT
-if [[ -n $SUB_URL ]]; then command -v curl >/dev/null 2>&1 || fail "需要 curl"; NEW_FILE="$TMP_DIR/sub.yaml"; log "下载订阅: $SUB_URL"; curl -fsSL --retry 2 --connect-timeout 8 "$SUB_URL" -o "$NEW_FILE" || fail "下载失败"; fi
+if [[ -n $SUB_URL ]]; then command -v curl >/dev/null 2>&1 || fail "需要 curl"; NEW_FILE="$TMP_DIR/sub.yaml"; safe_url=$(printf '%s' "$SUB_URL" | sed -E 's#^(https?://)[^/@]+@#\1***@#' | sed -E 's/([?&](token|access_token|apikey|api_key|key|secret)=)[^&#]*/\1***/gI'); log "下载订阅: $safe_url"; curl -fsSL --retry 2 --connect-timeout 8 --max-time 30 "$SUB_URL" -o "$NEW_FILE" || fail "下载失败"; fi
 [[ -n $NEW_FILE && -f $NEW_FILE ]] || fail "未提供新订阅文件"
 OLD_P="$TMP_DIR/old.yaml"; NEW_P="$TMP_DIR/new.yaml"
 extract(){ awk '/^proxies:/{f=1;print;next} /^[A-Za-z0-9_-]+:/{if(f)exit} f{print}' "$1" > "$2"; grep -q '^proxies:' "$2" || fail "缺少 proxies 段: $1"; }

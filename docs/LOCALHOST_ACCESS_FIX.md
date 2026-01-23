@@ -31,17 +31,12 @@ no_proxy=localhost,127.0.0.1,::1,0.0.0.0,*.local,.localhost,.local,ts.net,.ts.ne
 ```
 
 ### 3. 更新的文件
-- `/home/gw/opt/clash-for-linux-install/script/clashctl.sh` (源文件)
-- `/home/gw/.local/share/clash/script/clashctl.sh` (运行时文件)
+- `script/clashctl.sh` (仓库源文件)
+- `~/.local/share/clash/script/clashctl.sh` (安装后的运行时文件)
 
 ## 验证配置
 
-运行诊断脚本:
-```bash
-bash /tmp/test_localhost_access.sh
-```
-
-或手动验证:
+手动验证:
 ```bash
 # 检查环境变量
 echo $no_proxy
@@ -50,7 +45,7 @@ echo $no_proxy
 gsettings get org.gnome.system.proxy ignore-hosts
 
 # 测试访问
-curl -I http://localhost:8080
+curl -I --noproxy '*' http://localhost:8080
 ```
 
 ## 浏览器配置建议
@@ -92,13 +87,15 @@ curl -I http://localhost:8080
 如果修改了配置文件后需要重新加载:
 
 ```bash
-# 方法1: 重新加载代理设置
-source /home/gw/.local/share/clash/script/common.sh
-source /home/gw/.local/share/clash/script/clashctl.sh
-clashon
+# 重新应用“系统代理/ignore-hosts/no_proxy state”（推荐）
+bash ~/.local/share/clash/script/clashctl.sh proxy on
 
-# 方法2: 在新终端中自动加载
-# 关闭当前终端，打开新终端（会自动加载.bashrc）
+# 如果内核服务未运行，可先启动：
+# bash ~/.local/share/clash/script/clashctl.sh on
+
+# 注意：上述命令会更新 GNOME/KDE 代理设置与 Git 代理。
+# 若你希望 bash/zsh 里也自动拥有 http_proxy/ALL_PROXY，请参考：
+# docs/development/CLASH_PROXY_STARTUP_BEST_PRACTICES.md
 ```
 
 ## 服务管理
@@ -188,8 +185,8 @@ nslookup your-device.tail69c12a.ts.net
 ## 配置持久化
 
 修改已经持久化到源文件，下次系统重启或更新clash配置后仍然生效:
-- ✅ `/home/gw/opt/clash-for-linux-install/script/clashctl.sh`
-- ✅ `/home/gw/.local/share/clash/script/clashctl.sh`
+- ✅ `script/clashctl.sh`
+- ✅ `~/.local/share/clash/script/clashctl.sh`
 
 ## 附加的本地地址绕过规则
 

@@ -25,6 +25,20 @@
 echo "🧠 Braintrust.dev AI Services Connectivity Test"
 echo "==============================================="
 
+set -uo pipefail
+
+# Optional env bootstrap (controller URL + secret)
+SCRIPT_DIR="$(cd "${BASH_SOURCE[0]%/*}" && pwd)"
+if [[ -f "$SCRIPT_DIR/load_env.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "$SCRIPT_DIR/load_env.sh" 2>/dev/null || true
+fi
+
+API="${CLASH_API:-http://127.0.0.1:9090}"
+AUTH_HDR=()
+_hdr="$(clash_auth_header 2>/dev/null || true)"
+[[ -n "${_hdr:-}" ]] && AUTH_HDR=(-H "${_hdr}")
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -50,7 +64,11 @@ declare -A TEST_SITES=(
 
 # Get current AI group
 echo "📊 Current Configuration:"
-CURRENT_AI_NODE=$(curl -s http://127.0.0.1:9090/proxies/AI | jq -r '.now')
+if command -v jq >/dev/null 2>&1; then
+    CURRENT_AI_NODE=$(curl -fsS --noproxy '*' --connect-timeout 2 --max-time 4 "${AUTH_HDR[@]}" "$API/proxies/AI" 2>/dev/null | jq -r '.now' 2>/dev/null || echo "Unknown")
+else
+    CURRENT_AI_NODE=$(curl -fsS --noproxy '*' --connect-timeout 2 --max-time 4 "${AUTH_HDR[@]}" "$API/proxies/AI" 2>/dev/null | sed -n 's/.*"now":"\([^"]*\)".*/\1/p' || echo "Unknown")
+fi
 echo "🤖 AI Group: $CURRENT_AI_NODE"
 echo ""
 
@@ -115,7 +133,11 @@ echo ""
 echo "🔍 Available AI Nodes for Optimization:"
 echo "======================================="
 
-AI_NODES=$(curl -s http://127.0.0.1:9090/proxies/AI | jq -r '.all[]' | grep -E "(美国|新加坡|日本|台湾|越南).*GPT")
+if command -v jq >/dev/null 2>&1; then
+    AI_NODES=$(curl -fsS --noproxy '*' --connect-timeout 2 --max-time 5 "${AUTH_HDR[@]}" "$API/proxies/AI" 2>/dev/null | jq -r '.all[]' 2>/dev/null | grep -E "(美国|新加坡|日本|台湾|越南).*GPT" || true)
+else
+    AI_NODES=$(curl -fsS --noproxy '*' --connect-timeout 2 --max-time 5 "${AUTH_HDR[@]}" "$API/proxies/AI" 2>/dev/null | tr ',' '\n' | sed 's/[\[\]"]//g' | grep -E "(美国|新加坡|日本|台湾|越南).*GPT" || true)
+fi
 
 if [ -z "$AI_NODES" ]; then
     echo "❌ No AI nodes found. Please check your proxy configuration."
@@ -165,12 +187,5 @@ echo ""
 echo "📚 Get help:"
 echo "   ./show_help.sh ai"
 
-# Optional: Offer immediate optimization
 echo ""
-read -p "🤖 Would you like to run AI optimization now? (y/N): " -n 1 -r
-echo ""
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo "🚀 Running AI optimization..."
-    echo ""
-    ./optimize_ai.sh
-fi
+echo "💡 If you'd like to optimize now, run: ./optimize_ai.sh"

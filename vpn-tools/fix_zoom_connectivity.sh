@@ -14,12 +14,43 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Load env (optional) and bootstrap controller/secret (env override -> legacy compat -> runtime.yaml -> default)
+# shellcheck source=/dev/null
+. "${SCRIPT_DIR}/load_env.sh" 2>/dev/null || true
+
+clash_env_bootstrap 2>/dev/null || true
+
 API=${CLASH_API:-http://127.0.0.1:9090}
 PROXY=${PROXY:-http://127.0.0.1:7890}
 TIMEOUT=${TIMEOUT:-6}
-GROUP=${GROUP:-Streaming}
+GROUP=${GROUP:-}
+APPLY=0
 
-arg=${1:-}
+usage(){
+  cat <<EOF
+One-click Zoom diagnose/repair (preview by default).
+
+Usage:
+  $0 [--apply] [--group NAME] [--proxy URL] [--timeout SEC] [meeting_url|host]
+
+Notes:
+  - Without --apply, this script may temporarily switch nodes to probe, then restores the original selection.
+  - With --apply, it will keep the best candidate node selected in the target group.
+EOF
+}
+
+arg=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --apply) APPLY=1; shift;;
+    --group) GROUP="$2"; shift 2;;
+    --proxy) PROXY="$2"; shift 2;;
+    --timeout) TIMEOUT="$2"; shift 2;;
+    -h|--help) usage; exit 0;;
+    *) arg="$1"; shift; break;;
+  esac
+done
 
 have(){ command -v "$1" >/dev/null 2>&1; }
 err(){ echo "[ERROR] $*" >&2; }
@@ -98,17 +129,35 @@ test_zoom_basic(){
 
 # 3) If API reachable, prepare node list under GROUP
 api_up=0
-if curl -fsS "$API/version" >/dev/null 2>&1; then api_up=1; else info "Clash API not reachable; skip auto-switch"; fi
+if declare -F clash_api_get >/dev/null 2>&1; then
+  if clash_api_get /version >/dev/null 2>&1; then api_up=1; else info "Clash API not reachable; skip auto-switch"; fi
+else
+  if curl -fsS --noproxy '*' --connect-timeout 2 --max-time 4 "$API/version" >/dev/null 2>&1; then api_up=1; else info "Clash API not reachable; skip auto-switch"; fi
+fi
+
+group_enc="$GROUP"
+if declare -F clash_urlencode >/dev/null 2>&1 && [[ -n "${GROUP:-}" ]]; then
+  group_enc="$(clash_urlencode "$GROUP")"
+fi
 
 switch_node(){ # name
-  local name="$1"
-  curl -s -X PUT "$API/proxies/$GROUP" -H 'Content-Type: application/json' -d '{"name":"'"$name"'"}' >/dev/null
+  local name="$1" payload
+  payload=$(printf '{"name":"%s"}' "$name")
+  if declare -F clash_api_put_json >/dev/null 2>&1; then
+    clash_api_put_json "/proxies/$group_enc" "$payload" >/dev/null 2>&1 || return 1
+  else
+    curl -s --noproxy '*' --connect-timeout 2 --max-time 4 -X PUT "$API/proxies/$group_enc" -H 'Content-Type: application/json' -d "$payload" >/dev/null || return 1
+  fi
 }
 
 get_nodes(){
   if ! ((api_up)); then return; fi
   local j
-  j=$(curl -fsS "$API/proxies/$GROUP" || true)
+  if declare -F clash_api_get >/dev/null 2>&1; then
+    j=$(clash_api_get "/proxies/$group_enc" 2>/dev/null || true)
+  else
+    j=$(curl -fsS --noproxy '*' --connect-timeout 2 --max-time 4 "$API/proxies/$group_enc" 2>/dev/null || true)
+  fi
   if [[ -z "$j" ]]; then return; fi
   if have jq; then
     echo "$j" | jq -r '.all[]'
@@ -129,6 +178,18 @@ echo "Score: $score"
 if (( api_up )); then
   echo
   echo "Step 2: Auto-switch within $GROUP to find a working node"
+  if [[ -z "${GROUP:-}" ]] && declare -F clash_pick_selector_group >/dev/null 2>&1; then
+    GROUP="$(clash_pick_selector_group "Streaming" "STREAMING" "YOUTUBE" "YouTube" "MEDIA" "流媒体" 2>/dev/null || true)"
+  fi
+  GROUP=${GROUP:-Streaming}
+  group_enc="$GROUP"
+  if declare -F clash_urlencode >/dev/null 2>&1 && [[ -n "${GROUP:-}" ]]; then
+    group_enc="$(clash_urlencode "$GROUP")"
+  fi
+  original=""
+  if declare -F clash_group_now >/dev/null 2>&1; then
+    original="$(clash_group_now "$GROUP" 2>/dev/null || true)"
+  fi
   mapfile -t nodes < <(get_nodes)
   if ((${#nodes[@]}==0)); then
     info "No nodes found in group $GROUP";
@@ -151,9 +212,16 @@ if (( api_up )); then
       fi
     done
     if [[ -n "$best_node" ]]; then
-      echo "Applying best node: $best_node"
-      switch_node "$best_node"; sleep 1
-      ok "Switched $GROUP -> $best_node"
+      if (( APPLY == 1 )); then
+        echo "Applying best node: $best_node"
+        switch_node "$best_node"; sleep 1
+        ok "Switched $GROUP -> $best_node"
+      else
+        info "(preview) Best candidate: $best_node (run with --apply to keep it)"
+        if [[ -n "${original:-}" ]]; then
+          switch_node "$original" >/dev/null 2>&1 || true
+        fi
+      fi
     else
       info "No passing node found in quick probe"
     fi

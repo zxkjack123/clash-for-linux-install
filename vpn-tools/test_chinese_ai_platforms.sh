@@ -23,6 +23,32 @@
 echo "🇨🇳 Chinese AI Platforms Connectivity Test"
 echo "==========================================="
 
+set -uo pipefail
+
+APPLY=0
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --apply|--yes) APPLY=1; shift;;
+        -h|--help)
+            echo "Usage: $0 [--apply]" >&2
+            echo "  --apply  Allow node switching and apply best node to AI group" >&2
+            exit 0;;
+        *) echo "Unknown arg: $1" >&2; exit 2;;
+    esac
+done
+
+# Optional env bootstrap (controller URL + secret)
+SCRIPT_DIR="$(cd "${BASH_SOURCE[0]%/*}" && pwd)"
+if [[ -f "$SCRIPT_DIR/load_env.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "$SCRIPT_DIR/load_env.sh" 2>/dev/null || true
+fi
+
+API="${CLASH_API:-http://127.0.0.1:9090}"
+AUTH_HDR=()
+_hdr="$(clash_auth_header 2>/dev/null || true)"
+[[ -n "${_hdr:-}" ]] && AUTH_HDR=(-H "${_hdr}")
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -46,8 +72,13 @@ declare -A CHINESE_AI_SITES=(
 
 # Get current configuration
 echo "📊 Current Network Configuration:"
-CURRENT_AI_NODE=$(curl -s http://127.0.0.1:9090/proxies/AI | jq -r '.now')
-CURRENT_STREAMING_NODE=$(curl -s http://127.0.0.1:9090/proxies/Streaming | jq -r '.now')
+if command -v jq >/dev/null 2>&1; then
+    CURRENT_AI_NODE=$(curl -fsS --noproxy '*' --connect-timeout 2 --max-time 4 "${AUTH_HDR[@]}" "$API/proxies/AI" 2>/dev/null | jq -r '.now' 2>/dev/null || echo "Unknown")
+    CURRENT_STREAMING_NODE=$(curl -fsS --noproxy '*' --connect-timeout 2 --max-time 4 "${AUTH_HDR[@]}" "$API/proxies/Streaming" 2>/dev/null | jq -r '.now' 2>/dev/null || echo "Unknown")
+else
+    CURRENT_AI_NODE=$(curl -fsS --noproxy '*' --connect-timeout 2 --max-time 4 "${AUTH_HDR[@]}" "$API/proxies/AI" 2>/dev/null | sed -n 's/.*"now":"\([^"]*\)".*/\1/p' || echo "Unknown")
+    CURRENT_STREAMING_NODE=$(curl -fsS --noproxy '*' --connect-timeout 2 --max-time 4 "${AUTH_HDR[@]}" "$API/proxies/Streaming" 2>/dev/null | sed -n 's/.*"now":"\([^"]*\)".*/\1/p' || echo "Unknown")
+fi
 echo "🤖 AI Group: $CURRENT_AI_NODE"
 echo "🎬 Streaming Group: $CURRENT_STREAMING_NODE"
 echo ""
@@ -126,6 +157,15 @@ echo ""
 echo "🎯 Node Optimization for Chinese AI Platforms:"
 echo "=============================================="
 
+if [[ $APPLY -ne 1 ]]; then
+    echo "ℹ️ Preview mode: not switching nodes and not applying any changes." 
+    echo "   Re-run with --apply to test China-friendly nodes and set the best one." 
+    echo ""
+    echo "🔗 OpenXLab login URL (query params redacted):"
+    echo "https://sso.openxlab.org.cn/mineru-login?redirect=<redacted>"
+    exit 0
+fi
+
 # Test different nodes specifically for Chinese AI access
 CHINA_FRIENDLY_NODES=(
     "V1-香港01"
@@ -144,11 +184,17 @@ best_score=0
 
 for node in "${CHINA_FRIENDLY_NODES[@]}"; do
     # Check if node exists
-    if curl -s http://127.0.0.1:9090/proxies/AI | jq -r '.all[]' | grep -q "$node"; then
+    if command -v jq >/dev/null 2>&1; then
+        exists=$(curl -fsS --noproxy '*' --connect-timeout 2 --max-time 6 "${AUTH_HDR[@]}" "$API/proxies/AI" 2>/dev/null | jq -r '.all[]' 2>/dev/null | grep -q "$node" && echo 1 || echo 0)
+    else
+        exists=$(curl -fsS --noproxy '*' --connect-timeout 2 --max-time 6 "${AUTH_HDR[@]}" "$API/proxies/AI" 2>/dev/null | tr ',' '\n' | sed 's/[\[\]"]//g' | grep -q "$node" && echo 1 || echo 0)
+    fi
+
+    if [[ $exists -eq 1 ]]; then
         echo "🧪 Testing node: $node"
         
         # Switch to test node
-        curl -X PUT http://127.0.0.1:9090/proxies/AI \
+        curl -fsS --noproxy '*' --connect-timeout 2 --max-time 6 -X PUT "${AUTH_HDR[@]}" "$API/proxies/AI" \
             -H "Content-Type: application/json" \
             -d "{\"name\":\"$node\"}" >/dev/null 2>&1
         
@@ -204,7 +250,7 @@ if [ -n "$best_node" ] && [ $best_score -gt 0 ]; then
     echo ""
     
     echo "🎯 Setting AI group to optimal node: $best_node"
-    curl -X PUT http://127.0.0.1:9090/proxies/AI \
+    curl -fsS --noproxy '*' --connect-timeout 2 --max-time 6 -X PUT "${AUTH_HDR[@]}" "$API/proxies/AI" \
         -H "Content-Type: application/json" \
         -d "{\"name\":\"$best_node\"}" >/dev/null 2>&1
     
@@ -243,7 +289,7 @@ fi
 echo ""
 echo "🔗 SPECIFIC URL TO TRY:"
 echo "====================="
-echo "https://sso.openxlab.org.cn/mineru-login?redirect=https://mineru.net/OpenSourceTools/Extractor/?clientId=4m2wonemkv2rm37nwen8&source=minerU"
+echo "https://sso.openxlab.org.cn/mineru-login?redirect=<redacted>"
 echo ""
 echo "⚡ Quick Commands:"
 echo "================"

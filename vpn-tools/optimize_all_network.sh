@@ -9,42 +9,54 @@ BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PARENT_DIR="$(dirname "$BASE_DIR")"
 LOG_FILE="$HOME/.local/share/clash/logs/optimize_all_$(date +%Y%m%d_%H%M%S).log"
 
-detect_controller() {
-    local runtime="${CLASH_CONFIG_RUNTIME:-$HOME/.local/share/clash/runtime.yaml}"
-    local candidate="" host="" port="" default="http://127.0.0.1:9090"
-    [[ -f "$runtime" ]] || { echo "$default"; return; }
-    if command -v yq >/dev/null 2>&1; then
-        candidate=$(yq '."external-controller" // ""' "$runtime" 2>/dev/null || true)
-    fi
-    if [[ -z "$candidate" ]]; then
-        candidate=$(grep -E '^ *external-controller:' "$runtime" 2>/dev/null | tail -n1 | cut -d':' -f2- | tr -d ' "' || true)
-    fi
-    candidate=${candidate//$'\n'/}
-    candidate=${candidate//\"/}
-    candidate=${candidate//\'/}
-    candidate=${candidate//[[:space:]]/}
-    [[ -z "$candidate" ]] && { echo "$default"; return; }
-    if [[ "$candidate" == http*://* ]]; then
-        echo "$candidate"
-        return
-    fi
-    host=${candidate%:*}
-    port=${candidate##*:}
-    [[ -z "$port" ]] && port=9090
-    case "$host" in
-        ""|"0.0.0.0"|"::") host=127.0.0.1 ;;
-        *) : ;;
-    esac
-    echo "http://${host}:${port}"
-}
+# Load env (optional) and bootstrap controller/secret (env override -> legacy compat -> runtime.yaml -> default)
+# shellcheck source=/dev/null
+if [[ -f "$BASE_DIR/load_env.sh" ]]; then
+    source "$BASE_DIR/load_env.sh" || true
+fi
 
-API=${CLASH_API:-$(detect_controller)}
+clash_env_bootstrap 2>/dev/null || true
+
+API="${CLASH_API:-http://127.0.0.1:9090}"
 export CLASH_API="$API"
 
-# 加载环境变量配置（.env文件）
-if [[ -f "$BASE_DIR/load_env.sh" ]]; then
-    source "$BASE_DIR/load_env.sh"
-fi
+SERVICE="${BIN_KERNEL_NAME:-mihomo}"
+
+# Safety policy: no disruptive actions by default.
+AUTO_START_SERVICE=false
+
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --start-service|--auto-start)
+                AUTO_START_SERVICE=true
+                shift
+                ;;
+            -h|--help)
+                cat <<EOF
+Usage: $0 [--start-service]
+
+  --start-service   If Clash/Mihomo is not active, attempt to start it (systemctl --user start ...)
+
+By default, this script will NOT start or restart services automatically.
+EOF
+                exit 0
+                ;;
+            *)
+                echo "Unknown arg: $1" >&2
+                echo "Run with --help for usage." >&2
+                exit 2
+                ;;
+        esac
+    done
+}
+
+AUTH_HDR=()
+_hdr="$(clash_auth_header 2>/dev/null || true)"
+[[ -n "${_hdr:-}" ]] && AUTH_HDR=(-H "${_hdr}")
+
+CURL_CTRL_OPTS=(--noproxy '*' --connect-timeout 2 --max-time 4)
+PROXY="${PROXY:-http://127.0.0.1:7890}"
 
 # 颜色输出
 RED='\033[0;31m'
@@ -86,21 +98,28 @@ EOF
 check_clash_status() {
     log_info "检查Clash服务状态..."
     
-    if ! systemctl --user is-active mihomo &>/dev/null; then
-        log_error "Clash服务未运行，尝试启动..."
-        if systemctl --user start mihomo; then
-            log_success "Clash服务启动成功"
-            sleep 3
+    if ! systemctl --user is-active "$SERVICE" &>/dev/null; then
+        if $AUTO_START_SERVICE; then
+            log_warn "Clash服务未运行，--start-service 已启用，尝试启动..."
+            if systemctl --user start "$SERVICE"; then
+                log_success "Clash服务启动成功"
+                sleep 3
+            else
+                log_error "无法启动Clash服务，请手动检查"
+                return 1
+            fi
         else
-            log_error "无法启动Clash服务，请手动检查"
+            log_error "Clash服务未运行 (为避免默认副作用，本脚本不会自动启动服务)"
+            log_info "你可以手动启动: systemctl --user start $SERVICE"
+            log_info "或使用本脚本的 --start-service 允许自动启动"
             return 1
         fi
     else
         log_success "Clash服务运行正常"
     fi
     
-    if curl -fsS "$API/version" >/dev/null 2>&1; then
-        local version=$(curl -s "$API/version" | grep -oP '"version":"\K[^"]+' || echo "未知")
+    if curl -fsS "${CURL_CTRL_OPTS[@]}" "${AUTH_HDR[@]}" "$API/version" >/dev/null 2>&1; then
+        local version=$(curl -s "${CURL_CTRL_OPTS[@]}" "${AUTH_HDR[@]}" "$API/version" | grep -oP '"version":"\K[^"]+' || echo "未知")
         log_success "Clash API可访问 (版本: $version)"
     else
         log_error "Clash API不可访问"
@@ -186,7 +205,7 @@ optimize_dev() {
     
     # 检查GitHub连接
     log_info "测试GitHub连接..."
-    if timeout 10 curl -fsS --proxy http://127.0.0.1:7890 https://api.github.com >/dev/null 2>&1; then
+    if timeout 10 curl -fsS --proxy "$PROXY" https://api.github.com >/dev/null 2>&1; then
         log_success "GitHub连接正常"
     else
         log_warn "GitHub连接异常，建议切换节点"
@@ -194,7 +213,7 @@ optimize_dev() {
     
     # 检查NPM连接
     log_info "测试NPM连接..."
-    if timeout 10 curl -fsS --proxy http://127.0.0.1:7890 https://registry.npmjs.org >/dev/null 2>&1; then
+    if timeout 10 curl -fsS --proxy "$PROXY" https://registry.npmjs.org >/dev/null 2>&1; then
         log_success "NPM连接正常"
     else
         log_warn "NPM连接异常"
@@ -202,7 +221,7 @@ optimize_dev() {
     
     # 检查PyPI连接
     log_info "测试PyPI连接..."
-    if timeout 10 curl -fsS --proxy http://127.0.0.1:7890 https://pypi.org >/dev/null 2>&1; then
+    if timeout 10 curl -fsS --proxy "$PROXY" https://pypi.org >/dev/null 2>&1; then
         log_success "PyPI连接正常"
     else
         log_warn "PyPI连接异常"
@@ -251,7 +270,7 @@ check_domestic() {
         ((total++))
         
         log_info "测试 $name..."
-        if timeout 10 curl -fsS "$url" >/dev/null 2>&1; then
+        if timeout 10 curl -fsS --noproxy '*' "$url" >/dev/null 2>&1; then
             log_success "$name 连接正常"
             ((success++))
         else
@@ -316,6 +335,7 @@ show_summary() {
 
 # 主流程
 main() {
+    parse_args "$@"
     show_banner
     
     # 检查服务状态

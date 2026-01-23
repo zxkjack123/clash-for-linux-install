@@ -13,7 +13,16 @@ set -euo pipefail
 ROOT_DIR="$(cd "${BASH_SOURCE[0]%/*}" && pwd)"
 cd "$ROOT_DIR"
 
-API="http://127.0.0.1:9090"
+# Optional env bootstrap (controller URL + secret)
+if [[ -f "$ROOT_DIR/load_env.sh" ]]; then
+	# shellcheck source=/dev/null
+	source "$ROOT_DIR/load_env.sh" 2>/dev/null || true
+fi
+
+API="${CLASH_API:-http://127.0.0.1:9090}"
+AUTH_HDR=()
+_hdr="$(clash_auth_header 2>/dev/null || true)"
+[[ -n "${_hdr:-}" ]] && AUTH_HDR=(-H "${_hdr}")
 PORT_TEST_URL="https://www.google.com" # generic reachability
 
 have() { command -v "$1" >/dev/null 2>&1; }
@@ -22,7 +31,7 @@ info() { echo "[INFO] $*" >&2; }
 
 check_basics() {
 	for b in curl; do have "$b" || { err "Missing dependency: $b"; exit 1; }; done
-	if ! curl -fsS "$API/version" >/dev/null 2>&1; then
+	if ! curl -fsS --noproxy '*' --connect-timeout 2 --max-time 3 "${AUTH_HDR[@]}" "$API/version" >/dev/null 2>&1; then
 		err "Clash controller not reachable at $API (start service?)"; return 0
 	fi
 }

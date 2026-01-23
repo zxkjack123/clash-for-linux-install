@@ -26,14 +26,27 @@ HISTORY_LOG="$LOG_DIR/health_history.log"
 HEALTH_METRICS="$METRICS_DIR/health_metrics.json"
 
 # 加载环境变量配置（.env文件）
+# 备注：监控脚本应尽量“保守”，不要因可选环境文件缺失/异常而直接退出。
 if [[ -f "$BASE_DIR/load_env.sh" ]]; then
-    source "$BASE_DIR/load_env.sh"
+    # shellcheck source=/dev/null
+    source "$BASE_DIR/load_env.sh" || true
 fi
 
-API=${CLASH_API:-http://127.0.0.1:9090}
+# Controller address/secret are bootstrapped by load_env.sh (env override -> legacy compat -> runtime.yaml -> default).
+API="${CLASH_API:-http://127.0.0.1:9090}"
+AUTH_HDR=()
+_hdr="$(clash_auth_header 2>/dev/null || true)"
+[[ -n "${_hdr:-}" ]] && AUTH_HDR=(-H "${_hdr}")
+CURL_CTRL_OPTS=(--connect-timeout 2 --max-time 4)
+
 PROXY=${PROXY:-http://127.0.0.1:7890}
+# systemd --user unit name (override via .env if your kernel/service name differs)
+SERVICE=${BIN_KERNEL_NAME:-mihomo}
 CHECK_INTERVAL=600  # 10分钟
 ALERT_SCRIPT="$BASE_DIR/alert_notification.sh"
+
+# Optional overrides (avoid editing scripts; prefer .env)
+SILICONFLOW_URL=${SILICONFLOW_URL:-https://siliconflow.cn/}
 
 # 阈值配置
 LATENCY_WARN=500      # 延迟警告阈值(ms)
@@ -46,7 +59,8 @@ MIN_HEALTH_SCORE=60   # 最低健康分数
 MODE="once"
 CHECK_ONLY=false
 REPORT_ONLY=false
-AUTO_FIX=true
+# Safety-first default: do NOT change routing/service unless explicitly requested.
+AUTO_FIX=false
 
 # 初始化
 mkdir -p "$LOG_DIR" "$METRICS_DIR"
@@ -68,16 +82,24 @@ check_clash_service() {
     local status="OK"
     local msg=""
     
-    if ! systemctl --user is-active mihomo &>/dev/null; then
+    if ! systemctl --user is-active "$SERVICE" &>/dev/null; then
         status="CRITICAL"
         msg="Clash服务未运行"
         return 1
     fi
     
-    if ! curl -fsS "$API/version" >/dev/null 2>&1; then
-        status="CRITICAL"
-        msg="Clash API不可访问"
-        return 1
+    if declare -F clash_api_get >/dev/null 2>&1; then
+        if ! clash_api_get /version >/dev/null 2>&1; then
+            status="CRITICAL"
+            msg="Clash API不可访问"
+            return 1
+        fi
+    else
+        if ! curl -fsS --noproxy '*' "${CURL_CTRL_OPTS[@]}" "${AUTH_HDR[@]}" "$API/version" >/dev/null 2>&1; then
+            status="CRITICAL"
+            msg="Clash API不可访问"
+            return 1
+        fi
     fi
     
     echo "$status|$msg"
@@ -96,7 +118,7 @@ test_url() {
             --proxy "$PROXY" "$url" 2>/dev/null || echo "000")
     else
         http_code=$(curl -s -o /dev/null -w '%{http_code}' --connect-timeout 5 --max-time 10 \
-            "$url" 2>/dev/null || echo "000")
+            --noproxy '*' "$url" 2>/dev/null || echo "000")
     fi
     end_ms=$(date +%s%3N)
     duration_ms=$((end_ms - start_ms))
@@ -118,7 +140,7 @@ check_ai_services() {
         "https://chat.openai.com/|ChatGPT"
         "https://api.scnet.cn/api/llm/v1/chat/completions|SCNET|^(20[0-9]|401|403|405)$"
         "https://sg.uiuiapi.com/|UIUI-API|^(20[0-9]|30[12378])$"
-        "https://siliconflow.cn/|硅基流动|^(20[0-9]|30[0-9])$||direct"
+        "${SILICONFLOW_URL}|硅基流动|^(20[0-9]|30[0-9])$||direct"
         "https://openrouter.ai/api/v1|OpenRouter|^(20[0-9]|401|403)$"
         "https://kimi.moonshot.cn/|Kimi"
     )
@@ -298,13 +320,13 @@ trigger_auto_fix() {
         "ai_fail")
             if [ -x "$BASE_DIR/optimize_ai.sh" ]; then
                 log "执行AI优化..."
-                "$BASE_DIR/optimize_ai.sh" &>>"$LOG_DIR/auto_fix.log" || true
+                "$BASE_DIR/optimize_ai.sh" --apply &>>"$LOG_DIR/auto_fix.log" || true
             fi
             ;;
         "streaming_fail")
             if [ -x "$BASE_DIR/select_youtube_node.sh" ]; then
                 log "执行流媒体优化..."
-                "$BASE_DIR/select_youtube_node.sh" &>>"$LOG_DIR/auto_fix.log" || true
+                "$BASE_DIR/select_youtube_node.sh" --apply &>>"$LOG_DIR/auto_fix.log" || true
             fi
             ;;
         "runtime_issues")
@@ -315,7 +337,7 @@ trigger_auto_fix() {
             ;;
         "service_down")
             log "尝试重启服务..."
-            systemctl --user restart mihomo || true
+            systemctl --user restart "$SERVICE" || true
             sleep 5
             ;;
     esac
@@ -512,6 +534,11 @@ while [[ $# -gt 0 ]]; do
             MODE="daemon"
             shift
             ;;
+        --auto-fix)
+            AUTO_FIX=true
+            CHECK_ONLY=false
+            shift
+            ;;
         --check-only)
             CHECK_ONLY=true
             AUTO_FIX=false
@@ -538,6 +565,7 @@ while [[ $# -gt 0 ]]; do
 
 选项:
   --daemon, -d        后台守护模式
+    --auto-fix           显式启用自动修复/切换/重启（默认关闭，避免影响 Copilot 连接）
   --check-only        仅检查不修复
   --report, -r        生成详细报告
   --no-fix            禁用自动修复
@@ -546,6 +574,7 @@ while [[ $# -gt 0 ]]; do
 
 示例:
   $0                  # 运行一次检查
+    $0 --auto-fix        # 运行一次检查并允许自动修复
   $0 --daemon         # 后台守护模式
   $0 --report         # 生成报告
   $0 --check-only     # 仅检查不修复

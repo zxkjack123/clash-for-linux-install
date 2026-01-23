@@ -87,7 +87,7 @@ AI服务:    100% (4/4) | 1651ms
 
 ## 修改的文件
 
-**文件**: `/home/gw/opt/clash-for-linux-install/vpn-tools/network_health_monitor.sh`
+**文件**: `/path/to/clash-for-linux-install/vpn-tools/network_health_monitor.sh`
 
 **修改位置**: 第104-110行
 
@@ -136,7 +136,7 @@ local services=(
 
 ### 测试命令
 ```bash
-cd /home/gw/opt/clash-for-linux-install/vpn-tools
+cd /path/to/clash-for-linux-install/vpn-tools
 ./network_health_monitor.sh
 ```
 

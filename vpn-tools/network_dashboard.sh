@@ -24,7 +24,24 @@ if [[ -f "$BASE_DIR/load_env.sh" ]]; then
     source "$BASE_DIR/load_env.sh"
 fi
 
-API=${CLASH_API:-http://127.0.0.1:9090}
+clash_env_bootstrap 2>/dev/null || true
+
+# Controller address/secret are bootstrapped by load_env.sh (env override -> legacy compat -> runtime.yaml -> default).
+API="${CLASH_API:-http://127.0.0.1:9090}"
+SERVICE="${BIN_KERNEL_NAME:-mihomo}"
+
+api_get() {
+    if declare -F clash_api_get >/dev/null 2>&1; then
+        clash_api_get "$1" 2>/dev/null
+    else
+        local hdr=()
+        if declare -p AUTH_HDR >/dev/null 2>&1; then
+            hdr=("${AUTH_HDR[@]}")
+        fi
+        curl -fsS --noproxy '*' --connect-timeout 2 --max-time 4 "${hdr[@]}" "$API${1}" 2>/dev/null
+    fi
+}
+
 WATCH_MODE=false
 REFRESH_INTERVAL=10
 
@@ -93,33 +110,49 @@ show_system_overview() {
     # Clash服务状态
     local service_status="●"
     local service_color="${RED}"
-    if systemctl --user is-active mihomo &>/dev/null; then
+    local active
+    active=$(systemctl --user is-active "$SERVICE" 2>/dev/null || echo 'inactive')
+    if [ "$active" = "active" ]; then
         service_status="●"
         service_color="${GREEN}"
     fi
-    echo -e "  Clash服务:    ${service_color}${service_status}${RESET} $(systemctl --user is-active mihomo 2>/dev/null || echo 'inactive')"
+    echo -e "  Clash服务:    ${service_color}${service_status}${RESET} ${active}"
     
     # API状态
     local api_status="✗"
     local api_color="${RED}"
-    if curl -fsS "$API/version" >/dev/null 2>&1; then
+    local ver_json
+    ver_json=$(api_get "/version" 2>/dev/null || true)
+    if [[ -n "$ver_json" ]]; then
         api_status="✓"
         api_color="${GREEN}"
-        local version=$(curl -fsS "$API/version" 2>/dev/null | grep -oP '"version":"[^"]+' | cut -d'"' -f4 || echo "unknown")
+        local version=$(printf '%s' "$ver_json" | grep -oP '"version":"[^"]+' | cut -d'"' -f4 || echo "unknown")
         echo -e "  API状态:      ${api_color}${api_status}${RESET} $version"
     else
         echo -e "  API状态:      ${api_color}${api_status}${RESET} 不可访问"
     fi
     
-    # 当前节点
-    if curl -fsS "$API/proxies/西瓜加速" >/dev/null 2>&1; then
-        local current_node
-        if have jq; then
-            current_node=$(curl -fsS "$API/proxies/西瓜加速" 2>/dev/null | jq -r '.now' 2>/dev/null || echo "unknown")
+    # 当前节点（自动选择一个可用的 Selector 分组展示，避免硬编码旧分组名）
+    local status_group=""
+    if declare -F clash_pick_selector_group >/dev/null 2>&1; then
+        status_group="$(clash_pick_selector_group "西瓜加速" "速云梯" "GLOBAL" "自动选择" "PROXY" 2>/dev/null || true)"
+    fi
+    if [[ -n "$status_group" ]]; then
+        local current_node=""
+        if declare -F clash_group_now >/dev/null 2>&1; then
+            current_node="$(clash_group_now "$status_group" 2>/dev/null || true)"
         else
-            current_node=$(curl -fsS "$API/proxies/西瓜加速" 2>/dev/null | grep -oP '"now":"[^"]+' | cut -d'"' -f4 || echo "unknown")
+            local enc
+            if declare -F clash_urlencode >/dev/null 2>&1; then
+                enc="$(clash_urlencode "$status_group")"
+            elif command -v python3 >/dev/null 2>&1; then
+                enc=$(python3 -c 'import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1],safe=""))' "$status_group")
+            else
+                enc="$status_group"
+            fi
+            current_node=$(api_get "/proxies/${enc}" 2>/dev/null | grep -oP '"now":"[^"]+' | cut -d'"' -f4 || echo "unknown")
         fi
-        echo -e "  当前节点:     ${CYAN}$current_node${RESET}"
+        [[ -n "$current_node" ]] && echo -e "  当前节点:     ${CYAN}$current_node${RESET} (${status_group})"
     fi
     
     # 运行时间
@@ -320,19 +353,34 @@ execute_action() {
             ;;
         5)
             echo "重启Clash服务..."
-            systemctl --user restart mihomo
+            read -r -p "确认重启 ${SERVICE}？(y/N): " ans
+            if [[ "$ans" =~ ^[Yy]$ ]]; then
+                systemctl --user restart "$SERVICE"
+            else
+                echo "已取消"
+            fi
             ;;
         6)
             echo "运行时修复..."
-            bash "$PARENT_DIR/script/runtime_guard.sh" --auto-fix
+            read -r -p "确认执行运行时修复（可能重启服务）？(y/N): " ans
+            if [[ "$ans" =~ ^[Yy]$ ]]; then
+                bash "$PARENT_DIR/script/runtime_guard.sh" --auto-fix
+            else
+                echo "已取消"
+            fi
             ;;
         7)
             echo "🚀 一键优化全网络..."
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            if [ -x "$BASE_DIR/optimize_all_network.sh" ]; then
-                "$BASE_DIR/optimize_all_network.sh"
+            read -r -p "确认执行一键优化？(y/N): " ans
+            if [[ "$ans" =~ ^[Yy]$ ]]; then
+                if [ -x "$BASE_DIR/optimize_all_network.sh" ]; then
+                    "$BASE_DIR/optimize_all_network.sh"
+                else
+                    echo "错误: 优化脚本不存在或不可执行"
+                fi
             else
-                echo "错误: 优化脚本不存在或不可执行"
+                echo "已取消"
             fi
             ;;
         q|Q)
@@ -345,7 +393,7 @@ execute_action() {
     esac
     
     echo ""
-    read -p "按回车键继续..." -r
+    read -r -p "按回车键继续..."
 }
 
 # 显示完整仪表盘
@@ -382,7 +430,7 @@ watch_dashboard() {
 interactive_mode() {
     while true; do
         show_dashboard
-        read -p "请选择操作: " -n 1 -r action
+        read -r -n 1 -p "请选择操作: " action
         echo ""
         
         [ "$action" = "q" ] || [ "$action" = "Q" ] && break
@@ -399,7 +447,15 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --interval)
+            if [[ $# -lt 2 ]]; then
+                echo "ERROR: --interval requires seconds" >&2
+                exit 2
+            fi
             REFRESH_INTERVAL="$2"
+            if ! [[ "$REFRESH_INTERVAL" =~ ^[0-9]+$ ]] || [ "$REFRESH_INTERVAL" -lt 1 ]; then
+                echo "ERROR: --interval must be a positive integer" >&2
+                exit 2
+            fi
             shift 2
             ;;
         -h|--help)

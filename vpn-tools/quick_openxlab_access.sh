@@ -7,7 +7,22 @@
 #   Automatically handles proxy bypass and browser configuration
 #
 # USAGE:
-#   ./quick_openxlab_access.sh
+#   ./quick_openxlab_access.sh           # print URLs only (safe default)
+#   ./quick_openxlab_access.sh --open    # actually launch browser
+
+set -euo pipefail
+
+OPEN=0
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --open) OPEN=1; shift;;
+        -h|--help)
+            grep -E '^#' "$0" | head -n 40
+            exit 0
+            ;;
+        *) echo "Unknown arg: $1" >&2; exit 2;;
+    esac
+done
 
 echo "🎯 OpenXLab/MinerU Quick Access"
 echo "==============================="
@@ -39,30 +54,37 @@ for name in "${!urls[@]}"; do
     ((count++))
 done
 
-echo "🚀 Auto-launching MinerU login page..."
-echo ""
+if [[ $OPEN -ne 1 ]]; then
+    echo "ℹ️ Preview mode: not launching a browser. Re-run with --open to launch automatically."
+    echo ""
+fi
 
 # Try to open the specific MinerU URL
 minerU_url="https://sso.openxlab.org.cn/mineru-login?redirect=https://mineru.net/OpenSourceTools/Extractor/?clientId=4m2wonemkv2rm37nwen8&source=minerU"
 
-# Try different browsers
-if command -v firefox >/dev/null 2>&1; then
-    echo "🦊 Opening in Firefox..."
-    firefox --new-window "$minerU_url" >/dev/null 2>&1 &
-    echo "✅ Firefox launched"
-elif command -v google-chrome >/dev/null 2>&1; then
-    echo "🌐 Opening in Chrome..."
-    google-chrome --new-window "$minerU_url" >/dev/null 2>&1 &
-    echo "✅ Chrome launched"
-elif command -v chromium-browser >/dev/null 2>&1; then
-    echo "🌐 Opening in Chromium..."
-    chromium-browser --new-window "$minerU_url" >/dev/null 2>&1 &
-    echo "✅ Chromium launched"
+if [[ $OPEN -eq 1 ]]; then
+  # Try different browsers
+  if command -v firefox >/dev/null 2>&1; then
+      echo "🦊 Opening in Firefox..."
+      firefox --new-window "$minerU_url" >/dev/null 2>&1 &
+      echo "✅ Firefox launched"
+  elif command -v google-chrome >/dev/null 2>&1; then
+      echo "🌐 Opening in Chrome..."
+      google-chrome --new-window "$minerU_url" >/dev/null 2>&1 &
+      echo "✅ Chrome launched"
+  elif command -v chromium-browser >/dev/null 2>&1; then
+      echo "🌐 Opening in Chromium..."
+      chromium-browser --new-window "$minerU_url" >/dev/null 2>&1 &
+      echo "✅ Chromium launched"
+  else
+      echo "❌ No supported browser found"
+      echo ""
+      echo "📋 Please manually copy and paste this URL:"
+      echo "$minerU_url"
+  fi
 else
-    echo "❌ No supported browser found"
-    echo ""
-    echo "📋 Please manually copy and paste this URL:"
-    echo "$minerU_url"
+  echo "📋 MinerU login URL:"
+  echo "$minerU_url"
 fi
 
 echo ""

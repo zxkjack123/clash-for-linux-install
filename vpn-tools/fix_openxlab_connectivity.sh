@@ -19,6 +19,32 @@
 echo "🔧 OpenXLab/MinerU Connectivity Fix"
 echo "=================================="
 
+set -uo pipefail
+
+APPLY=0
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --apply|--yes) APPLY=1; shift;;
+        -h|--help)
+            echo "Usage: $0 [--apply]" >&2
+            echo "  --apply  Create helper files (Desktop shortcut, /tmp browser script)" >&2
+            exit 0;;
+        *) echo "Unknown arg: $1" >&2; exit 2;;
+    esac
+done
+
+# Optional env bootstrap (controller URL + secret)
+SCRIPT_DIR="$(cd "${BASH_SOURCE[0]%/*}" && pwd)"
+if [[ -f "$SCRIPT_DIR/load_env.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "$SCRIPT_DIR/load_env.sh" 2>/dev/null || true
+fi
+
+API="${CLASH_API:-http://127.0.0.1:9090}"
+AUTH_HDR=()
+_hdr="$(clash_auth_header 2>/dev/null || true)"
+[[ -n "${_hdr:-}" ]] && AUTH_HDR=(-H "${_hdr}")
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -78,7 +104,7 @@ if [ "$dns_ok" = false ]; then
     echo "  - Cloudflare DNS: 1.1.1.1, 1.0.0.1"
     echo "  - Quad9 DNS: 9.9.9.9, 149.112.112.112"
     echo ""
-    echo "🔧 Quick DNS fix:"
+    echo "🔧 Manual DNS fix (review before running):"
     echo "sudo systemctl stop systemd-resolved"
     echo "echo 'nameserver 8.8.8.8' | sudo tee /etc/resolv.conf"
     echo "echo 'nameserver 1.1.1.1' | sudo tee -a /etc/resolv.conf"
@@ -138,8 +164,13 @@ echo "4️⃣ Proxy Configuration Optimization:"
 echo "===================================="
 
 echo "Current proxy status:"
-ai_node=$(curl -s http://127.0.0.1:9090/proxies/AI | jq -r '.now' 2>/dev/null || echo "Unknown")
-streaming_node=$(curl -s http://127.0.0.1:9090/proxies/Streaming | jq -r '.now' 2>/dev/null || echo "Unknown")
+if command -v jq >/dev/null 2>&1; then
+    ai_node=$(curl -fsS --noproxy '*' --connect-timeout 2 --max-time 4 "${AUTH_HDR[@]}" "$API/proxies/AI" 2>/dev/null | jq -r '.now' 2>/dev/null || echo "Unknown")
+    streaming_node=$(curl -fsS --noproxy '*' --connect-timeout 2 --max-time 4 "${AUTH_HDR[@]}" "$API/proxies/Streaming" 2>/dev/null | jq -r '.now' 2>/dev/null || echo "Unknown")
+else
+    ai_node=$(curl -fsS --noproxy '*' --connect-timeout 2 --max-time 4 "${AUTH_HDR[@]}" "$API/proxies/AI" 2>/dev/null | sed -n 's/.*"now":"\([^"]*\)".*/\1/p' || echo "Unknown")
+    streaming_node=$(curl -fsS --noproxy '*' --connect-timeout 2 --max-time 4 "${AUTH_HDR[@]}" "$API/proxies/Streaming" 2>/dev/null | sed -n 's/.*"now":"\([^"]*\)".*/\1/p' || echo "Unknown")
+fi
 echo "🤖 AI Group: $ai_node"
 echo "🎬 Streaming Group: $streaming_node"
 echo ""
@@ -153,6 +184,12 @@ echo ""
 # Step 5: Create workaround scripts
 echo "5️⃣ Creating Workaround Solutions:"
 echo "================================="
+
+if [[ $APPLY -ne 1 ]]; then
+    echo "ℹ️ Preview mode: not creating any files on disk." 
+    echo "   Re-run with --apply to create a Desktop shortcut and /tmp browser launcher." 
+    echo ""
+else
 
 # Create a desktop shortcut for OpenXLab
 cat > "$HOME/Desktop/OpenXLab-Direct.desktop" 2>/dev/null << 'EOF'
@@ -191,6 +228,8 @@ EOF
 
 chmod +x "/tmp/openxlab_browser.sh"
 echo -e "✅ Created browser launcher: ${CYAN}/tmp/openxlab_browser.sh${NC}"
+
+fi
 
 echo ""
 
@@ -264,7 +303,11 @@ fi
 
 echo ""
 echo "💡 IMMEDIATE ACTIONS:"
-echo "1. Run: /tmp/openxlab_browser.sh"
+if [[ $APPLY -eq 1 ]]; then
+    echo "1. Run: /tmp/openxlab_browser.sh"
+else
+    echo "1. (Optional) Re-run with --apply to create /tmp/openxlab_browser.sh"
+fi
 echo "2. Or manually visit: https://openxlab.org.cn/ (bypass proxy)"
 echo "3. If still not working, try: https://github.com/OpenXLab"
 echo ""

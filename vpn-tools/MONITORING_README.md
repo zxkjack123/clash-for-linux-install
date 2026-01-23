@@ -18,7 +18,7 @@
 ## 🚀 快速开始
 
 ```bash
-cd /home/gw/opt/clash-for-linux-install/vpn-tools
+cd /path/to/clash-for-linux-install/vpn-tools
 
 # 一键启动监控系统
 ./quick_start_monitoring.sh
@@ -43,9 +43,9 @@ cd /home/gw/opt/clash-for-linux-install/vpn-tools
 ### 1️⃣ 实时健康监控
 
 自动监控四大类服务：
-- 🤖 **AI服务**：OpenAI、Claude、ChatGPT
+- 🤖 **AI服务**：ChatGPT、SCNET、UIUI-API、硅基流动、OpenRouter、Kimi
 - 💻 **开发服务**：GitHub、NPM、PyPI
-- 🎬 **流媒体**：YouTube、Netflix、Zoom
+- 🎬 **流媒体**：YouTube、Zoom、Google Meet
 - 🏠 **国内网站**：百度、淘宝、B站
 
 **监控指标**：
@@ -263,7 +263,7 @@ bash ../script/runtime_guard.sh --auto-fix
 
 详细使用指南请查看：
 ```bash
-cat /home/gw/opt/clash-for-linux-install/NETWORK_OPTIMIZATION_GUIDE.md
+cat /path/to/clash-for-linux-install/docs/network/NETWORK_OPTIMIZATION_GUIDE.md
 ```
 
 ## 🎯 最佳实践

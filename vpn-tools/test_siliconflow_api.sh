@@ -4,6 +4,8 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 PROXY="http://127.0.0.1:7890"
 
 # 颜色定义
@@ -76,13 +78,14 @@ if [ ${#success_urls[@]} -gt 0 ]; then
         echo -e "  ${GREEN}→${NC} $url"
     done
     echo ""
-    
-    # 生成修复命令
+
+    # Prefer env override (safe, no file mutation)
     recommended_url="${success_urls[0]}"
-    echo -e "${BLUE}📝 推荐修复命令:${NC}"
+    echo -e "${BLUE}📝 建议配置方式 (无需修改脚本文件):${NC}"
     echo ""
-    echo -e "${YELLOW}cd /home/gw/opt/clash-for-linux-install/vpn-tools${NC}"
-    echo -e "${YELLOW}sed -i 's|https://api.siliconflow.cn/|$recommended_url|g' network_health_monitor.sh${NC}"
+    echo -e "${YELLOW}export SILICONFLOW_URL=\"$recommended_url\"${NC}"
+    echo -e "${YELLOW}# 或写入项目根目录 .env:${NC}"
+    echo -e "${YELLOW}SILICONFLOW_URL=\"$recommended_url\"${NC}"
     echo ""
 fi
 
@@ -107,31 +110,6 @@ fi
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
-# 如果找到可用地址，询问是否立即修复
-if [ ${#success_urls[@]} -gt 0 ]; then
-    read -p "是否立即应用修复？(y/n): " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        recommended_url="${success_urls[0]}"
-        cd /home/gw/opt/clash-for-linux-install/vpn-tools
-        
-        # 备份原文件
-        cp network_health_monitor.sh network_health_monitor.sh.bak-siliconflow
-        
-        # 应用修复
-        sed -i "s|https://api.siliconflow.cn/|$recommended_url|g" network_health_monitor.sh
-        
-        echo ""
-        echo -e "${GREEN}✅ 修复已应用！${NC}"
-        echo -e "${BLUE}备份文件:${NC} network_health_monitor.sh.bak-siliconflow"
-        echo ""
-        echo -e "${BLUE}验证修复:${NC}"
-        echo -e "${YELLOW}./network_health_monitor.sh${NC}"
-        echo ""
-    else
-        echo ""
-        echo -e "${BLUE}未应用修复${NC}"
-        echo "您可以稍后手动执行上述命令"
-        echo ""
-    fi
-fi
+echo -e "${BLUE}说明:${NC}"
+echo "- 本工具仅用于探测可达 URL，不会自动修改任何文件。"
+echo "- network_health_monitor.sh 支持通过 SILICONFLOW_URL 环境变量覆盖探测地址。"

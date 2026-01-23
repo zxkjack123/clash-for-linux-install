@@ -1,4 +1,4 @@
-# shellcheck disable=SC2148
+#!/usr/bin/env bash
 # shellcheck disable=SC1091
 . script/common.sh >&/dev/null
 . script/clashctl.sh >&/dev/null
@@ -45,6 +45,27 @@ tar -xf "$ZIP_UI" -C "$CLASH_BASE_DIR"
 _set_rc
 _set_bin
 _merge_config_restart
+
+# Install lightweight CLI entrypoints (avoid naming conflicts with the kernel binary `clash`/`mihomo`)
+mkdir -p "${USER_HOME}/.local/bin"
+# Ensure scripts are executable in the install dir
+chmod +x "${CLASH_SCRIPT_DIR}/clashctl.sh" 2>/dev/null || true
+[ -f "${CLASH_SCRIPT_DIR}/emergency_off.sh" ] && chmod +x "${CLASH_SCRIPT_DIR}/emergency_off.sh" 2>/dev/null || true
+
+_install_cli_link() {
+    local name="$1"
+    local target="${CLASH_SCRIPT_DIR}/clashctl.sh"
+    local dest="${USER_HOME}/.local/bin/${name}"
+    # If an existing non-symlink file is present, do not overwrite it.
+    if [ -e "$dest" ] && [ ! -L "$dest" ]; then
+        _okcat '⚠️' "检测到已存在命令：$dest (非符号链接)，跳过安装 ${name}；你可以手动改名或删除后重试"
+        return 0
+    fi
+    ln -sf "$target" "$dest" 2>/dev/null || true
+}
+
+_install_cli_link clashctl
+_install_cli_link mihomoctl
 
 # Create user systemd service
 mkdir -p "${USER_HOME}/.config/systemd/user"
@@ -93,6 +114,7 @@ loginctl enable-linger "$USER" 2>/dev/null || _okcat '⚠️' "无法设置开�
 clashui
 _okcat '🎉' 'enjoy 🎉'
 _okcat '📂' "说明：已安装为用户服务，无需任何特殊权限。配置位于：$CLASH_BASE_DIR"
-_okcat '🚀' "代理将在每次登录时自动启动。手动控制：clash on/off"
-clash
+_okcat '🚀' "代理将在每次登录时自动启动（systemd 用户服务）。命令入口：clashctl on/off/status"
+_okcat '💡' "若 clashctl 不可用，请确认 ~/.local/bin 在 PATH 中，或直接运行：bash $CLASH_SCRIPT_DIR/clashctl.sh status"
+clashctl
 _quit

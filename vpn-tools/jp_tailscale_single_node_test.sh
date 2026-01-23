@@ -77,13 +77,25 @@ while [[ $# -gt 0 ]]; do
     --quick) MODE=quick; shift;;
     --full) MODE=full; shift;;
     --no-switch) NO_SWITCH=1; shift;;
-    --group) GROUP_TO_SWITCH="$2"; shift 2;;
-    --proxy-name) TARGET_PROXY_NAME="$2"; shift 2;;
-    --ts-peer) TS_PEER="$2"; shift 2;;
-    --concurrency) CONCURRENCY="$2"; shift 2;;
-    --dl-seconds) DL_SECONDS="$2"; shift 2;;
+    --group)
+      [[ $# -ge 2 ]] || { echo "ERROR: --group requires a value" >&2; exit 2; }
+      GROUP_TO_SWITCH="$2"; shift 2;;
+    --proxy-name)
+      [[ $# -ge 2 ]] || { echo "ERROR: --proxy-name requires a value" >&2; exit 2; }
+      TARGET_PROXY_NAME="$2"; shift 2;;
+    --ts-peer)
+      [[ $# -ge 2 ]] || { echo "ERROR: --ts-peer requires a value" >&2; exit 2; }
+      TS_PEER="$2"; shift 2;;
+    --concurrency)
+      [[ $# -ge 2 ]] || { echo "ERROR: --concurrency requires a value" >&2; exit 2; }
+      CONCURRENCY="$2"; shift 2;;
+    --dl-seconds)
+      [[ $# -ge 2 ]] || { echo "ERROR: --dl-seconds requires a value" >&2; exit 2; }
+      DL_SECONDS="$2"; shift 2;;
     --apply-tighten) APPLY_TIGHTEN=1; shift;;
-    --fallback) FALLBACK_MODE="$2"; shift 2;;
+    --fallback)
+      [[ $# -ge 2 ]] || { echo "ERROR: --fallback requires a value" >&2; exit 2; }
+      FALLBACK_MODE="$2"; shift 2;;
     -h|--help) usage; exit 0;;
     *) echo "Unknown arg: $1" >&2; usage; exit 2;;
   esac
@@ -117,6 +129,11 @@ detect_controller() {
 }
 
 read_secret(){
+  # Prefer env override (preferred)
+  if [ -n "${CLASH_SECRET:-}" ]; then
+    printf '%s' "$CLASH_SECRET"; return 0
+  fi
+
   local runtime="${CLASH_CONFIG_RUNTIME:-$HOME/.local/share/clash/runtime.yaml}"
   [ -f "$runtime" ] || return 0
   local s=""
@@ -126,22 +143,25 @@ read_secret(){
   if [ -z "$s" ]; then
     s=$(grep -E '^ *secret:' "$runtime" 2>/dev/null | tail -n1 | cut -d':' -f2- | tr -d ' "' || true)
   fi
+  s=${s//$'\n'/}
+  s=${s//\"/}
+  s=${s//\'/}
   printf '%s' "$s"
 }
 
 api_get(){
-  local url="$1"; shift || true
-  local secret="$1"; shift || true
+  local url="$1"
+  local secret="${2:-}"
   local hdr=()
   [ -n "$secret" ] && hdr=(-H "Authorization: Bearer $secret")
-  curl -fsS --max-time 3 "${url}" "${hdr[@]}" 2>/dev/null || true
+  curl -fsS --noproxy '*' --connect-timeout 2 --max-time 3 "${url}" "${hdr[@]}" 2>/dev/null || true
 }
 
 api_put_proxy(){
   local base="$1" group="$2" name="$3" secret="$4"
   local hdr=(-H 'Content-Type: application/json')
   [ -n "$secret" ] && hdr+=(-H "Authorization: Bearer $secret")
-  curl -fsS --max-time 3 -X PUT "${base}/proxies/${group}" "${hdr[@]}" --data "{\"name\":\"${name}\"}" >/dev/null 2>&1 || return 1
+  curl -fsS --noproxy '*' --connect-timeout 2 --max-time 3 -X PUT "${base}/proxies/${group}" "${hdr[@]}" --data "{\"name\":\"${name}\"}" >/dev/null 2>&1 || return 1
 }
 
 get_group_now(){
@@ -157,13 +177,13 @@ get_group_now(){
 }
 
 API_BASE="${CLASH_API:-$(detect_controller)}"
-API_SECRET="$(read_secret)"
+SECRET="$(read_secret)"
 
 PREV_NOW=""
 RESTORE_NEEDED=0
 cleanup(){
   if [ "$RESTORE_NEEDED" = 1 ] && [ -n "$PREV_NOW" ]; then
-    api_put_proxy "$API_BASE" "$GROUP_TO_SWITCH" "$PREV_NOW" "$API_SECRET" >/dev/null 2>&1 || true
+    api_put_proxy "$API_BASE" "$GROUP_TO_SWITCH" "$PREV_NOW" "$SECRET" >/dev/null 2>&1 || true
   fi
 }
 trap cleanup EXIT
@@ -223,7 +243,7 @@ fi
 # ---- API switch ----
 section "MIHOMO CONTROL (optional)"
 api_ok=no
-if [ -n "$API_BASE" ] && [ -n "$(api_get "${API_BASE}/version" "$API_SECRET")" ]; then
+if [ -n "$API_BASE" ] && [ -n "$(api_get "${API_BASE}/version" "$SECRET")" ]; then
   api_ok=yes
 fi
 
@@ -234,10 +254,10 @@ if [ "$NO_SWITCH" = 1 ]; then
 elif [ "$api_ok" != yes ]; then
   echo "switch        : skipped (controller not reachable)"
 else
-  PREV_NOW=$(get_group_now "$API_BASE" "$GROUP_TO_SWITCH" "$API_SECRET" || true)
+  PREV_NOW=$(get_group_now "$API_BASE" "$GROUP_TO_SWITCH" "$SECRET" || true)
   echo "prev_now      : ${PREV_NOW:-unknown}"
   if [ -n "$PREV_NOW" ]; then
-    if api_put_proxy "$API_BASE" "$GROUP_TO_SWITCH" "$TARGET_PROXY_NAME" "$API_SECRET"; then
+    if api_put_proxy "$API_BASE" "$GROUP_TO_SWITCH" "$TARGET_PROXY_NAME" "$SECRET"; then
       RESTORE_NEEDED=1
       echo "switch        : ${NH_OK:-OK} ${GROUP_TO_SWITCH} -> ${TARGET_PROXY_NAME} (will restore on exit)"
     else
@@ -479,8 +499,8 @@ if [ "$APPLY_TIGHTEN" = 1 ]; then
   # NOTE: CLASH_LIB_MODE must be set BEFORE sourcing clashctl.sh, otherwise the script may run its CLI path.
   if ! ( cd "$REPO_DIR" && bash -c 'set -e; export CLASH_LIB_MODE=1 CLASH_ERROR_MODE=exit; source script/common.sh; source script/clashctl.sh; _merge_sanitize_restart' ); then
     # If rebuild returns non-zero, verify whether it still applied (sometimes restart step returns non-zero but runtime is already updated).
-    if [ -n "${API_BASE:-}" ] && [ -n "$(api_get "${API_BASE}/version" "${API_SECRET}")" ]; then
-      now_all=$(api_get "${API_BASE}/proxies/${GROUP_TO_SWITCH}" "${API_SECRET}" | tr '\n' ' ')
+    if [ -n "${API_BASE:-}" ] && [ -n "$(api_get "${API_BASE}/version" "${SECRET}")" ]; then
+      now_all=$(api_get "${API_BASE}/proxies/${GROUP_TO_SWITCH}" "${SECRET}" | tr '\n' ' ')
       if echo "$now_all" | grep -q '"all"\s*:\s*\["JP-Tailscale","故障转移"\]'; then
         echo "apply result   : ${NH_WARN:-WARN} rebuild returned non-zero, but controller already reflects tightened AUTO-SMART"
       else

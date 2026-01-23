@@ -135,9 +135,46 @@ cd vpn-tools
 - Some tools may take several minutes to complete
 
 ### Safety
-- All scripts are read-only testing tools
-- No permanent changes are made to your system
-- Safe to run multiple times
+- Most scripts are **read-only** testing/diagnostic tools.
+- Some scripts are **configuration tools** and may modify local Clash/Mihomo files (they will say so explicitly).
+- Always run a preview/--help first before applying changes.
+
+## 🧷 JP‑Tailscale-only 配置收敛工具（默认仅预览）
+
+脚本：`use_jp_tailscale_only.sh`
+
+用途：把本机 `~/.local/share/clash/mixin.yaml` 的 `proxy-groups` 收敛到 **JP‑Tailscale-only**（可选保留兼容分组名 `速云梯`，避免旧规则引用断裂）。
+
+安全特性：
+- **默认仅预览（dry-run）**：不写入文件、不重启 mihomo
+- `--apply` 才会写入 `mixin.yaml`，并自动创建 `mixin.yaml.bak.<timestamp>` 备份
+- `--rebuild` 会重建 runtime 并重启 mihomo（**会短暂影响代理/VS Code/Copilot 连接**），且必须和 `--apply` 一起使用
+
+常用参数：
+- `--apply`：应用修改（仍不重启）
+- `--rebuild`：应用后重建 runtime + 重启 mihomo（有风险，建议挑窗口期）
+- `--prune-all-selectors`：更激进地裁剪所有 `select` 组，仅保留安全条目（用于清理残留订阅节点名）
+- `--no-compat-suyunti`：不保留/创建 `速云梯` 兼容组
+- `--with-direct-fallback`：允许 `DIRECT` 作为 `AUTO-SMART/故障转移` 的兜底选项
+- `--mixin PATH`：指定 mixin 路径
+
+依赖：需要 `mikefarah/yq v4`（优先使用本仓库安装的 `~/.local/share/clash/bin/yq`）。
+
+执行示例：
+```bash
+cd vpn-tools
+
+# 1) 仅预览（推荐先做这个）
+./use_jp_tailscale_only.sh
+
+# 2) 应用变更（不重启）
+./use_jp_tailscale_only.sh --apply
+
+# 3) 应用 + 重建 runtime（会重启 mihomo，有短断风险）
+./use_jp_tailscale_only.sh --apply --rebuild
+```
+
+说明：当使用 `--rebuild` 时，重建日志会写入仓库的 `tmp/use_jp_tailscale_only.rebuild.*.log`（避免在终端输出潜在敏感信息）。
 
 ## 🧩 VS Code / Copilot: “Fetching …” 卡顿排查
 

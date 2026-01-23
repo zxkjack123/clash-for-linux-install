@@ -107,7 +107,7 @@ generate_report() {
 
 ```bash
 # 删除损坏的JSON文件
-rm -f /home/gw/.local/share/clash/metrics/health_metrics.json
+rm -f ~/.local/share/clash/metrics/health_metrics.json
 
 # 重新运行健康检查
 ./network_health_monitor.sh
@@ -165,17 +165,17 @@ jq: parse error: Expected value before ',' at line 4, column 19
 
 ```bash
 # 1. 运行健康检查
-cd /home/gw/opt/clash-for-linux-install/vpn-tools
+cd /path/to/clash-for-linux-install/vpn-tools
 ./network_health_monitor.sh
 
 # 2. 验证JSON格式
-cat /home/gw/.local/share/clash/metrics/health_metrics.json | jq .
+cat ~/.local/share/clash/metrics/health_metrics.json | jq .
 
 # 3. 生成报告
 ./network_health_monitor.sh --report
 
 # 4. 查看报告
-ls -lt /home/gw/.local/share/clash/logs/health_report_*.md | head -1
+ls -lt ~/.local/share/clash/logs/health_report_*.md | head -1
 ```
 
 ## 技术要点
@@ -218,10 +218,10 @@ jq -r '.field.subfield // .field // "未知"' file.json
 
 ## 相关文件
 
-- `/home/gw/opt/clash-for-linux-install/vpn-tools/network_health_monitor.sh` (已修复)
-- `/home/gw/opt/clash-for-linux-install/vpn-tools/network_dashboard.sh` (正常)
-- `/home/gw/.local/share/clash/metrics/health_metrics.json` (已重新生成)
-- `/home/gw/.local/share/clash/logs/health_report_*.md` (报告输出)
+- `/path/to/clash-for-linux-install/vpn-tools/network_health_monitor.sh` (已修复)
+- `/path/to/clash-for-linux-install/vpn-tools/network_dashboard.sh` (正常)
+- `~/.local/share/clash/metrics/health_metrics.json` (已重新生成)
+- `~/.local/share/clash/logs/health_report_*.md` (报告输出)
 
 ## 状态
 

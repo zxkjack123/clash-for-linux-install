@@ -1,4 +1,25 @@
 # Changelog
+## [2.5.6] - 2026-01-23
+
+### ✨ New
+- Added `script/emergency_off.sh`: a safe-by-default “one-click DIRECT fallback” tool that stops user services and unsets system proxy (supports `--dry-run` and `--trial` rollback).
+- Added `vpn-tools/use_jp_tailscale_only.sh`: a preview-first helper to prune subscription nodes from `~/.local/share/clash/mixin.yaml` and converge proxy-groups to **JP‑Tailscale-only** (optional rebuild/restart).
+
+### 🛠 Fixes
+- `vpn-tools/test_docker_proxy.sh`: removed `eval` execution by switching to argv-based command invocation; fixed negative-test semantics so “expected fail” checks no longer count as failures.
+- `script/clash_diagnose.sh --json`: now emits **JSON only on stdout** (human-readable report goes to stderr) so it can be reliably piped into parsers.
+
+### 🔧 Improvements
+- `script/runtime_guard.sh`: hardened alert hook handling:
+  - Prefer safe modes via `--alert none|log|notify|webhook|script` and `--alert-script` + repeated `--alert-arg`.
+  - Legacy `--alert-cmd/ALERT_CMD` remains available only behind an explicit unsafe opt-in.
+- Docs refreshed to match the new safe defaults (Docker host networking guidance; runtime guard alert examples).
+
+### ✅ Verification
+- `bash -n` on repo shell scripts
+- `script/clash_diagnose.sh --fast --json`
+- `script/runtime_guard.sh --check --json`
+
 ## [2.5.5] - 2025-12-22
 
 ### ✨ New
@@ -119,7 +140,7 @@
 
 ### ✨ New
 - One-click start/stop scripts:
-  - `vpn-tools/start_vpn.sh` to start mihomo and apply system proxy safely (wraps clashon and prints controller /version).
+  - `vpn-tools/start_vpn.sh` to start mihomo and apply system proxy safely (calls `clashctl on` and prints controller `/version`; legacy `clashon` remains available when sourcing helpers).
   - `vpn-tools/stop_vpn.sh` to stop the service and fully clean proxy settings (env, GNOME/KDE), leaving no residue.
 
 ### 🔧 Improvements
@@ -135,7 +156,7 @@
 - Dropped duplicate `resources/config.yml` to avoid confusion with the canonical `resources/config.yaml`.
 
 ### ✅ Verification
-- Verified service lifecycle via one-click scripts and `clashon/clashoff` wrappers.
+- Verified service lifecycle via one-click scripts and `clashctl on/off` (with `clashon/clashoff` available as optional sourced helpers).
 - Controller: http://127.0.0.1:9990, version `v1.19.2`; mixed-port `7890` for HTTP/SOCKS.
 - Quick VPN Check: 13/13 (100%) GOOD on representative endpoints.
 

@@ -11,7 +11,7 @@
 - 默认安装 `mihomo` 内核，[可选安装](https://github.com/nelvko/clash-for-linux-install/wiki/FAQ#%E5%AE%89%E8%A3%85-clash-%E5%86%85%E6%A0%B8) `clash`。
 - 自动使用 [subconverter](https://github.com/tindy2013/subconverter) 进行本地订阅转换。
 - **🚀 用户空间安装**：所有文件安装在用户目录，无需 root 权限运行。
-- **⚡ 自动代理启动**：登录时自动启用代理，无需手动操作。
+- **⚡ 自动启动（systemd 用户服务）**：登录时自动启动内核，并由 `clash-proxy-env.service` 应用系统代理（GNOME/KDE/Git）。
 - **🔒 安全隔离**：每个用户独立安装，互不影响。
 - 多架构支持，适配主流 `Linux` 发行版：`CentOS 7.6`、`Debian 12`、`Ubuntu 24.04.1 LTS`。
 
@@ -102,11 +102,11 @@ vpn-tools/
 ### ✅ 无密码体验
 - **普通操作无需任何权限**：所有日常命令（启停、状态查看、配置修改）都不需要输入密码
 - **用户服务管理**：使用 `systemctl --user` 管理服务，无需 root 权限
-- **环境变量自动设置**：代理环境变量自动配置，无需手动干预
+- **系统代理自动应用**：通过 `clash-proxy-env.service` 设置 GNOME/KDE 系统代理与 Git 代理
 
 ### ✅ 自动化部署
 - **开机自启**：服务自动随用户登录启动（通过 `loginctl enable-linger`）
-- **终端自动代理**：打开新终端时自动启用代理环境
+- **终端环境变量**：默认不在每个新 bash/zsh 里自动注入 `http_proxy`（避免 VS Code/短命令卡顿）；如需终端变量请按需配置轻量片段
 - **用户空间安装**：所有文件位于 `~/.local/share/clash/`，易于管理和备份
 
 ### ✅ 安全与隔离
@@ -163,7 +163,7 @@ git clone --depth 1 https://gh-proxy.com/https://github.com/zxkjack123/clash-for
 这是一个**用户空间安装版本**，具有以下特点：
 - ✅ 安装到 `~/.local/share/clash/`
 - ✅ 无需任何管理员权限运行日常命令
-- ✅ 自动设置代理环境
+- ✅ 登录时自动启动用户服务，并应用系统代理（GNOME/KDE/Git）
 - ✅ 用户服务自动启动
 - ✅ 每个用户独立安装，配置互不影响
 - ✅ 安全隔离，无系统级权限风险
@@ -176,37 +176,66 @@ git clone --depth 1 https://gh-proxy.com/https://github.com/zxkjack123/clash-for
 
 ### 命令一览
 
-执行 `clash` 列出开箱即用的快捷命令。
-
-> 兼容多种命令风格
+安装后推荐使用 `clashctl`（控制入口，安装脚本会尝试写到 `~/.local/bin/`）：
 
 ```bash
-$ clash
+$ clashctl
 Usage:
-    clash     COMMAND [OPTION]
-    mihomo    COMMAND [OPTION]
-    clashctl  COMMAND [OPTION]
-    mihomoctl COMMAND [OPTION]
+  clashctl COMMAND  [OPTION]
 
 Commands:
-    on                   开启代理
-    off                  关闭代理
-    ui                   面板地址
-    status               内核状况
-    tun      [on|off]    Tun 模式
-    mixin    [-e|-r]     Mixin 配置
-    secret   [SECRET]    Web 密钥
-    update   [auto|log]  更新订阅
+  on                      开启代理
+  off                     关闭代理
+  proxy    [on|off|status] 系统代理
+  ui                      面板地址
+  status                  内核状况
+  tun      [on|off]       Tun 模式
+  mixin    [-e|-r]        Mixin 配置
+  secret   [SECRET]       Web 密钥
+  update   [auto|log]     更新订阅
+  diag | doctor           一键诊断
 ```
+
+> 说明：
+> - 若你的系统没有把 `~/.local/bin` 加进 PATH，可直接运行：`bash ~/.local/share/clash/script/clashctl.sh status`
+> - `clash` / `mihomo` 一般指内核二进制本身，不建议用作控制入口（避免混淆）
 
 ### 优雅启停
 
 ```bash
-$ clashoff
-😼 已关闭代理环境
+$ clashctl off
 
-$ clashon
-😼 已开启代理环境
+$ clashctl on
+```
+
+### 🧯 紧急切回直连网络
+
+当节点全挂、代理进程异常、或你只是想临时“恢复正常不上代理”的网络时：
+
+- **首选（已有命令）**：`clashctl off`
+- **命令不可用/环境乱了**：运行独立脚本（会停止用户服务 + 卸载系统代理）
+
+```bash
+# 安装后脚本路径（推荐）
+bash ~/.local/share/clash/script/emergency_off.sh
+
+# 如果你只想停服务但保留系统/Git 代理设置（不推荐，一般会导致应用连接失败），可加：
+# bash ~/.local/share/clash/script/emergency_off.sh --no-unset-proxy
+
+# 若需要清理“当前终端”的 http_proxy/all_proxy（可选）
+eval "$(bash ~/.local/share/clash/script/emergency_off.sh --print-unset)"
+
+# 不影响网络的模拟（只展示将要执行的动作）
+bash ~/.local/share/clash/script/emergency_off.sh --dry-run
+
+# 试运行（更安全）：应用后等待 20 秒自动回滚
+bash ~/.local/share/clash/script/emergency_off.sh --trial 20
+
+# 试运行 + 直连自检：trial 默认会检查 baidu/bing/qq；不通就立刻回滚
+bash ~/.local/share/clash/script/emergency_off.sh --trial 20
+
+# 额外增加自定义站点检查（默认检查 + 你指定的都会测）
+bash ~/.local/share/clash/script/emergency_off.sh --trial 20 --require-url https://www.taobao.com
 ```
 
 > **用户空间版本特色**：无需输入密码，命令执行更快速！
@@ -215,40 +244,34 @@ $ clashon
 
 <summary>原理</summary>
 
-- **用户空间版本**: 使用 `systemctl --user` 控制 `clash` 启停，直接调整用户环境变量（http_proxy 等），无需 sudo 权限。
-- **系统版本**: 使用 `systemctl` 控制 `clash` 启停，并调整代理环境变量的值（http_proxy 等）。
+- **用户空间版本**: 使用 `systemctl --user` 控制内核服务（`mihomo`/`clash`）启停，并由 `clash-proxy-env.service` 应用系统代理（GNOME/KDE）与 Git 代理。
+- **终端环境变量**: bash/zsh 默认不自动注入 `http_proxy` 等变量（避免每次新开 shell 卡顿）。如需终端变量，请参考 `docs/development/CLASH_PROXY_STARTUP_BEST_PRACTICES.md` 的轻量片段。
 
 应用程序在发起网络请求时，会通过其指定的代理地址转发流量，不调整会造成：关闭代理但未卸载代理变量导致仍转发请求、开启代理后未设置代理地址导致请求不转发。
 
-`clashon` 等命令封装了上述流程。
+`clashctl on/off/proxy ...` 以及 `clash-proxy-env.service` 会完成上述流程。
 
 </details>
 
-### 🚀 自动代理启动
+### 🚀 自动启动与代理生效范围
 
-用户空间版本的一大特色是**自动代理启动**：
-
-- **登录自动启用**：每次登录系统或打开新终端时，代理自动启用
-- **环境变量自动设置**：`http_proxy`、`https_proxy` 等环境变量自动配置
-- **后台静默运行**：代理服务在后台运行，不影响正常使用
-- **开机自启**：通过 `loginctl enable-linger` 实现开机自动启动
+- **服务启动**：安装后会启用 systemd 用户服务，登录时自动启动内核（`mihomo`/`clash`）。如需“开机即启”，可使用 `loginctl enable-linger`（可能需要管理员权限）。
+- **系统代理**：由 `clash-proxy-env.service` 在登录时应用 GNOME/KDE 系统代理与 Git 代理，GUI 应用通常会自动生效。
+- **终端环境变量**：为避免每次新开 shell 都跑重逻辑导致卡顿，bash/zsh 默认不会自动注入 `http_proxy`/`ALL_PROXY`。
+  若你希望终端也自动获得代理变量，请按需配置轻量片段：`docs/development/CLASH_PROXY_STARTUP_BEST_PRACTICES.md`。
 
 ```bash
-# 打开新终端时自动显示
-$ echo $http_proxy
-http://127.0.0.1:7890
+# 查看系统代理状态
+$ clashctl proxy status
 
-# 检查代理状态
-$ clash proxy status
-😼 系统代理：开启
-http_proxy： http://127.0.0.1:7890
-socks_proxy：socks5h://127.0.0.1:7890
+# 验证 GNOME 代理模式（如使用 GNOME）
+$ gsettings get org.gnome.system.proxy mode
 ```
 
 ### Web 控制台
 
 ```bash
-$ clashui
+$ clashctl ui
 ╔═══════════════════════════════════════════════╗
 ║                😼 Web 控制台                  ║
 ║═══════════════════════════════════════════════║
@@ -260,10 +283,10 @@ $ clashui
 ║                                               ║
 ╚═══════════════════════════════════════════════╝
 
-$ clashsecret 666
+$ clashctl secret 666
 😼 密钥更新成功，已重启生效
 
-$ clashsecret
+$ clashctl secret
 😼 当前密钥：666
 ```
 
@@ -273,29 +296,29 @@ $ clashsecret
 ### 更新订阅
 
 ```bash
-$ clashupdate https://example.com
+$ clashctl update https://example.com
 👌 正在下载：原配置已备份...
 🍃 下载成功：内核验证配置...
 🍃 订阅更新成功
 
-$ clashupdate auto [url]
+$ clashctl update auto [url]
 😼 已设置定时更新订阅
 
-$ clashupdate log
+$ clashctl update log
 ✅ [2025-02-23 22:45:23] 订阅更新成功：https://example.com
 ```
 
-- `clashupdate` 会记住上次更新成功的订阅链接，后续执行无需再指定。
-- 可通过 `crontab -e` 修改定时更新频率及订阅链接。
+- `clashctl update` 会记住上次更新成功的订阅链接，后续执行无需再指定。
+- 如需定时刷新订阅，推荐使用用户级 systemd timer：`docs/installation/AUTO_SUBSCRIPTION_REFRESH.md`。
 - 通过配置文件进行更新：[pr#24](https://github.com/nelvko/clash-for-linux-install/pull/24#issuecomment-2565054701)
 
 ### `Tun` 模式
 
 ```bash
-$ clashtun
+$ clashctl tun
 😾 Tun 状态：关闭
 
-$ clashtun on
+$ clashctl tun on
 😼 Tun 模式已开启
 ```
 
@@ -306,13 +329,13 @@ $ clashtun on
 ### `Mixin` 配置
 
 ```bash
-$ clashmixin
+$ clashctl mixin
 😼 less 查看 mixin 配置
 
-$ clashmixin -e
+$ clashctl mixin -e
 😼 vim 编辑 mixin 配置
 
-$ clashmixin -r
+$ clashctl mixin -r
 😼 less 查看 运行时 配置
 ```
 
@@ -360,7 +383,7 @@ bash uninstall.sh
 4. **恢复配置**（如有备份）：
    ```bash
    [ -f ~/mixin_backup.yaml ] && cp ~/mixin_backup.yaml ~/.local/share/clash/mixin.yaml
-   [ -f ~/url_backup.txt ] && clash update $(cat ~/url_backup.txt)
+  [ -f ~/url_backup.txt ] && clashctl update $(cat ~/url_backup.txt)
    ```
 
 ## 🚀 用户空间版本特性
@@ -427,7 +450,7 @@ docker run --rm curlimages/curl curl -x http://HOST_IP:7890 https://www.google.c
 
 ## � 运行时健康 & 指标 (Metrics)
 
-新增 Prometheus 指标文件 (默认路径参考脚本变量 `CLASH_METRICS_FILE`)，可通过 `clash metrics` 立即生成，或 `clash metrics --cron-install 5` 安装每 5 分钟自动刷新任务。
+新增 Prometheus 指标文件 (默认路径参考脚本变量 `CLASH_METRICS_FILE`)，可通过 `clashctl metrics` 立即生成，或 `clashctl metrics --cron-install 5` 安装每 5 分钟自动刷新任务。
 
 当前输出的指标包括：
 - `clash_health_score` / `clash_health_grade` 综合健康得分与等级 (A/B/C/D → 3/2/1/0)
@@ -448,7 +471,7 @@ sudo apt install -y jq   # 或其它发行版等价命令
 
 命令：
 ```bash
-clash downgrade [--since <分钟> --threshold <次数> --mode tag|drop --no-switch]
+clashctl downgrade [--since <分钟> --threshold <次数> --mode tag|drop --no-switch]
 ```
 
 说明：
@@ -460,7 +483,7 @@ clash downgrade [--since <分钟> --threshold <次数> --mode tag|drop --no-swit
 
 清理标签：
 ```bash
-clash cleanfail   # 去除所有分组引用中的 [FAIL] 后缀并自动重新合并
+clashctl cleanfail   # 去除所有分组引用中的 [FAIL] 后缀并自动重新合并
 ```
 
 并发安全：`downgrade` 与 `cleanfail` 在写入 `mixin.yaml` 前都会获取与主合并流程相同的文件锁，避免与订阅更新/其它合并并发冲突。
@@ -481,7 +504,7 @@ scrape_configs:
 Grafana 可直接基于上述指标绘制：失败趋势、活跃连接、上传/下载速率（对 bytes 总量做 rate()）。
 
 
-## �🔐 高级稳定性强化 (P0→P2)
+## 🔐 高级稳定性强化 (P0→P2)
 
 | 等级 | 内容                                                         | 状态            |
 | ---- | ------------------------------------------------------------ | --------------- |
@@ -491,7 +514,7 @@ Grafana 可直接基于上述指标绘制：失败趋势、活跃连接、上传
 | P2   | 可插入定时巡检 (cron) 与集中健康日志                         | ✅ 已实现 (示例) |
 
 ### 差异报告
-执行 `clash update` 后若 runtime 发生变化会生成 `/tmp/runtime_diff_YYYYmmdd_HHMMSS.log`，并在更新日志里追加 `DIFF-时间戳` 标记，内容聚焦：
+执行 `clashctl update` 后若 runtime 发生变化会生成 `/tmp/runtime_diff_YYYYmmdd_HHMMSS.log`，并在更新日志里追加 `DIFF-时间戳` 标记，内容聚焦：
 1. 规则增删 (常见风险触发点)
 2. dns.fallback 变更 (防止裸 IP 回流)
 3. proxy-groups 名称变更 (识别订阅分组漂移)
@@ -509,8 +532,12 @@ Grafana 可直接基于上述指标绘制：失败趋势、活跃连接、上传
 # 单次巡检
 bash script/runtime_guard.sh --check
 
-# 巡检并自愈 + 报告 + 通知
-bash script/runtime_guard.sh --auto-fix --report --alert-cmd 'notify-send "Clash runtime 修复"'
+# 巡检并自愈 + 报告 + 通知（安全模式；默认不会执行任意 shell 字符串）
+# notify/webhook 会调用仓库的 vpn-tools/alert_notification.sh（可自行配置通知渠道）
+bash script/runtime_guard.sh --auto-fix --report --alert notify
+
+# 或：自定义脚本告警（安全 argv 传参）
+# bash script/runtime_guard.sh --auto-fix --report --alert-script /path/to/hook.sh --alert-arg foo --alert-arg bar
 
 # 每 10 分钟巡检 (添加到 crontab)
 */10 * * * * bash /absolute/path/script/runtime_guard.sh --auto-fix --cron >> /tmp/runtime_guard_status.log 2>&1
@@ -534,16 +561,14 @@ docker run --network host your-image
 ### 配置说明
 
 Docker 支持已自动配置以下内容：
-- ✅ **端口绑定**：代理服务监听所有网络接口 (`:::7890`)
-- ✅ **防火墙规则**：允许 Docker 网络访问代理端口
-- ✅ **LAN 访问**：启用 `allow-lan: true` 支持容器访问
-- ✅ **API 接口**：Web 控制台支持容器内访问 (`:::9090`)
+- ✅ **安全默认**：默认更倾向仅本机监听（`127.0.0.1`），避免把代理/控制接口暴露到局域网
+- ✅ **推荐方式（Linux）**：Docker 使用 `--network host`，容器内直接访问宿主机的 `127.0.0.1:7890`
+- ⚠️ **bridge 模式**：如必须让容器通过 `<HOST_IP>:7890/9090` 访问，需要你显式调整监听地址并配合防火墙（详见下方文档）
 
 ### 详细文档
-- **[DOCKER_INTEGRATION.md](DOCKER_INTEGRATION.md)** - 完整 Docker 集成指南
+- **[docs/integrations/DOCKER_INTEGRATION.md](docs/integrations/DOCKER_INTEGRATION.md)** - 完整 Docker 集成指南
+- **[docs/DOCKER_PROXY_GUIDE.md](docs/DOCKER_PROXY_GUIDE.md)** - Docker 代理使用与安全默认说明
 - **[vpn-tools/test_docker_proxy.sh](vpn-tools/test_docker_proxy.sh)** - 完整测试套件
-
-## 常见问题
 
 ## 常见问题
 
@@ -558,21 +583,23 @@ sudo loginctl enable-linger $USER
 ```
 
 #### Q: 新终端中 clash 命令不可用？
-A: 检查 shell 配置文件：
+A: 本项目推荐使用 `clashctl` 作为控制入口（避免与内核二进制 `clash/mihomo` 混淆）。
+
+1) 确认安装脚本已创建入口（默认在 `~/.local/bin/`）：
 ```bash
-# 检查是否已添加到 bashrc/zshrc
-grep clash ~/.bashrc ~/.zshrc
-# 如果没有，重新安装或手动添加：
-echo 'source ~/.local/share/clash/script/common.sh && source ~/.local/share/clash/script/clashctl.sh' >> ~/.bashrc
+command -v clashctl || ls -l ~/.local/bin/clashctl
+```
+
+2) 如果 `~/.local/bin` 不在 PATH 中，请将其加入 PATH（或直接用完整路径运行）：
+```bash
+bash ~/.local/share/clash/script/clashctl.sh status
 ```
 
 #### Q: 代理环境变量没有自动设置？
-A: 重新加载 shell 配置：
-```bash
-source ~/.bashrc  # 或 source ~/.zshrc
-# 然后手动启用代理：
-clashon
-```
+A: 这是**刻意的默认行为**：避免每次新开 bash/zsh 都执行重逻辑导致卡顿。
+
+- GUI 应用通常使用系统代理（由 `clash-proxy-env.service` 设置）
+- 若你希望终端自动拥有 `http_proxy/ALL_PROXY`，请按需添加轻量片段：`docs/development/CLASH_PROXY_STARTUP_BEST_PRACTICES.md`
 
 #### Q: 服务无法启动？
 A: 检查服务状态和日志：
@@ -587,10 +614,18 @@ systemctl --user restart mihomo
 ```
 
 #### Q: 想要禁用自动代理启动？
-A: 编辑 shell 配置文件，注释掉相关行：
+A: 禁用 systemd 用户服务即可：
+
 ```bash
-# 编辑 ~/.bashrc 或 ~/.zshrc，在包含 clashon 的行前加 #
-sed -i 's/.*clashon.*/#&/' ~/.bashrc
+systemctl --user disable --now mihomo.service 2>/dev/null || true
+systemctl --user disable --now clash.service 2>/dev/null || true
+systemctl --user disable --now clash-proxy-env.service 2>/dev/null || true
+```
+
+如果你之前启用了开机自启（lingering），也可以关闭：
+
+```bash
+loginctl disable-linger "$USER" 2>/dev/null || true
 ```
 
 ### 通用问题

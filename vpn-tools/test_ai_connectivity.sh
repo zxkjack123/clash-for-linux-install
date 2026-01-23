@@ -1,28 +1,31 @@
 #!/bin/bash
 # AI connectivity test (clean rebuild)
-# Usage: ./test_ai_connectivity.sh [--group AI] [--rounds 5] [--limit N] [--apply] [--json out.json] [--md report.md]
+# Usage: ./test_ai_connectivity.sh [--group AI] [--rounds 5] [--limit N] [--switch] [--apply] [--json out.json] [--md report.md]
 set -euo pipefail
 
-API=${CLASH_API:-http://127.0.0.1:9090}
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Load env (optional) and bootstrap controller/secret (env override -> legacy compat -> runtime.yaml -> default)
+# shellcheck source=/dev/null
+. "${SCRIPT_DIR}/load_env.sh" 2>/dev/null || true
+
+API="${CLASH_API:-http://127.0.0.1:9090}"
+PROXY=${PROXY:-http://127.0.0.1:7890}
 GROUP=AI
 ROUNDS=5
 LIMIT=0
 APPLY=0
+SWITCH=0
 JSON_OUT=""
 MD_OUT=""
 QUIET=0
 
+# Controller calls should never be affected by proxy env.
+CTRL_CURL_OPTS=(--noproxy '*' --connect-timeout 2 --max-time 6)
+
 # Secret autodetect
-API_SECRET=${CLASH_API_SECRET:-}
-if [[ -z $API_SECRET ]]; then
-  for f in "$(dirname "$0")/../resources/mixin.yaml" "$(dirname "$0")/../resources/config.yaml" "$(dirname "$0")/../config.yaml"; do
-    [[ -z $API_SECRET && -f $f ]] || continue
-    s=$(grep -E '^secret:' "$f" | awk '{print $2}' | head -n1 || true)
-    [[ -n ${s:-} ]] && API_SECRET=$s
-  done
-fi
+SECRET="${CLASH_SECRET:-}"
 AUTH_HEADER=()
-[[ -n $API_SECRET ]] && AUTH_HEADER=(-H "Authorization: Bearer $API_SECRET")
+[[ -n $SECRET ]] && AUTH_HEADER=(-H "Authorization: Bearer $SECRET")
 
 have(){ command -v "$1" >/dev/null 2>&1; }
 log(){ [[ $QUIET -eq 1 ]] || echo "$@" >&2; }
@@ -32,7 +35,8 @@ while [[ $# -gt 0 ]]; do
     --group) GROUP=$2; shift 2;;
     --rounds) ROUNDS=$2; shift 2;;
     --limit) LIMIT=$2; shift 2;;
-    --apply) APPLY=1; shift;;
+    --switch) SWITCH=1; shift;;
+    --apply) APPLY=1; SWITCH=1; shift;;
     --json) JSON_OUT=$2; shift 2;;
     --md) MD_OUT=$2; shift 2;;
     -q|--quiet) QUIET=1; shift;;
@@ -41,11 +45,20 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if ! curl -fsS "${AUTH_HEADER[@]}" "$API/version" >/dev/null 2>&1; then
+if ! curl -fsS "${CTRL_CURL_OPTS[@]}" "${AUTH_HEADER[@]}" "$API/version" >/dev/null 2>&1; then
   echo "Controller unreachable $API" >&2; exit 1
 fi
 
-nodes_json=$(curl -fsS "${AUTH_HEADER[@]}" "$API/proxies/$GROUP") || { echo "Cannot fetch group $GROUP" >&2; exit 1; }
+# Save current group selection so we can restore when not applying.
+ORIG_NOW=""
+_group_json=$(curl -fsS "${CTRL_CURL_OPTS[@]}" "${AUTH_HEADER[@]}" "$API/proxies/$GROUP" 2>/dev/null || true)
+if have jq; then
+  ORIG_NOW=$(printf '%s' "$_group_json" | jq -r '.now // empty' 2>/dev/null || true)
+else
+  ORIG_NOW=$(printf '%s' "$_group_json" | sed -n 's/.*"now":"\([^"]*\)".*/\1/p' | head -n1 || true)
+fi
+
+nodes_json=$(curl -fsS "${CTRL_CURL_OPTS[@]}" "${AUTH_HEADER[@]}" "$API/proxies/$GROUP") || { echo "Cannot fetch group $GROUP" >&2; exit 1; }
 if have jq; then
   mapfile -t NODES < <(echo "$nodes_json" | jq -r '.all[]' | sed 's/ /%20/g')
 else
@@ -85,26 +98,69 @@ code_ok(){
 
 declare -A MET
 
-curl_probe(){ local url=$1 out code t; out=$(curl -s -o /dev/null -w '%{http_code},%{time_total}' --max-time 12 "$url" || true); code=${out%%,*}; t=${out##*,}; [[ -z $code ]] && code=000; echo "$code,$t"; }
+curl_probe(){
+  local url=$1 out code t
+  out=$(curl -s -o /dev/null -w '%{http_code},%{time_total}' --connect-timeout 5 --max-time 12 --proxy "$PROXY" "$url" || true)
+  code=${out%%,*}; t=${out##*,}
+  [[ -z $code ]] && code=000
+  echo "$code,$t"
+}
+
+delay_probe(){
+  local node_enc=$1 url=$2 timeout_ms=${3:-12000}
+  local resp d
+  resp=$(curl -fsS "${CTRL_CURL_OPTS[@]}" "${AUTH_HEADER[@]}" "$API/proxies/${node_enc}/delay?timeout=${timeout_ms}&url=${url}" 2>/dev/null || true)
+  if have jq; then
+    d=$(printf '%s' "$resp" | jq -r '.delay // empty' 2>/dev/null || true)
+  else
+    d=$(printf '%s' "$resp" | sed -n 's/.*"delay"[ ]*:[ ]*\([0-9]\+\).*/\1/p' | head -n1 || true)
+  fi
+  [[ -n ${d:-} ]] || return 1
+  printf '%s' "$d"
+}
 percentile(){ local p=$1; shift; local arr=($(printf '%s\n' "$@" | sort -n)); local n=${#arr[@]}; [[ $n -eq 0 ]] && { echo 0; return; }; [[ $n -eq 1 ]] && { echo ${arr[0]}; return; }; local rank=$(awk -v p=$p -v n=$n 'BEGIN{print (p/100)*(n-1)}'); local lo=${rank%.*}; local hi=$((lo+1)); (( hi>=n )) && hi=$lo; local frac=$(awk -v r=$rank -v l=$lo 'BEGIN{print r-l}'); awk -v a=${arr[$lo]} -v b=${arr[$hi]} -v f=$frac 'BEGIN{print a+(b-a)*f}'; }
 score_node(){ local sr=$1 med=$2 p95=$3; awk -v sr=$sr -v m=$med -v p=$p95 'BEGIN{s=sr*60; L=(m*0.6+p*0.4); l=(L>4?0:(4-L)/4*30); printf "%.2f", s+l}'; }
-apply_group(){ curl -fsS -X PUT "${AUTH_HEADER[@]}" "$API/proxies/$GROUP" -H 'Content-Type: application/json' -d '{"name":"'"$1"'"}' >/dev/null 2>&1; }
+apply_group(){ curl -fsS "${CTRL_CURL_OPTS[@]}" -X PUT "${AUTH_HEADER[@]}" "$API/proxies/$GROUP" -H 'Content-Type: application/json' -d '{"name":"'"$1"'"}' >/dev/null 2>&1; }
+
+restore_original(){
+  if [[ ${SWITCH:-0} -eq 1 && ${APPLY:-0} -ne 1 && -n ${ORIG_NOW:-} ]]; then
+    apply_group "$ORIG_NOW" >/dev/null 2>&1 || true
+  fi
+}
+trap restore_original EXIT INT TERM
 
 log "Group=$GROUP Nodes=${#NODES[@]} Rounds=$ROUNDS"
 start=$(date +%s)
 for node in "${NODES[@]}"; do
   decoded=${node//%20/ }
-  curl -fsS -X PUT "${AUTH_HEADER[@]}" "$API/proxies/$GROUP" -H 'Content-Type: application/json' -d '{"name":"'"$decoded"'"}' >/dev/null || { log "Switch fail $decoded"; continue; }
-  sleep 1
   lat=(); attempts=0; successes=0
-  for ((r=1;r<=ROUNDS;r++)); do
-    mapfile -t SHUF < <(printf '%s\n' "${ENDPOINTS[@]}" | shuf)
-    for ep in "${SHUF[@]}"; do
-      svc=${ep%%:*}; url=${ep#*:}; res=$(curl_probe "$url"); code=${res%%,*}; t=${res##*,}; attempts=$((attempts+1))
-      if code_ok "$svc" "$code"; then successes=$((successes+1)); lat+=($t); fi
+  if [[ $SWITCH -eq 1 ]]; then
+    # Side-effectful mode: temporarily switch the group to test real traffic through local proxy.
+    curl -fsS "${CTRL_CURL_OPTS[@]}" -X PUT "${AUTH_HEADER[@]}" "$API/proxies/$GROUP" -H 'Content-Type: application/json' -d '{"name":"'"$decoded"'"}' >/dev/null || { log "Switch fail $decoded"; continue; }
+    sleep 1
+    for ((r=1;r<=ROUNDS;r++)); do
+      mapfile -t SHUF < <(printf '%s\n' "${ENDPOINTS[@]}" | shuf)
+      for ep in "${SHUF[@]}"; do
+        svc=${ep%%:*}; url=${ep#*:}; res=$(curl_probe "$url"); code=${res%%,*}; t=${res##*,}; attempts=$((attempts+1))
+        if code_ok "$svc" "$code"; then successes=$((successes+1)); lat+=($t); fi
+      done
+      if [[ $r -eq 2 ]]; then sr_tmp=$(awk -v s=$successes -v a=$attempts 'BEGIN{if(a==0)print 0; else print s/a}'); awk -v v=$sr_tmp 'BEGIN{exit !(v<0.3)}'; [[ $? -eq 0 ]] && break; fi
     done
-    if [[ $r -eq 2 ]]; then sr_tmp=$(awk -v s=$successes -v a=$attempts 'BEGIN{if(a==0)print 0; else print s/a}'); awk -v v=$sr_tmp 'BEGIN{exit !(v<0.3)}'; [[ $? -eq 0 ]] && break; fi
-  done
+  else
+    # Safe-by-default mode: do NOT switch; use controller delay API to estimate per-node latency.
+    # Note: this does not fully validate endpoint reachability per node.
+    local_delay_urls=("https://www.gstatic.com/generate_204" "https://www.cloudflare.com/cdn-cgi/trace")
+    for ((r=1;r<=ROUNDS;r++)); do
+      for u in "${local_delay_urls[@]}"; do
+        attempts=$((attempts+1))
+        if dms=$(delay_probe "$node" "$u" 12000); then
+          successes=$((successes+1))
+          # Convert ms -> seconds to reuse scoring.
+          lat+=("$(awk -v d="$dms" 'BEGIN{printf "%.3f", d/1000}')")
+        fi
+      done
+    done
+  fi
   sr=$(awk -v s=$successes -v a=$attempts 'BEGIN{if(a==0)print 0; else print s/a}')
   med=$(percentile 50 "${lat[@]}"); p95=$(percentile 95 "${lat[@]}")
   sc=$(score_node $sr $med $p95)

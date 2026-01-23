@@ -29,10 +29,46 @@
 
 ## 快速使用指南
 
+## 🧯 紧急：一键切回直连（不走代理）
+
+当 clash/mihomo 节点异常导致网络不可用时，直接运行：
+
+```bash
+bash ~/.local/share/clash/script/emergency_off.sh
+```
+
+如需在**不改网络**的情况下先看看它会做什么：
+
+```bash
+bash ~/.local/share/clash/script/emergency_off.sh --dry-run
+```
+
+如需更安全的“试运行”（到点自动回滚）：
+
+```bash
+bash ~/.local/share/clash/script/emergency_off.sh --trial 20
+```
+
+试运行 + 直连自检（推荐）：trial 默认会检查 baidu/bing/qq；不通就立刻回滚。
+
+```bash
+bash ~/.local/share/clash/script/emergency_off.sh --trial 20
+
+# 额外加一个你关心的站点（默认检查 + 你指定的都会测）
+bash ~/.local/share/clash/script/emergency_off.sh --trial 20 --require-url https://www.taobao.com
+```
+
+> 默认会**停止服务 + 卸载系统/Git 代理**，让系统恢复到“无代理直连”状态。
+> 如果你只想停服务而不动代理设置（不推荐），可用：`bash ~/.local/share/clash/script/emergency_off.sh --no-unset-proxy`
+
+> 若你当前终端仍残留 `http_proxy/all_proxy`，可选执行：
+>
+> `eval "$(bash ~/.local/share/clash/script/emergency_off.sh --print-unset)"`
+
 ### 方式1: 使用仪表盘（推荐）
 
 ```bash
-cd /home/gw/opt/clash-for-linux-install/vpn-tools
+cd /path/to/clash-for-linux-install/vpn-tools
 ./network_dashboard.sh
 
 # 选择 [7] 一键优化全网络
@@ -41,7 +77,7 @@ cd /home/gw/opt/clash-for-linux-install/vpn-tools
 ### 方式2: 直接运行脚本
 
 ```bash
-cd /home/gw/opt/clash-for-linux-install/vpn-tools
+cd /path/to/clash-for-linux-install/vpn-tools
 ./optimize_all_network.sh
 ```
 
@@ -167,7 +203,7 @@ AI服务 (75% ✓)
 **A**: 可能API地址不正确，修改方法：
 
 ```bash
-nano /home/gw/opt/clash-for-linux-install/vpn-tools/network_health_monitor.sh
+nano /path/to/clash-for-linux-install/vpn-tools/network_health_monitor.sh
 
 # 找到第107行，修改为正确的API地址
 "https://api.siliconflow.cn/v1/models|硅基流动"
@@ -191,7 +227,7 @@ nano /home/gw/opt/clash-for-linux-install/vpn-tools/network_health_monitor.sh
 crontab -e
 
 # 每天早上8点自动优化
-0 8 * * * /home/gw/opt/clash-for-linux-install/vpn-tools/optimize_all_network.sh
+0 8 * * * /path/to/clash-for-linux-install/vpn-tools/optimize_all_network.sh
 ```
 
 ### Q4: 优化日志在哪里？
@@ -252,7 +288,7 @@ ls -lt ~/.local/share/clash/logs/optimize_all_*.log | head -1 | awk '{print $NF}
 
 ### 核心文件
 ```
-/home/gw/opt/clash-for-linux-install/vpn-tools/
+/path/to/clash-for-linux-install/vpn-tools/
 ├── network_health_monitor.sh      (监控引擎) ✅ 已更新
 ├── network_dashboard.sh            (可视化界面) ✅ 已更新
 ├── optimize_all_network.sh         (一键优化) ✅ 新建
@@ -272,7 +308,7 @@ ls -lt ~/.local/share/clash/logs/optimize_all_*.log | head -1 | awk '{print $NF}
 
 ### 文档文件
 ```
-/home/gw/opt/clash-for-linux-install/
+/path/to/clash-for-linux-install/
 ├── UPDATE_NOTES.md                 (本次更新说明) ✅ 新建
 ├── BUG_FIX_REPORT.md               (bug修复报告)
 ├── NETWORK_OPTIMIZATION_GUIDE.md   (优化指南)
@@ -323,7 +359,7 @@ ls -lt ~/.local/share/clash/logs/optimize_all_*.log | head -1
 **更新完成** ✅ 立即体验新功能！
 
 ```bash
-cd /home/gw/opt/clash-for-linux-install/vpn-tools
+cd /path/to/clash-for-linux-install/vpn-tools
 ./network_dashboard.sh
 # 然后按 7
 ```
