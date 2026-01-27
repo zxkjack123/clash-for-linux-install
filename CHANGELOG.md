@@ -1,4 +1,22 @@
 # Changelog
+## [2.5.7] - 2026-01-27
+
+### ✨ New
+- Added `vpn-tools/enable_copilot_fallback_direct.sh`: a preview-first helper to create/update a dedicated `COPILOT` **fallback** group (`JP-Tailscale` → `DIRECT`) in `~/.local/share/clash/mixin.yaml`, with an optional rebuild/restart path.
+
+### 🛠 Fixes
+- `install.sh`: resource copy is now safe for spaces/newlines in filenames (switched to `find -print0 | xargs -0`), and still skips large archives/images.
+- `vpn-tools/trace_mihomo_connections.sh`: improved controller parsing and output robustness (stable delimiter + id-based dedupe), and correctly sends the Authorization header when `secret` is set.
+- `vpn-tools/network_change_probe.sh`: more resilient connectivity probing and reporting (reduces false positives in noisy networks).
+
+### 🔧 Improvements
+- `script/sanitize_runtime.sh`: Copilot domain rules are injected as **high-priority** rules (ahead of broad GitHub rules). If a `COPILOT` group exists, Copilot routes to it; otherwise it safely falls back to `DIRECT`.
+- `script/clashctl.sh`: expanded `NO_PROXY`/GNOME ignore-hosts to include Tailscale control-plane domains (`tailscale.com`, `.tailscale.com`, `controlplane.tailscale.com`) so tailnet control traffic remains DIRECT.
+
+### ✅ Verification
+- `bash -n` on changed shell scripts
+- `script/clash_diagnose.sh --fast --json`
+
 ## [2.5.6] - 2026-01-23
 
 ### ✨ New

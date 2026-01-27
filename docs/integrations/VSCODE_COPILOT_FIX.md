@@ -1,5 +1,19 @@
 # VSCode Copilot 断开连接问题 - 诊断与解决方案
 
+## 2026-01 更新：推荐的“稳定兜底”方案
+
+如果你希望 Copilot **优先走 JP-Tailscale，但在 JP-Tailscale 短暂重启/不健康时自动回落 DIRECT**（避免 VS Code/Copilot 长时间超时重试），推荐按下面流程：
+
+1. 创建/更新 `COPILOT` fallback 组（默认仅预览）：
+  - `cd /path/to/clash-for-linux-install/vpn-tools && bash enable_copilot_fallback_direct.sh`
+2. 应用并重建运行时（会重启 mihomo，可能短暂影响代理依赖应用）：
+  - `bash enable_copilot_fallback_direct.sh --apply --rebuild`
+3. 复现问题的同时进行“实锤”追踪（确认命中规则与链路）：
+  - `bash trace_mihomo_connections.sh --seconds 60`
+  - 重点看输出里的 `rule=...` 与 `chains=...`，确认 Copilot 流量命中 `COPILOT`（或你的目标分组）。
+
+> 说明：Copilot 域名规则由 `script/sanitize_runtime.sh` 自动保持高优先级（避免被宽泛 GitHub 规则提前吞掉），通常无需手工编辑 rules。
+
 ## 诊断时间
 2025-10-14 15:50:00
 

@@ -63,7 +63,12 @@ fi
 ui_addr=$(printf '%s' "$ui_addr" | tr -d "\"'")
 secret=$(printf '%s' "$secret" | tr -d "\"'")
 
-api="http://127.0.0.1:${ui_addr##*:}"
+ui_host="${ui_addr%:*}"
+ui_port="${ui_addr##*:}"
+case "$ui_host" in
+  ''|0.0.0.0|::) ui_host='127.0.0.1' ;;
+esac
+api="http://${ui_host}:${ui_port}"
 
 hdr=()
 [ -n "$secret" ] && hdr=(-H "Authorization: Bearer $secret")
@@ -74,36 +79,42 @@ echo "Tracing controller ${api} for ${SECONDS}s (interval=${INTERVAL}s)"
 echo "Filter host =~ /$FILTER/  process =~ /$PROCESS_RE/"
 echo
 
-# Print a compact line per match; we dedupe by connection id to reduce spam.
-seen_ids=""
+# Print a compact line per match; dedupe by connection id to reduce spam.
+# NOTE: Do NOT use a pipeline to feed the while-read loop, otherwise dedupe state
+# will be lost in a subshell.
+declare -A seen_ids=()
+DELIM=$'\x1f'
 
 while [ $(date +%s) -lt "$end" ]; do
   json=$(curl -sS --max-time 2 "${hdr[@]}" "${api}/connections" 2>/dev/null || echo '{}')
 
-  echo "$json" | jq -r --arg re "$FILTER" --arg pre "$PROCESS_RE" '
-    .connections // []
-    | map({
-        id,
-        host:(.metadata.host // ""),
-        dst:((.metadata.destinationIP // "") + ":" + ((.metadata.destinationPort // 0)|tostring)),
-        process:(.metadata.process // ""),
-        rule:(.rule // ""),
-        rulePayload:(.rulePayload // ""),
-        chains:(.chains // [])
-      })
-    | map(select((.host|test($re)) or (.dst|test($re))))
-    | map(select((.process|test($pre)) or (.process=="")))
-    | .[]
-    | "\(.id)\t\(.process)\t\(.host)\t\(.dst)\t\(.rule)\t\(.rulePayload)\tchains=\(.chains|join("->"))"' \
-    | while IFS=$'\t' read -r id proc host dst rule payload chains; do
-        # dedupe by id
-        if echo "$seen_ids" | grep -q "\b${id}\b" 2>/dev/null; then
-          continue
-        fi
-        seen_ids="$seen_ids $id"
-        ts=$(date '+%H:%M:%S')
-        printf '[%s] %s host=%s dst=%s rule=%s(%s) %s\n' "$ts" "${proc:-?}" "$host" "$dst" "$rule" "$payload" "$chains"
-      done
+  while IFS="$DELIM" read -r id proc host dst rule payload chains; do
+    [ -z "${id:-}" ] && continue
+    # dedupe by id
+    if [[ -n "${seen_ids[$id]+x}" ]]; then
+      continue
+    fi
+    seen_ids[$id]=1
+    ts=$(date '+%H:%M:%S')
+    [ -z "${proc:-}" ] && proc='?'
+    printf '[%s] proc=%s host=%s dst=%s rule=%s payload=%s chains=%s\n' "$ts" "$proc" "$host" "$dst" "$rule" "$payload" "$chains"
+  done < <(
+    echo "$json" | jq -r --arg re "$FILTER" --arg pre "$PROCESS_RE" '
+      .connections // []
+      | map({
+          id,
+          host:(.metadata.host // ""),
+          dst:((.metadata.destinationIP // "") + ":" + ((.metadata.destinationPort // 0)|tostring)),
+          process:(.metadata.process // ""),
+          rule:(.rule // ""),
+          rulePayload:(.rulePayload // ""),
+          chains:(.chains // [])
+        })
+      | map(select((.host|test($re)) or (.dst|test($re))))
+      | map(select((.process|test($pre)) or (.process=="")))
+      | .[]
+      | "\(.id)\u001f\(.process)\u001f\(.host)\u001f\(.dst)\u001f\(.rule)\u001f\(.rulePayload)\u001f\(.chains|@json)"'
+  )
 
   sleep "$INTERVAL"
 done

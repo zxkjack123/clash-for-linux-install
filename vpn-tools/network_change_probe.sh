@@ -25,7 +25,8 @@
 
 set -euo pipefail
 
-LOG_FILE="$(pwd)/network-change-log.tsv"
+# Allow overriding output location (useful to avoid polluting a git working tree).
+LOG_FILE="${LOG_FILE:-$(pwd)/network-change-log.tsv}"
 RAW_DIR="${RAW_DIR:-}" # optional external raw dump directory
 HILIGHT_TS="${ERR_TS:-}"  # user-supplied timestamp (YYYY-MM-DDTHH:MM)
 
@@ -80,7 +81,7 @@ _count_veth(){
 
 _process_ip(){
   # Consume ip monitor lines, condense to significant state changes.
-  sed -u 's/^[ \\t]*//; /^(?)/!p' | while IFS= read -r line; do
+  sed -u 's/^[ \\t]*//' | while IFS= read -r line; do
     case "$line" in
       *" state UP"*|*" state DOWN"*|"Deleted"*|"default"*|"veth"*"device created"*|"device removed"*)
         # Extract iface name heuristically
@@ -102,7 +103,8 @@ _process_ip(){
 }
 
 _process_nm(){
-  awk '{print strftime("%Y-%m-%dT%H:%M:%S%z"),$0}' | while read -r ts rest; do
+  # Preserve the full message (nmcli output can contain spaces).
+  awk '{printf "%s\t%s\n", strftime("%Y-%m-%dT%H:%M:%S%z"), $0}' | while IFS=$'\t' read -r ts rest; do
     _emit NM "-" "$rest"
   done
 }
@@ -120,27 +122,51 @@ _process_resolved(){
 }
 
 # Launch background taps
-IP_FIFO=$(mktemp -u)
+IP_FIFO=$(mktemp -t ipmon.fifo.XXXXXX)
+rm -f -- "$IP_FIFO"
 mkfifo "$IP_FIFO"
-(ip monitor link addr route neigh > "$IP_FIFO" 2>/dev/null &)
+ip monitor link addr route neigh > "$IP_FIFO" 2>/dev/null &
+IP_MON_PID=$!
 _process_ip < "$IP_FIFO" &
 BG_IP=$!
 
 if [ $NM_MONITOR_AVAILABLE -eq 1 ]; then
-  NM_FIFO=$(mktemp -u); mkfifo "$NM_FIFO"; (nmcli monitor > "$NM_FIFO" 2>/dev/null &); _process_nm < "$NM_FIFO" & BG_NM=$!
+  NM_FIFO=$(mktemp -t nmmon.fifo.XXXXXX)
+  rm -f -- "$NM_FIFO"
+  mkfifo "$NM_FIFO"
+  nmcli monitor > "$NM_FIFO" 2>/dev/null &
+  NM_MON_PID=$!
+  _process_nm < "$NM_FIFO" &
+  BG_NM=$!
 fi
 if [ $RESOLVED_JOURNAL_AVAILABLE -eq 1 ]; then
-  RES_FIFO=$(mktemp -u); mkfifo "$RES_FIFO"; (journalctl -u systemd-resolved -f -n 0 > "$RES_FIFO" 2>/dev/null &); _process_resolved < "$RES_FIFO" & BG_DNS=$!
+  RES_FIFO=$(mktemp -t resolved.fifo.XXXXXX)
+  rm -f -- "$RES_FIFO"
+  mkfifo "$RES_FIFO"
+  journalctl -u systemd-resolved -f -n 0 > "$RES_FIFO" 2>/dev/null &
+  RES_MON_PID=$!
+  _process_resolved < "$RES_FIFO" &
+  BG_DNS=$!
 fi
 
 _emit INIT "-" "initial snapshots"; _snapshot_route; _count_veth; _snapshot_pubip
 
 cleanup(){
   _emit EXIT "-" "stopping" || true
-  [ -n "${BG_IP:-}" ] && kill $BG_IP 2>/dev/null || true
-  [ -n "${BG_NM:-}" ] && kill $BG_NM 2>/dev/null || true
-  [ -n "${BG_DNS:-}" ] && kill $BG_DNS 2>/dev/null || true
-  rm -f ${IP_FIFO:-} ${NM_FIFO:-} ${RES_FIFO:-}
+  [ -n "${BG_IP:-}" ] && kill "$BG_IP" 2>/dev/null || true
+  [ -n "${BG_NM:-}" ] && kill "$BG_NM" 2>/dev/null || true
+  [ -n "${BG_DNS:-}" ] && kill "$BG_DNS" 2>/dev/null || true
+
+  # Also stop producer processes; otherwise they may keep running after Ctrl-C.
+  [ -n "${IP_MON_PID:-}" ] && kill "$IP_MON_PID" 2>/dev/null || true
+  [ -n "${NM_MON_PID:-}" ] && kill "$NM_MON_PID" 2>/dev/null || true
+  [ -n "${RES_MON_PID:-}" ] && kill "$RES_MON_PID" 2>/dev/null || true
+
+  local -a to_rm=()
+  [ -n "${IP_FIFO:-}" ] && to_rm+=("$IP_FIFO")
+  [ -n "${NM_FIFO:-}" ] && to_rm+=("$NM_FIFO")
+  [ -n "${RES_FIFO:-}" ] && to_rm+=("$RES_FIFO")
+  [ ${#to_rm[@]} -gt 0 ] && rm -f -- "${to_rm[@]}" || true
 }
 trap cleanup INT TERM EXIT
 

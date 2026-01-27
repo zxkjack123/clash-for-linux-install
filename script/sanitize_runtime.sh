@@ -43,6 +43,26 @@ DOMAIN-SUFFIX,scnet.cn,DIRECT
 DOMAIN-SUFFIX,szai.scnet.cn,DIRECT
 EOF
 
+# GitHub Copilot: optional priority routing.
+#
+# Why this exists:
+# - Subscription rules often include broad `DOMAIN-KEYWORD,github,...` or GitHub dev rule-sets.
+# - If Copilot-specific domains are not placed early, they may be swallowed by those broad rules.
+#
+# Strategy:
+# - If a proxy-group named "COPILOT" exists, route Copilot domains to it.
+# - Otherwise, fall back to DIRECT (safe default).
+# - Always place these rules at the top of the rules list.
+#
+# You can override target group explicitly (must exist), e.g.:
+#   CLASH_COPILOT_TARGET="COPILOT" bash script/sanitize_runtime.sh --restart
+read -r -d '' COPILOT_PRIORITY_RULES_TEMPLATE <<'EOF' || true
+DOMAIN,api.githubcopilot.com,${TARGET}
+DOMAIN,api.individual.githubcopilot.com,${TARGET}
+DOMAIN-SUFFIX,githubcopilot.com,${TARGET}
+DOMAIN,copilot-proxy.githubusercontent.com,${TARGET}
+EOF
+
 DRY=false
 RESTART=false
 VERBOSE=false
@@ -54,12 +74,17 @@ VERBOSE=false
 #   - Place them at the top of rules so they override broad DOMAIN-SUFFIX,google.com rules.
 # Override target group with: CLASH_GOOGLE_SCHOLAR_TARGET="<group-name>"
 CLASH_GOOGLE_SCHOLAR_TARGET="${CLASH_GOOGLE_SCHOLAR_TARGET:-}"
+
+# Override Copilot target group (optional; must exist).
+CLASH_COPILOT_TARGET="${CLASH_COPILOT_TARGET:-}"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dry) DRY=true; shift ;;
     --restart) RESTART=true; shift ;;
     --verbose|-v) VERBOSE=true; shift ;;
-  --file|-f) TARGET_FILE="$2"; shift 2 ;;
+    --file|-f)
+      [[ $# -ge 2 ]] || { echo "[ERR] --file/-f 需要一个路径" >&2; exit 1; }
+      TARGET_FILE="$2"; shift 2 ;;
     -h|--help)
       sed -n '1,30p' "$0"; exit 0 ;;
     *) echo "[ERR] 未知参数: $1" >&2; exit 1 ;;
@@ -75,6 +100,10 @@ vv(){ $VERBOSE && echo "[debug] $*" >&2 || true; }
 # Detect a safe Scholar target group (only if yq is available)
 GOOGLE_SCHOLAR_TARGET=""
 GOOGLE_SCHOLAR_PRIORITY_RULES=""
+
+# Detect a safe Copilot target group (only if yq is available)
+COPILOT_TARGET=""
+COPILOT_PRIORITY_RULES=""
 if [ -x "$YQ_BIN" ]; then
   if [ -n "$CLASH_GOOGLE_SCHOLAR_TARGET" ]; then
     # honor explicit override only if it exists in proxy-groups
@@ -99,6 +128,32 @@ if [ -x "$YQ_BIN" ]; then
     # Keep rules minimal/specific to avoid affecting other Google services.
     GOOGLE_SCHOLAR_PRIORITY_RULES=$'DOMAIN,scholar.google.com,'"$GOOGLE_SCHOLAR_TARGET"$'\nDOMAIN-SUFFIX,scholar.googleusercontent.com,'"$GOOGLE_SCHOLAR_TARGET"
   fi
+
+  # Copilot routing:
+  # - honor explicit CLASH_COPILOT_TARGET only if the group exists
+  # - otherwise prefer a dedicated group named "COPILOT" if present
+  # - otherwise default to DIRECT
+  if [ -n "$CLASH_COPILOT_TARGET" ]; then
+    if CLASH_COPILOT_TARGET="$CLASH_COPILOT_TARGET" "$YQ_BIN" -e '((.["proxy-groups"] // []) | map(.name) | contains([strenv(CLASH_COPILOT_TARGET)]))' "$RUNTIME" >/dev/null 2>&1; then
+      COPILOT_TARGET="$CLASH_COPILOT_TARGET"
+    else
+      vv "CLASH_COPILOT_TARGET 指定的分组不存在: $CLASH_COPILOT_TARGET (将忽略)"
+    fi
+  fi
+  if [ -z "$COPILOT_TARGET" ]; then
+    # mikefarah/yq v4 supports map()/contains(), but not jq-style if/index.
+    # Keep the decision in bash and only ask yq for an existence boolean.
+    if "$YQ_BIN" -e '((.["proxy-groups"] // []) | map(.name) | contains(["COPILOT"]))' "$RUNTIME" >/dev/null 2>&1; then
+      COPILOT_TARGET="COPILOT"
+    else
+      COPILOT_TARGET="DIRECT"
+    fi
+  fi
+  # Materialize template into concrete rule lines.
+  if [ -n "$COPILOT_TARGET" ]; then
+    # Replace literal "${TARGET}" safely (no regex pitfalls).
+    COPILOT_PRIORITY_RULES="${COPILOT_PRIORITY_RULES_TEMPLATE//'${TARGET}'/$COPILOT_TARGET}"
+  fi
 fi
 
 # Fallback (no yq): try to detect a safe existing group by plain text.
@@ -116,6 +171,20 @@ if [ -z "$GOOGLE_SCHOLAR_TARGET" ]; then
   fi
 fi
 
+# Fallback (no yq): try to detect COPILOT group by plain text.
+if [ -z "$COPILOT_TARGET" ]; then
+  if [ -n "$CLASH_COPILOT_TARGET" ] && grep -qF "name: $CLASH_COPILOT_TARGET" "$RUNTIME" 2>/dev/null; then
+    COPILOT_TARGET="$CLASH_COPILOT_TARGET"
+  elif grep -qF 'name: COPILOT' "$RUNTIME" 2>/dev/null; then
+    COPILOT_TARGET="COPILOT"
+  else
+    COPILOT_TARGET="DIRECT"
+  fi
+fi
+if [ -z "$COPILOT_PRIORITY_RULES" ] && [ -n "$COPILOT_TARGET" ]; then
+  COPILOT_PRIORITY_RULES="${COPILOT_PRIORITY_RULES_TEMPLATE//'${TARGET}'/$COPILOT_TARGET}"
+fi
+
 if [ -z "$GOOGLE_SCHOLAR_PRIORITY_RULES" ] && [ -n "$GOOGLE_SCHOLAR_TARGET" ]; then
   GOOGLE_SCHOLAR_PRIORITY_RULES=$'DOMAIN,scholar.google.com,'"$GOOGLE_SCHOLAR_TARGET"$'\nDOMAIN-SUFFIX,scholar.googleusercontent.com,'"$GOOGLE_SCHOLAR_TARGET"
 fi
@@ -127,6 +196,7 @@ HAS_DIRECT_1=$(grep -E "IP-CIDR,1.1.1.1/32,DIRECT,no-resolve" -n "$RUNTIME" || t
 HAS_DIRECT_8=$(grep -E "IP-CIDR,8.8.8.8/32,DIRECT,no-resolve" -n "$RUNTIME" || true)
 FALLBACK_HAS_IP=$(grep -E "^ *fallback:.*(1.1.1.1|8.8.8.8)" -n "$RUNTIME" || true)
 HAS_SCHOLAR_RULE=$(grep -E "^ *- +DOMAIN,scholar\\.google\\.com," -n "$RUNTIME" || true)
+HAS_COPILOT_RULE=$(grep -E "^ *- +(DOMAIN|DOMAIN-SUFFIX),.*githubcopilot\\.com," -n "$RUNTIME" || true)
 
 vv "Hijack1: ${HIJACK_1:-<none>}"
 vv "Hijack8: ${HIJACK_8:-<none>}"
@@ -144,6 +214,11 @@ if $DRY; then
     [[ -z "$HAS_SCHOLAR_RULE" ]] && echo "将补充(高优先级): DOMAIN,scholar.google.com,${GOOGLE_SCHOLAR_TARGET}"
   else
     echo "提示: 未能确定 Google Scholar 的安全分组 (yq 不可用或缺少可用分组)，将不注入 Scholar 规则"
+  fi
+  if [ -n "$COPILOT_PRIORITY_RULES" ]; then
+    [[ -z "$HAS_COPILOT_RULE" ]] && echo "将补充(高优先级): Copilot 规则 -> ${COPILOT_TARGET}"
+  else
+    echo "提示: 未生成 Copilot 优先规则（将保持现状）"
   fi
   [[ -z "$HIJACK_1$HIJACK_8$FALLBACK_HAS_IP" && -n "$HAS_DIRECT_1$HAS_DIRECT_8" ]] && echo "无修改 (已清洁)"
   exit 0
@@ -164,7 +239,7 @@ if [ -x "$YQ_BIN" ]; then
     .rules = (
       ( ["IP-CIDR,1.1.1.1/32,DIRECT,no-resolve","IP-CIDR,8.8.8.8/32,DIRECT,no-resolve"] +
         ((.rules // []) | map(select(. != "IP-CIDR,1.1.1.1/32,西瓜加速,no-resolve" and . != "IP-CIDR,8.8.8.8/32,西瓜加速,no-resolve")))
-      ) | unique
+      )
     ) |
     .dns.fallback = ((.dns.fallback // []) | map(select(. != "1.1.1.1" and . != "8.8.8.8")))
   ' "$RUNTIME" 2>/dev/null
@@ -174,6 +249,55 @@ if [ -x "$YQ_BIN" ]; then
     MODIFIED=true
   else
     vv "yq 修改失败, 进入文本回退"
+  fi
+fi
+
+# GitHub Copilot: ensure Copilot rules are placed before broad GitHub rules.
+# Only inject when we can produce a safe rule set (target must be DIRECT or an existing group).
+if [ -x "$YQ_BIN" ] && [ -n "$COPILOT_PRIORITY_RULES" ]; then
+  # Always operate on an array (some merged configs may omit rules temporarily).
+  # IMPORTANT: Do not sort rules here; ordering is how Clash/Mihomo resolves matches.
+  PRIORITY_RULES="$COPILOT_PRIORITY_RULES" "$YQ_BIN" -i '
+    .rules = (
+      ((.rules // []) | map(tostring)) as $rules |
+      (
+        (strenv(PRIORITY_RULES) | split("\n") | map(select(length > 0)))
+          | map(sub("\\r$"; ""))
+          | map(select(length > 0))
+      ) as $prio |
+      (
+        ($rules
+          | map(
+              select((test("^DOMAIN,api\\.githubcopilot\\.com,")) | not)
+              | select((test("^DOMAIN,api\\.individual\\.githubcopilot\\.com,")) | not)
+              | select((test("^DOMAIN-SUFFIX,githubcopilot\\.com,")) | not)
+              | select((test("^DOMAIN,copilot-proxy\\.githubusercontent\\.com,")) | not)
+            )
+        )
+      ) as $rest |
+      ($prio + $rest)
+    )
+  ' "$RUNTIME" 2>/dev/null && MODIFIED=true || true
+fi
+
+# Text-only fallback: inject Copilot rules at the top of rules: (if yq isn't available).
+if [ ! -x "$YQ_BIN" ] && [ -n "$COPILOT_PRIORITY_RULES" ]; then
+  # Remove any existing Copilot rules (regardless of target) to avoid duplicates/conflicts.
+  sed -i -E \
+    -e '/^\s*-\s*DOMAIN,api\.githubcopilot\.com,/d' \
+    -e '/^\s*-\s*DOMAIN,api\.individual\.githubcopilot\.com,/d' \
+    -e '/^\s*-\s*DOMAIN-SUFFIX,githubcopilot\.com,/d' \
+    -e '/^\s*-\s*DOMAIN,copilot-proxy\.githubusercontent\.com,/d' \
+    "$RUNTIME" 2>/dev/null || true
+
+  # Insert right after rules: so it overrides broad GitHub rules.
+  if ! grep -qE '^\s*-\s*DOMAIN,api\.githubcopilot\.com,' "$RUNTIME" 2>/dev/null; then
+    # sed inserts in reverse order (last inserted appears first); insert bottom-up.
+    sed -i "/^rules:/a \\  - DOMAIN,copilot-proxy.githubusercontent.com,${COPILOT_TARGET}" "$RUNTIME" 2>/dev/null || true
+    sed -i "/^rules:/a \\  - DOMAIN-SUFFIX,githubcopilot.com,${COPILOT_TARGET}" "$RUNTIME" 2>/dev/null || true
+    sed -i "/^rules:/a \\  - DOMAIN,api.individual.githubcopilot.com,${COPILOT_TARGET}" "$RUNTIME" 2>/dev/null || true
+    sed -i "/^rules:/a \\  - DOMAIN,api.githubcopilot.com,${COPILOT_TARGET}" "$RUNTIME" 2>/dev/null || true
+    MODIFIED=true
   fi
 fi
 
@@ -238,10 +362,11 @@ if [ -x "$YQ_BIN" ] && [ -n "$SCNET_PRIORITY_RULES" ]; then
   if "$YQ_BIN" -e '.rules? | length > 0' "$RUNTIME" >/dev/null 2>&1; then
     PRIORITY_RULES="$SCNET_PRIORITY_RULES" "$YQ_BIN" -i '
       .rules = (
-        (strenv(PRIORITY_RULES) | split("\n") | map(select(length > 0)))
-          | map(sub("\\r$"; ""))
-          | map(select(length > 0))
-        as $prio |
+        (
+          (strenv(PRIORITY_RULES) | split("\n") | map(select(length > 0)))
+            | map(sub("\\r$"; ""))
+            | map(select(length > 0))
+        ) as $prio |
         ($prio + ((.rules // []) | reduce .[] as $item (
           [];
           . + (if ($prio | index($item)) then [] else [$item] end)
@@ -257,10 +382,11 @@ if [ -x "$YQ_BIN" ] && [ -n "$GOOGLE_SCHOLAR_PRIORITY_RULES" ]; then
   if "$YQ_BIN" -e '.rules? | length > 0' "$RUNTIME" >/dev/null 2>&1; then
     PRIORITY_RULES="$GOOGLE_SCHOLAR_PRIORITY_RULES" "$YQ_BIN" -i '
       .rules = (
-        (strenv(PRIORITY_RULES) | split("\n") | map(select(length > 0)))
-          | map(sub("\\r$"; ""))
-          | map(select(length > 0))
-        as $prio |
+        (
+          (strenv(PRIORITY_RULES) | split("\n") | map(select(length > 0)))
+            | map(sub("\\r$"; ""))
+            | map(select(length > 0))
+        ) as $prio |
         (
           (.rules // [])
           | map(
@@ -301,6 +427,53 @@ if [ -x "$YQ_BIN" ]; then
         ($rules | map(select((((test("^GEOIP,")) or (test("^MATCH,")))) | not ))) + $geos + $matches
       )
     ' "$RUNTIME" 2>/dev/null && MODIFIED=true || true
+  fi
+fi
+
+# Re-pin DIRECT IP-CIDR rules to absolute top.
+# Rationale: later "priority rules" injections (Copilot/SCNET/Scholar) may prepend other DOMAIN rules,
+# which can accidentally push the 1.1.1.1 / 8.8.8.8 safeguards down. Keep them at index 0/1.
+if [ -x "$YQ_BIN" ]; then
+  if "$YQ_BIN" -e '.rules? | length > 0' "$RUNTIME" >/dev/null 2>&1; then
+    # Keep the DIRECT safeguards at index 0/1, but also ensure Copilot rules are immediately
+    # after them (still before any subscription rules).
+    if [ -n "$COPILOT_PRIORITY_RULES" ]; then
+      PRIORITY_RULES="$COPILOT_PRIORITY_RULES" "$YQ_BIN" -i '
+        .rules = (
+          ((.rules // []) | map(tostring)) as $rules |
+          (
+            (strenv(PRIORITY_RULES) | split("\n") | map(select(length > 0)))
+              | map(sub("\\r$"; ""))
+              | map(select(length > 0))
+          ) as $prio |
+          ["IP-CIDR,1.1.1.1/32,DIRECT,no-resolve","IP-CIDR,8.8.8.8/32,DIRECT,no-resolve"] as $direct |
+          (
+            ($rules
+              | map(
+                  # Drop duplicates of the safeguards
+                  select(. != "IP-CIDR,1.1.1.1/32,DIRECT,no-resolve")
+                  | select(. != "IP-CIDR,8.8.8.8/32,DIRECT,no-resolve")
+                  # Drop any existing Copilot rules (regardless of target)
+                  | select((test("^DOMAIN,api\\.githubcopilot\\.com,")) | not)
+                  | select((test("^DOMAIN,api\\.individual\\.githubcopilot\\.com,")) | not)
+                  | select((test("^DOMAIN-SUFFIX,githubcopilot\\.com,")) | not)
+                  | select((test("^DOMAIN,copilot-proxy\\.githubusercontent\\.com,")) | not)
+                )
+            )
+          ) as $rest |
+          ($direct + $prio + $rest)
+        )
+      ' "$RUNTIME" 2>/dev/null && MODIFIED=true || true
+    else
+      "$YQ_BIN" -i '
+        .rules = (
+          ["IP-CIDR,1.1.1.1/32,DIRECT,no-resolve","IP-CIDR,8.8.8.8/32,DIRECT,no-resolve"] +
+          ((.rules // [])
+            | map(select(. != "IP-CIDR,1.1.1.1/32,DIRECT,no-resolve" and . != "IP-CIDR,8.8.8.8/32,DIRECT,no-resolve"))
+          )
+        )
+      ' "$RUNTIME" 2>/dev/null && MODIFIED=true || true
+    fi
   fi
 fi
 

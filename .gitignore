@@ -8,6 +8,7 @@ resources/backup/**
 vpn-tools/_tmp_ai.*
 vpn-tools/batch_*.md
 vpn-tools/network-change-log.tsv
+network-change-log.tsv
 vpn-tools/*.json
 cache.db
 .tmp/

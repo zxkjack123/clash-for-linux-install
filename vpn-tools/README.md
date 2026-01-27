@@ -62,6 +62,7 @@ cd vpn-tools
 - **`launcher.sh`** - Interactive tool launcher
 - **`show_help.sh`** - Help and documentation system
 - **`harden_controller_security.sh`** - Harden controller exposure (set secret, optionally bind controller to localhost)
+- **`enable_copilot_fallback_direct.sh`** - Ensure a dedicated `COPILOT` fallback group exists (JP‑Tailscale → DIRECT), with optional rebuild/restart
 
 ## 📚 Documentation
 
@@ -182,6 +183,8 @@ cd vpn-tools
 
 推荐流程（2 分钟内能定位到“走没走代理/命中了哪条规则”）：
 
+0. （可选但强烈推荐）启用 Copilot fallback 兜底（JP‑Tailscale → DIRECT）：
+	- `./enable_copilot_fallback_direct.sh --apply --rebuild`
 1. 确保 VS Code 显式走本地代理（推荐 override）：
 	- `http.proxy`: `http://127.0.0.1:7890`
 	- `http.proxySupport`: `override`

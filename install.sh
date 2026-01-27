@@ -39,7 +39,11 @@ if [ -n "$url" ]; then
 fi
 
 /bin/cp -rf "$SCRIPT_BASE_DIR" "$CLASH_BASE_DIR"
-/bin/ls "$RESOURCES_BASE_DIR" | grep -Ev 'zip|png' | xargs -I {} /bin/cp -rf "${RESOURCES_BASE_DIR}/{}" "$CLASH_BASE_DIR"
+# Copy resources except large archives and images (safe for spaces/newlines in filenames).
+find "$RESOURCES_BASE_DIR" -mindepth 1 -maxdepth 1 \
+    ! -name 'zip' \
+    ! -name '*.png' \
+    -print0 | xargs -0 -I {} /bin/cp -rf "{}" "$CLASH_BASE_DIR"
 tar -xf "$ZIP_UI" -C "$CLASH_BASE_DIR"
 
 _set_rc

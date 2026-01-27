@@ -27,7 +27,7 @@ _gnome_build_ignore_hosts() {
     local base=(
         "localhost" "127.0.0.0/8" "::1" "0.0.0.0" "*.local" ".localhost" ".local"
         "10.0.0.0/8" "172.16.0.0/12" "192.168.0.0/16"
-        "ts.net" ".ts.net" "tailscale.io" ".tailscale.io" "100.100.100.100" "100.64.0.0/10"
+        "ts.net" ".ts.net" "tailscale.io" ".tailscale.io" "tailscale.com" ".tailscale.com" "controlplane.tailscale.com" "100.100.100.100" "100.64.0.0/10"
         "scnet.cn" ".scnet.cn" "szai.scnet.cn" ".szai.scnet.cn" "qdai.scnet.cn" ".qdai.scnet.cn"
     )
     if [ -n "$ts_suffix" ]; then
@@ -77,7 +77,7 @@ _set_system_proxy() {
     #  2) tailscale MagicDNS 解析 & Funnel 域 统一走直连, 避免被 http_proxy 劫持到本地 127.0.0.1:PORT 造成连接失败
     #  3) 加入 100.100.100.100 (Tailscale 内部 DNS) 及 100.64.0.0/10 CGNAT 地址空间; 虽然多数工具不支持 CIDR 匹配, 但保留不影响
     #  4) 添加 0.0.0.0, *.local, .localhost 以确保所有本地服务（包括Docker容器、本地Web服务等）都能正常访问
-    local no_proxy_addr="localhost,127.0.0.1,::1,0.0.0.0,*.local,.localhost,.local,ts.net,.ts.net,tailscale.io,.tailscale.io,100.100.100.100,100.64.0.0/10,scnet.cn,.scnet.cn,szai.scnet.cn,.szai.scnet.cn,qdai.scnet.cn,.qdai.scnet.cn"
+    local no_proxy_addr="localhost,127.0.0.1,::1,0.0.0.0,*.local,.localhost,.local,ts.net,.ts.net,tailscale.io,.tailscale.io,tailscale.com,.tailscale.com,controlplane.tailscale.com,100.100.100.100,100.64.0.0/10,scnet.cn,.scnet.cn,szai.scnet.cn,.szai.scnet.cn,qdai.scnet.cn,.qdai.scnet.cn"
     # 动态探测 tailnet MagicDNSSuffix (tailscale status --json) 例: tail69c12a.ts.net
     if command -v tailscale >/dev/null 2>&1; then
         local ts_suffix
@@ -124,14 +124,14 @@ _set_system_proxy() {
                     # Nothing to change – keep env fresh (exports) and exit early.
                     export http_proxy=$http_proxy_addr https_proxy=$http_proxy HTTP_PROXY=$http_proxy HTTPS_PROXY=$http_proxy
                     export all_proxy=$socks_proxy_addr ALL_PROXY=$all_proxy
-                    export no_proxy=$no_proxy_addr NO_PROXY=$no_proxy
+                    export no_proxy=$no_proxy_addr NO_PROXY=$no_proxy_addr
                     return 0
                 fi
             else
                 # Non-GNOME path, settings already applied; exit.
                 export http_proxy=$http_proxy_addr https_proxy=$http_proxy HTTP_PROXY=$http_proxy HTTPS_PROXY=$http_proxy
                 export all_proxy=$socks_proxy_addr ALL_PROXY=$all_proxy
-                export no_proxy=$no_proxy_addr NO_PROXY=$no_proxy
+                export no_proxy=$no_proxy_addr NO_PROXY=$no_proxy_addr
                 return 0
             fi
         fi
@@ -147,7 +147,7 @@ _set_system_proxy() {
     export ALL_PROXY=$all_proxy
 
     export no_proxy=$no_proxy_addr
-    export NO_PROXY=$no_proxy
+    export NO_PROXY=$no_proxy_addr
 
     # Enable Clash system proxy (affects system-level settings)
     "$BIN_YQ" -i '.system-proxy.enable = true' "$CLASH_CONFIG_MIXIN"
@@ -329,8 +329,9 @@ function clashui() {
     _get_ui_port
     # 公网ip
     # ifconfig.me
-    local query_url='api64.ipify.org'
-    local public_ip=$(curl -s --noproxy "*" --connect-timeout 2 $query_url)
+    local query_url='https://api64.ipify.org'
+    local public_ip
+    public_ip=$(curl -sS --noproxy "*" --connect-timeout 2 --max-time 4 "$query_url" 2>/dev/null || echo "")
     local public_address="http://${public_ip:-公网}:${UI_PORT}/ui"
     # 内网ip
     # ip route get 1.1.1.1 | grep -oP 'src \K\S+'
@@ -422,13 +423,13 @@ _merge_sanitize_restart() {
     local sanitizer_script="$(dirname "$CLASH_SCRIPT_DIR")/script/sanitize_runtime.sh"
     [ -f "$sanitizer_script" ] && bash "$sanitizer_script" --file "$tmp_out" --verbose || true
     # 关键 DIRECT 规则强制存在 (防止订阅端再度挟持)
-    "$BIN_YQ" -i '(.rules //= [])' "$tmp_out" 2>/dev/null || true
+    "$BIN_YQ" -i '.rules = (.rules // [])' "$tmp_out" 2>/dev/null || true
     grep -q 'IP-CIDR,1.1.1.1/32,DIRECT' "$tmp_out" 2>/dev/null || \
         "$BIN_YQ" -i '.rules += ["IP-CIDR,1.1.1.1/32,DIRECT,no-resolve"]' "$tmp_out" 2>/dev/null || true
     grep -q 'IP-CIDR,8.8.8.8/32,DIRECT' "$tmp_out" 2>/dev/null || \
         "$BIN_YQ" -i '.rules += ["IP-CIDR,8.8.8.8/32,DIRECT,no-resolve"]' "$tmp_out" 2>/dev/null || true
-    # 去重 DIRECT 规则 (及所有规则防膨胀)
-    "$BIN_YQ" -i '.rules |= ( . // [] | unique )' "$tmp_out" 2>/dev/null || true
+    # 注意: yq 的 unique() 会对规则排序，破坏规则优先级（例如 Copilot 需要在宽泛 GitHub 规则之前）。
+    # 因此这里不做全量 unique；重复规则通常不影响运行，且 sanitizer 会尽量避免重复注入。
 
     # 防御性修复：ProxyGroup 循环 (AUTO-SMART <-> 速云梯)
     # 该循环会导致 mihomo -t 直接失败，从而让 update 看起来“卡住/失败”。
@@ -461,18 +462,19 @@ _merge_sanitize_restart() {
                                         )
                                 ) as $base |
                                 ($base + [
-                                    "DOMAIN,update.code.visualstudio.com,DIRECT",
-                                    "DOMAIN,marketplace.visualstudio.com,DIRECT",
-                                    "DOMAIN-SUFFIX,gallery.vsassets.io,DIRECT",
-                                        "DOMAIN-SUFFIX,microsoft.com,DIRECT",
+                                    # VS Code / Microsoft endpoints:
+                                    # 默认走 CLASH_MATCH_GROUP（通常为 AUTO-SMART）以避免在“直连受限”网络里出现大量超时。
+                                    "DOMAIN,update.code.visualstudio.com," + strenv(CLASH_MATCH_GROUP),
+                                    "DOMAIN,marketplace.visualstudio.com," + strenv(CLASH_MATCH_GROUP),
+                                    "DOMAIN-SUFFIX,gallery.vsassets.io," + strenv(CLASH_MATCH_GROUP),
+                                    "DOMAIN-SUFFIX,microsoft.com," + strenv(CLASH_MATCH_GROUP),
                                         "DOMAIN-SUFFIX,wikipedia.org," + strenv(CLASH_MATCH_GROUP),
                                         "DOMAIN-SUFFIX,wikimedia.org," + strenv(CLASH_MATCH_GROUP),
                                         "DOMAIN-SUFFIX,wikidata.org," + strenv(CLASH_MATCH_GROUP)
                                     ] + $geos + [
                                         "MATCH," + strenv(CLASH_MATCH_GROUP)
                                     ])
-                            ) |
-                            .rules |= unique
+                                )
                         ' "$tmp_out" 2>/dev/null || true
                 fi
         fi

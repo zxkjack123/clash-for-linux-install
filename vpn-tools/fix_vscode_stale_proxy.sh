@@ -94,7 +94,7 @@ launch_clean() {
   http_proxy_addr="http://${auth}127.0.0.1:${port}"
   socks_proxy_addr="socks5h://${auth}127.0.0.1:${port}"
   # Bypass local proxy for localhost/LAN/Tailscale and Copilot endpoints (to avoid flaky proxy paths)
-  no_proxy_addr="localhost,127.0.0.1,::1,ts.net,.ts.net,tailscale.io,.tailscale.io,100.100.100.100,100.64.0.0/10,api.githubcopilot.com,api.individual.githubcopilot.com,copilot-proxy.githubusercontent.com,.githubcopilot.com,api.github.com,github.com"
+  no_proxy_addr="localhost,127.0.0.1,::1,ts.net,.ts.net,tailscale.io,.tailscale.io,tailscale.com,.tailscale.com,controlplane.tailscale.com,100.100.100.100,100.64.0.0/10,api.githubcopilot.com,api.individual.githubcopilot.com,copilot-proxy.githubusercontent.com,.githubcopilot.com,api.github.com,github.com"
 
   echo "Launching VS Code with sanitized proxy env (http=${http_proxy_addr}) -> $target"
   # Clear any inherited *_proxy and set correct ones for the new window only
