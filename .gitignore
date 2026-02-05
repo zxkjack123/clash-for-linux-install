@@ -20,6 +20,7 @@ trace*.txt
 tmp/
 guard_*.txt
 resources/mixin.yaml.bak-*
+resources/config.yaml.bak
 /tmp/.clash_latency.*
 .refresh_subscription.log
 

@@ -32,6 +32,7 @@ docs/
 - **[AI 服务配置](integrations/AI_SERVICES_FINAL.md)** - OpenAI、Claude 等 AI 服务配置
 - **[AI 服务更新](integrations/AI_SERVICES_UPDATE.md)** - AI 服务的最新更新和优化
 - **[VSCode Copilot 修复](integrations/VSCODE_COPILOT_FIX.md)** - GitHub Copilot 连接问题诊断和解决
+- **[科研/学术分流模板](integrations/RESEARCH_ACADEMIC_PROFILE.md)** - Copilot / Docker / Scholar / 期刊站点的最小分流模板
 
 ### 开发和调试 (development/)
 
@@ -55,5 +56,5 @@ docs/
 
 ---
 
-**最后更新**: 2026-01-27  
-**版本**: v2.5.7
+**最后更新**: 2026-02-05  
+**版本**: v2.5.8

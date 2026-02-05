@@ -68,6 +68,18 @@ KERNEL="${BIN_KERNEL_NAME:-mihomo}"
 [ -f "$RUNTIME" ] && { ok "runtime.yaml 存在"; add_json runtime_present true; }
 
 # 2. 服务状态
+# 检查 Tailscale 状态 (Critical for chain proxy)
+if command -v tailscale >/dev/null 2>&1; then
+    TS_STATUS=$(tailscale status --peers=false 2>/dev/null | head -n 1)
+    if echo "$TS_STATUS" | grep -q "offline"; then
+        fail "Tailscale 状态: Offline (代理链路断开)"; add_json tailscale_status "offline"; STATUS=1
+        echo "  建议: sudo systemctl restart tailscaled"
+    else
+        ok "Tailscale 状态: Online"
+        add_json tailscale_status "online"
+    fi
+fi
+
 if systemctl --user is-active "$KERNEL" >/dev/null 2>&1; then
   ok "systemd 服务: $KERNEL 活跃"
   add_json service_active true
@@ -75,12 +87,25 @@ else
   fail "systemd 服务: $KERNEL 未运行 (执行 clashon)"; add_json service_active false; STATUS=1
 fi
 
-# 3. 端口解析 (mixed-port / external-controller)
-MIXED_PORT=$([ -x "$YQ" ] && "$YQ" '.mixed-port // ."port" // 7890' "$RUNTIME" 2>/dev/null || echo 7890)
+# 3. 端口解析 (port / socks-port / mixed-port / external-controller)
+# 兼容两种配置：
+#   - mixed-port: 同一个端口同时提供 HTTP + SOCKS
+#   - port + socks-port: 分离的 HTTP 端口与 SOCKS 端口
+HTTP_PORT=$([ -x "$YQ" ] && "$YQ" '."port" // 7890' "$RUNTIME" 2>/dev/null || echo 7890)
+SOCKS_PORT=$([ -x "$YQ" ] && "$YQ" '."socks-port" // ""' "$RUNTIME" 2>/dev/null || echo '')
+MIXED_PORT=$([ -x "$YQ" ] && "$YQ" '."mixed-port" // ""' "$RUNTIME" 2>/dev/null || echo '')
+HTTP_PORT=$(printf '%s' "$HTTP_PORT" | tr -d "\"'" )
+SOCKS_PORT=$(printf '%s' "$SOCKS_PORT" | tr -d "\"'" )
+MIXED_PORT=$(printf '%s' "$MIXED_PORT" | tr -d "\"'" )
+
+# 实际测试端口：优先 mixed-port，否则分别使用 port / socks-port
+HTTP_TEST_PORT=${MIXED_PORT:-$HTTP_PORT}
+SOCKS_TEST_PORT=${MIXED_PORT:-$SOCKS_PORT}
+
 UI_ADDR=$([ -x "$YQ" ] && "$YQ" '."external-controller" // "127.0.0.1:9090"' "$RUNTIME" 2>/dev/null || echo '127.0.0.1:9090')
 UI_ADDR=$(printf '%s' "$UI_ADDR" | tr -d "\"'")
 UI_PORT=${UI_ADDR##*:}
-add_json mixed_port "$MIXED_PORT"; add_json ui_port "$UI_PORT"
+add_json mixed_port "$HTTP_TEST_PORT"; add_json ui_port "$UI_PORT"
 
 # 3.1 安全检查：controller 是否暴露且无鉴权
 ALLOW_LAN=$([ -x "$YQ" ] && "$YQ" '."allow-lan" // false' "$RUNTIME" 2>/dev/null || echo false)
@@ -100,8 +125,34 @@ case "$CTRL_HOST" in
 esac
 add_json controller_exposed $([ $CTRL_EXPOSED -eq 1 ] && echo true || echo false)
 
-LISTEN_HTTP=$(ss -ltn 2>/dev/null | grep -E ":$MIXED_PORT\b" || true)
-if [ -n "$LISTEN_HTTP" ]; then ok "监听端口: mixed $MIXED_PORT"; add_json mixed_listen true; else fail "未监听 mixed $MIXED_PORT"; add_json mixed_listen false; STATUS=1; fi
+LISTEN_HTTP=$(ss -ltn 2>/dev/null | grep -E ":$HTTP_TEST_PORT\b" || true)
+if [ -n "$LISTEN_HTTP" ]; then
+  if [ -n "$MIXED_PORT" ]; then
+    ok "监听端口: mixed $HTTP_TEST_PORT"
+  else
+    ok "监听端口: http $HTTP_TEST_PORT"
+  fi
+  add_json mixed_listen true
+else
+  if [ -n "$MIXED_PORT" ]; then
+    fail "未监听 mixed $HTTP_TEST_PORT"
+  else
+    fail "未监听 http $HTTP_TEST_PORT"
+  fi
+  add_json mixed_listen false
+  STATUS=1
+fi
+
+# SOCKS 端口监听（仅在非 mixed-port 且配置了 socks-port 时检查）
+if [ -z "$MIXED_PORT" ] && [ -n "$SOCKS_PORT" ]; then
+  LISTEN_SOCKS=$(ss -ltn 2>/dev/null | grep -E ":$SOCKS_PORT\b" || true)
+  if [ -n "$LISTEN_SOCKS" ]; then
+    ok "监听端口: socks $SOCKS_PORT"
+  else
+    warn "未监听 socks $SOCKS_PORT"
+    STATUS=$(( STATUS==1?1:2 ))
+  fi
+fi
 LISTEN_UI=$(ss -ltn 2>/dev/null | grep -E ":$UI_PORT\b" || true)
 if [ -n "$LISTEN_UI" ]; then ok "监听端口: ui $UI_PORT"; add_json ui_listen true; else warn "控制端口未监听: $UI_PORT"; add_json ui_listen false; STATUS=$(( STATUS==1?1:2 )); fi
 
@@ -110,7 +161,7 @@ if [ $CTRL_EXPOSED -eq 1 ] && [ -z "$SECRET" ]; then
   warn "安全风险：external-controller=$UI_ADDR 且 secret 为空（同网段任意主机可控制 Clash）"
   STATUS=$(( STATUS==1?1:2 ))
 elif [ -z "$SECRET" ]; then
-  warn "建议：设置 controller secret（当前为空，虽然 controller 可能仅本机可访问）"
+  warn "建议：设置 controller secret（推荐：clashctl secret init；或自定义：clashctl secret <token>）"
   STATUS=$(( STATUS==1?1:2 ))
 fi
 
@@ -123,12 +174,27 @@ if echo "$CTRL_VERSION" | grep -q '{'; then ok "控制接口可访问"; add_json
 
 # 5. 代理连通性 (HTTP)
 TEST_URL=${TEST_URL:-http://www.gstatic.com/generate_204}
-HTTP_CODE=$(curl -o /dev/null -s -w '%{http_code}' --max-time 6 --proxy "http://127.0.0.1:$MIXED_PORT" "$TEST_URL" || echo 000)
+HTTP_CODE=$(curl -o /dev/null -s -w '%{http_code}' --max-time 6 --proxy "http://127.0.0.1:$HTTP_TEST_PORT" "$TEST_URL" 2>/dev/null || true)
+[ -z "$HTTP_CODE" ] && HTTP_CODE=000
 if [ "$HTTP_CODE" = 204 ] || [ "$HTTP_CODE" = 200 ]; then ok "HTTP 代理成功 $HTTP_CODE"; add_json http_proxy_ok true; else fail "HTTP 代理失败 code=$HTTP_CODE"; add_json http_proxy_ok false; STATUS=1; fi
 
 # 6. SOCKS5 (使用 curl 支持)
-SOCKS_CODE=$(curl -o /dev/null -s -w '%{http_code}' --max-time 8 --socks5-hostname "127.0.0.1:$MIXED_PORT" "$TEST_URL" 2>/dev/null || echo 000)
-if [ "$SOCKS_CODE" = 204 ] || [ "$SOCKS_CODE" = 200 ]; then ok "SOCKS5 代理成功 $SOCKS_CODE"; add_json socks_proxy_ok true; else warn "SOCKS5 测试失败 code=$SOCKS_CODE"; add_json socks_proxy_ok false; STATUS=$(( STATUS==1?1:2 )); fi
+if [ -n "$SOCKS_TEST_PORT" ]; then
+  SOCKS_CODE=$(curl -o /dev/null -s -w '%{http_code}' --max-time 8 --socks5-hostname "127.0.0.1:$SOCKS_TEST_PORT" "$TEST_URL" 2>/dev/null || true)
+  [ -z "$SOCKS_CODE" ] && SOCKS_CODE=000
+  if [ "$SOCKS_CODE" = 204 ] || [ "$SOCKS_CODE" = 200 ]; then
+    ok "SOCKS5 代理成功 $SOCKS_CODE"
+    add_json socks_proxy_ok true
+  else
+    warn "SOCKS5 测试失败 code=$SOCKS_CODE (端口=$SOCKS_TEST_PORT)"
+    add_json socks_proxy_ok false
+    STATUS=$(( STATUS==1?1:2 ))
+  fi
+else
+  warn "SOCKS5 测试跳过：未配置 socks-port 且未启用 mixed-port"
+  add_json socks_proxy_ok skipped
+  STATUS=$(( STATUS==1?1:2 ))
+fi
 
 # 7. 直连对比 (无代理, 不走 127.0.0.1 代理) – 仅测一次
 DIRECT_CODE=$(curl -o /dev/null -s -w '%{http_code}' --max-time 6 --noproxy '*' "$TEST_URL" || echo 000)
@@ -176,7 +242,7 @@ else
 
   # 安全提示 (不强制)
   if [ -z "$SECRET" ]; then
-    echo ' - 安全建议：为 external-controller 设置 secret（clash secret <token>），并考虑将 external-controller 绑定到 127.0.0.1'
+    echo ' - 安全建议：为 external-controller 设置 secret（clashctl secret init / clashctl secret <token>），并保持 external-controller 仅监听 127.0.0.1'
   fi
   if [ "$ALLOW_LAN" = true ]; then
     echo ' - 安全建议：allow-lan=true 会让代理端口对局域网可见；若只需本机/容器使用，请评估是否需要收紧'

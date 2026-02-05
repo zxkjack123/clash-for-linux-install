@@ -23,7 +23,7 @@ Options:
   --check           Only detect VS Code processes carrying 127.0.0.1:6209 in env.
   --launch-here     Start a new VS Code window for current directory with sanitized proxy env.
   --launch <path>   Start a new VS Code window for the specified path with sanitized proxy env.
-  --print-port      Print the current Clash mixed-port and exit.
+  --print-port      Print the current Clash HTTP proxy port (mixed-port or port) and exit.
 
 Notes:
   - Stale 6209 proxies come from an older VS Code process environment. The reliable fix is to
@@ -32,17 +32,30 @@ Notes:
 EOF
 }
 
-get_port() {
+get_http_port() {
   local port
   if command -v yq >/dev/null 2>&1; then
     # Prefer BIN_YQ from common.sh if available, else fallback to yq
     local _yq="${BIN_YQ:-yq}"
     local _rt="${CLASH_CONFIG_RUNTIME:-$ROOT_DIR/resources/config.yaml}"
-    port=$("$_yq" '.mixed-port // 7890' "$_rt" 2>/dev/null || echo 7890)
+    port=$("$_yq" -r '."mixed-port" // .port // 7890' "$_rt" 2>/dev/null || echo 7890)
   else
     port=7890
   fi
   [[ "$port" =~ ^[0-9]+$ ]] || port=7890
+  echo "$port"
+}
+
+get_socks_port() {
+  local port
+  if command -v yq >/dev/null 2>&1; then
+    local _yq="${BIN_YQ:-yq}"
+    local _rt="${CLASH_CONFIG_RUNTIME:-$ROOT_DIR/resources/config.yaml}"
+    port=$("$_yq" -r '."mixed-port" // ."socks-port" // ""' "$_rt" 2>/dev/null || echo "")
+  else
+    port=""
+  fi
+  [[ "$port" =~ ^[0-9]+$ ]] || port=""
   echo "$port"
 }
 
@@ -81,8 +94,9 @@ detect_6209() {
 
 launch_clean() {
   local target="$1"; shift || true
-  local port auth http_proxy_addr socks_proxy_addr no_proxy_addr
-  port=$(get_port)
+  local port socks_port auth http_proxy_addr socks_proxy_addr no_proxy_addr
+  port=$(get_http_port)
+  socks_port=$(get_socks_port)
   if command -v yq >/dev/null 2>&1; then
     local _yq="${BIN_YQ:-yq}"
     local _rt="${CLASH_CONFIG_RUNTIME:-$ROOT_DIR/resources/config.yaml}"
@@ -92,30 +106,40 @@ launch_clean() {
   fi
   [ -n "$auth" ] && auth="$auth@"
   http_proxy_addr="http://${auth}127.0.0.1:${port}"
-  socks_proxy_addr="socks5h://${auth}127.0.0.1:${port}"
+  socks_proxy_addr=""
+  if [ -n "${socks_port:-}" ]; then
+    socks_proxy_addr="socks5h://${auth}127.0.0.1:${socks_port}"
+  fi
   # Bypass local proxy for localhost/LAN/Tailscale and Copilot endpoints (to avoid flaky proxy paths)
   no_proxy_addr="localhost,127.0.0.1,::1,ts.net,.ts.net,tailscale.io,.tailscale.io,tailscale.com,.tailscale.com,controlplane.tailscale.com,100.100.100.100,100.64.0.0/10,api.githubcopilot.com,api.individual.githubcopilot.com,copilot-proxy.githubusercontent.com,.githubcopilot.com,api.github.com,github.com"
 
   echo "Launching VS Code with sanitized proxy env (http=${http_proxy_addr}) -> $target"
   # Clear any inherited *_proxy and set correct ones for the new window only
-  env -u http_proxy -u https_proxy -u all_proxy -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY \
-    http_proxy="$http_proxy_addr" \
-    https_proxy="$http_proxy_addr" \
-    all_proxy="$socks_proxy_addr" \
-    HTTP_PROXY="$http_proxy_addr" \
-    HTTPS_PROXY="$http_proxy_addr" \
-    ALL_PROXY="$socks_proxy_addr" \
-    no_proxy="$no_proxy_addr" \
-    NO_PROXY="$no_proxy_addr" \
-    code -n "$target" >/dev/null 2>&1 &
+  local -a cmd
+  cmd=(env -u http_proxy -u https_proxy -u all_proxy -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY
+    http_proxy="$http_proxy_addr"
+    https_proxy="$http_proxy_addr"
+    HTTP_PROXY="$http_proxy_addr"
+    HTTPS_PROXY="$http_proxy_addr"
+    no_proxy="$no_proxy_addr"
+    NO_PROXY="$no_proxy_addr")
+  if [ -n "$socks_proxy_addr" ]; then
+    cmd+=(all_proxy="$socks_proxy_addr" ALL_PROXY="$socks_proxy_addr")
+  fi
+  cmd+=(code -n "$target")
+  "${cmd[@]}" >/dev/null 2>&1 &
 }
 
 print_listener_status() {
   echo "Checking listeners for 6209 and active Clash port..."
-  local port
-  port=$(get_port)
+  local port socks_port
+  port=$(get_http_port)
+  socks_port=$(get_socks_port)
   (ss -ltnp 2>/dev/null | grep -E ":6209\\b" && true) || echo "No listener on 6209"
   (ss -ltnp 2>/dev/null | grep -E ":${port}\\b" && true) || echo "No listener on ${port} (unexpected)"
+  if [ -n "${socks_port:-}" ] && [ "$socks_port" != "$port" ]; then
+    (ss -ltnp 2>/dev/null | grep -E ":${socks_port}\\b" && true) || echo "No listener on ${socks_port} (SOCKS)"
+  fi
 }
 
 main() {
@@ -125,7 +149,7 @@ main() {
       --check) mode="--check"; shift ;;
       --launch-here) mode="--launch"; target="$(pwd)"; shift ;;
       --launch) mode="--launch"; target="$2"; shift 2 ;;
-      --print-port) get_port; exit 0 ;;
+      --print-port) get_http_port; exit 0 ;;
       -h|--help) usage; exit 0 ;;
       *) echo "Unknown option: $1" >&2; usage; exit 1 ;;
     esac

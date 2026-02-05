@@ -31,9 +31,14 @@ runtime_yaml="$HOME/.local/share/clash/runtime.yaml"
 detect_port() {
   local port=""
   if [[ -f "$runtime_yaml" ]]; then
-    port=$(awk -F': ' '/^mixed-port:/ {print $2; exit}' "$runtime_yaml" 2>/dev/null || true)
+    port=$(awk -F': *' '/^mixed-port:/ {print $2; exit}' "$runtime_yaml" 2>/dev/null || true)
+    port=$(echo "${port:-}" | xargs 2>/dev/null || true)
+    if [[ -z "${port:-}" || "${port:-}" == "null" ]]; then
+      port=$(awk -F': *' '/^port:/ {print $2; exit}' "$runtime_yaml" 2>/dev/null || true)
+      port=$(echo "${port:-}" | xargs 2>/dev/null || true)
+    fi
   fi
-  [[ -n "${port:-}" ]] && echo "$port" || echo "7890"
+  [[ "${port:-}" =~ ^[0-9]{2,5}$ ]] && echo "$port" || echo "7890"
 }
 
 PORT=${PROXY_PORT:-$(detect_port)}

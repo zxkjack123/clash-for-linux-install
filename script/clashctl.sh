@@ -57,17 +57,26 @@ _ensure_gnome_ignore_hosts() {
 }
 
 _set_system_proxy() {
-    # Ensure MIXED_PORT is populated and valid before constructing proxy URLs
+    # Detect proxy ports (supports both mixed-port and split port/socks-port modes)
     _get_proxy_port
     if ! [[ "+${MIXED_PORT:-}" =~ ^\+[0-9]+$ ]] || [ "${MIXED_PORT:-0}" -lt 1 ] || [ "${MIXED_PORT:-0}" -gt 65535 ]; then
         # Fallback to default port to avoid producing an invalid url like 127.0.0.1:
         MIXED_PORT=7890
     fi
+    if [[ -n "${SOCKS_PORT:-}" ]]; then
+        if ! [[ "+${SOCKS_PORT:-}" =~ ^\+[0-9]+$ ]] || [ "${SOCKS_PORT:-0}" -lt 1 ] || [ "${SOCKS_PORT:-0}" -gt 65535 ]; then
+            SOCKS_PORT=""
+        fi
+    fi
+
     local auth=$("$BIN_YQ" '.authentication[0] // ""' "$CLASH_CONFIG_RUNTIME")
     [ -n "$auth" ] && auth=$auth@
 
     local http_proxy_addr="http://${auth}127.0.0.1:${MIXED_PORT}"
-    local socks_proxy_addr="socks5h://${auth}127.0.0.1:${MIXED_PORT}"
+    local socks_proxy_addr=""
+    if [[ -n "${SOCKS_PORT:-}" ]]; then
+        socks_proxy_addr="socks5h://${auth}127.0.0.1:${SOCKS_PORT}"
+    fi
     # 基础直连免代理列表 (扩展 Tailscale / Funnel 域 & 100.64.0.0/10 内网网段，避免干扰 tailnet 访问)
     # 说明: curl / 浏览器 在设置 http_proxy 后，会对所有域名走代理；加入 *.ts.net 可确保 tailnet 解析 / 访问直接走 Tailscale 接口
     #      100.64.0.0/10 属于 Tailscale CGNAT 地址空间；tailscale.io 及 ts.net 控制面 / funnel 子域避免代理分层导致握手异常。
@@ -108,7 +117,7 @@ _set_system_proxy() {
     # trigger desktop-wide NET::ERR_NETWORK_CHANGED events (especially in Electron / Chrome).
     # Create a small state file capturing last applied port & auth.
     local state_file="$CLASH_PROXY_STATE_FILE"
-    local current_state="${MIXED_PORT}|${auth}"
+    local current_state="${MIXED_PORT}|${SOCKS_PORT:-}|${auth}"
     if [ -f "$state_file" ]; then
         local previous_state shell_http shell_mode
         previous_state=$(cat "$state_file" 2>/dev/null || echo '')
@@ -123,14 +132,22 @@ _set_system_proxy() {
                     _ensure_gnome_ignore_hosts
                     # Nothing to change – keep env fresh (exports) and exit early.
                     export http_proxy=$http_proxy_addr https_proxy=$http_proxy HTTP_PROXY=$http_proxy HTTPS_PROXY=$http_proxy
-                    export all_proxy=$socks_proxy_addr ALL_PROXY=$all_proxy
+                    if [ -n "$socks_proxy_addr" ]; then
+                        export all_proxy=$socks_proxy_addr ALL_PROXY=$all_proxy
+                    else
+                        unset all_proxy ALL_PROXY
+                    fi
                     export no_proxy=$no_proxy_addr NO_PROXY=$no_proxy_addr
                     return 0
                 fi
             else
                 # Non-GNOME path, settings already applied; exit.
                 export http_proxy=$http_proxy_addr https_proxy=$http_proxy HTTP_PROXY=$http_proxy HTTPS_PROXY=$http_proxy
-                export all_proxy=$socks_proxy_addr ALL_PROXY=$all_proxy
+                if [ -n "$socks_proxy_addr" ]; then
+                    export all_proxy=$socks_proxy_addr ALL_PROXY=$all_proxy
+                else
+                    unset all_proxy ALL_PROXY
+                fi
                 export no_proxy=$no_proxy_addr NO_PROXY=$no_proxy_addr
                 return 0
             fi
@@ -143,8 +160,12 @@ _set_system_proxy() {
     export HTTP_PROXY=$http_proxy
     export HTTPS_PROXY=$http_proxy
 
-    export all_proxy=$socks_proxy_addr
-    export ALL_PROXY=$all_proxy
+    if [ -n "$socks_proxy_addr" ]; then
+        export all_proxy=$socks_proxy_addr
+        export ALL_PROXY=$all_proxy
+    else
+        unset all_proxy ALL_PROXY
+    fi
 
     export no_proxy=$no_proxy_addr
     export NO_PROXY=$no_proxy_addr
@@ -159,8 +180,14 @@ _set_system_proxy() {
         gsettings set org.gnome.system.proxy.http port "${MIXED_PORT}" 2>/dev/null || true
         gsettings set org.gnome.system.proxy.https host '127.0.0.1' 2>/dev/null || true
         gsettings set org.gnome.system.proxy.https port "${MIXED_PORT}" 2>/dev/null || true
-        gsettings set org.gnome.system.proxy.socks host '127.0.0.1' 2>/dev/null || true
-        gsettings set org.gnome.system.proxy.socks port "${MIXED_PORT}" 2>/dev/null || true
+        if [ -n "${SOCKS_PORT:-}" ]; then
+            gsettings set org.gnome.system.proxy.socks host '127.0.0.1' 2>/dev/null || true
+            gsettings set org.gnome.system.proxy.socks port "${SOCKS_PORT}" 2>/dev/null || true
+        else
+            # Disable SOCKS proxy when socks-port is not configured (avoid pointing to an HTTP-only port).
+            gsettings set org.gnome.system.proxy.socks host "''" 2>/dev/null || true
+            gsettings set org.gnome.system.proxy.socks port 0 2>/dev/null || true
+        fi
         # Apply best-practice ignore-hosts (LAN + Tailscale + optional MagicDNS)
         _ensure_gnome_ignore_hosts
     fi
@@ -170,6 +197,9 @@ _set_system_proxy() {
         kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key ProxyType 1 2>/dev/null || true
         kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key httpProxy "127.0.0.1:${MIXED_PORT}" 2>/dev/null || true
         kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key httpsProxy "127.0.0.1:${MIXED_PORT}" 2>/dev/null || true
+        if [ -n "${SOCKS_PORT:-}" ]; then
+            kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key socksProxy "127.0.0.1:${SOCKS_PORT}" 2>/dev/null || true
+        fi
         kwriteconfig5 --file kioslaverc --group 'Proxy Settings' --key NoProxyFor "localhost,127.0.0.1,::1" 2>/dev/null || true
     fi
 
@@ -304,7 +334,11 @@ function clashproxy() {
         auth=$("$BIN_YQ" '.authentication[0] // ""' "$CLASH_CONFIG_RUNTIME" 2>/dev/null)
         [ -n "$auth" ] && auth="$auth@"
         http_proxy_addr="http://${auth}127.0.0.1:${MIXED_PORT}"
-        socks_proxy_addr="socks5h://${auth}127.0.0.1:${MIXED_PORT}"
+        if [ -n "${SOCKS_PORT:-}" ]; then
+            socks_proxy_addr="socks5h://${auth}127.0.0.1:${SOCKS_PORT}"
+        else
+            socks_proxy_addr="(disabled)"
+        fi
 
         _okcat "系统代理：开启
 http_proxy： ${http_proxy_addr}
@@ -327,28 +361,56 @@ function clashstatus() {
 
 function clashui() {
     _get_ui_port
-    # 公网ip
-    # ifconfig.me
-    local query_url='https://api64.ipify.org'
-    local public_ip
-    public_ip=$(curl -sS --noproxy "*" --connect-timeout 2 --max-time 4 "$query_url" 2>/dev/null || echo "")
-    local public_address="http://${public_ip:-公网}:${UI_PORT}/ui"
-    # 内网ip
-    # ip route get 1.1.1.1 | grep -oP 'src \K\S+'
-    local local_ip=$(hostname -I | awk '{print $1}')
-    local local_address="http://${local_ip}:${UI_PORT}/ui"
+    local ext_addr ext_host
+    ext_addr=$("$BIN_YQ" -r '.external-controller // ""' "$CLASH_CONFIG_RUNTIME" 2>/dev/null || echo "")
+    ext_addr=${ext_addr//$'\n'/}
+    ext_addr=${ext_addr//\"/}
+    ext_addr=${ext_addr//\'/}
+    [ -z "$ext_addr" ] && ext_addr="127.0.0.1:${UI_PORT}"
+    ext_host=${ext_addr%:*}
+    [ -z "$ext_host" ] && ext_host="127.0.0.1"
+
+    local localhost_address="http://127.0.0.1:${UI_PORT}/ui"
+    local local_address=""
+    local public_address=""
+
+    # Only compute LAN/public addresses when the controller is not loopback-only.
+    if [[ "$ext_host" != "127.0.0.1" && "$ext_host" != "localhost" ]]; then
+        local local_ip
+        local_ip=$(hostname -I | awk '{print $1}')
+        [ -n "$local_ip" ] && local_address="http://${local_ip}:${UI_PORT}/ui"
+
+        local query_url='https://api64.ipify.org'
+        local public_ip
+        public_ip=$(curl -sS --noproxy "*" --connect-timeout 2 --max-time 4 "$query_url" 2>/dev/null || echo "")
+        [ -n "$public_ip" ] && public_address="http://${public_ip}:${UI_PORT}/ui"
+    fi
     printf "\n"
     printf "╔═══════════════════════════════════════════════╗\n"
     printf "║                %s                  ║\n" "$(_okcat 'Web 控制台')"
     printf "║═══════════════════════════════════════════════║\n"
     printf "║                                               ║\n"
-    printf "║     🔓 注意放行端口：%-5s                    ║\n" "$UI_PORT"
-    printf "║     🏠 内网：%-31s  ║\n" "$local_address"
-    printf "║     🌏 公网：%-31s  ║\n" "$public_address"
-    printf "║     ☁️  公共：%-31s  ║\n" "$URL_CLASH_UI"
+    printf "║     🔒 控制器：%-33s║\n" "${ext_addr}"
+    printf "║     🖥️  本机：%-33s║\n" "$localhost_address"
+    if [ -n "$local_address" ]; then
+        printf "║     🏠 局域网：%-31s  ║\n" "$local_address"
+    else
+        printf "║     🏠 局域网：%-31s  ║\n" "(disabled by localhost-only)"
+    fi
+    if [ -n "$public_address" ]; then
+        printf "║     🌏 公网：%-33s║\n" "$public_address"
+    else
+        printf "║     🌏 公网：%-33s║\n" "(disabled by localhost-only)"
+    fi
+    printf "║     ☁️  公共：%-33s║\n" "$URL_CLASH_UI"
     printf "║                                               ║\n"
     printf "╚═══════════════════════════════════════════════╝\n"
     printf "\n"
+    if [[ "$ext_host" == "127.0.0.1" || "$ext_host" == "localhost" ]]; then
+        _okcat '🔐' '提示：当前 external-controller 为 localhost-only（更安全）。如需局域网访问，请先设置密钥：clashctl secret init'
+    else
+        _okcat '⚠️' '提示：检测到 external-controller 非 localhost-only；强烈建议设置密钥并限制防火墙访问：clashctl secret init'
+    fi
 }
 
 _merge_build_runtime() {
@@ -513,19 +575,14 @@ _cleanup_probe_fields() {
             "$CLASH_CONFIG_RUNTIME" 2>/dev/null || true
     fi
     if grep -qE 'url:|interval:|tolerance:' "$CLASH_CONFIG_RUNTIME"; then
-        # 深度检测：用 yq 再判定 select 组内部是否仍残留
-        local remain=$("$BIN_YQ" '.proxy-groups[] | select(.type=="select" and (has("url") or has("interval") or has("tolerance"))) | .name' "$CLASH_CONFIG_RUNTIME" 2>/dev/null | wc -l || echo 0)
-        [ "$remain" -gt 0 ] && {
-            _failcat "仍有 ${remain} 个 select 分组残留探测字段（请手工检查）"
-            return 1
-        }
+        _failcat '仍检测到 select 组探测字段残留（url/interval/tolerance），请手工检查'
+        return 1
     fi
     _okcat '🧹 已清理 select 组探测字段'
 }
 
 function clashsecret() {
-    case "$#" in
-    0)
+    if [ $# -eq 0 ]; then
         # Never print secrets. Only report whether a secret is set.
         local _sec _len
         _sec="$("$BIN_YQ" -r '.secret // ""' "$CLASH_CONFIG_RUNTIME" 2>/dev/null || echo "")"
@@ -535,8 +592,44 @@ function clashsecret() {
         else
             _failcat "当前密钥：未设置"
         fi
-        ;;
-    1)
+        return 0
+    fi
+
+    if [ $# -eq 1 ] && [ "$1" = "init" ]; then
+        # Generate a random secret, store it to a local file, and write it into mixin.yaml.
+        local _sec _len secret_file
+        _sec="$("$BIN_YQ" -r '.secret // ""' "$CLASH_CONFIG_RUNTIME" 2>/dev/null || echo "")"
+        _len=${#_sec}
+        if [ "$_len" -gt 0 ]; then
+            _okcat "密钥已存在（长度：${_len}），无需初始化"
+            return 0
+        fi
+
+        if command -v python3 >/dev/null 2>&1; then
+            _sec=$(python3 -c 'import secrets; print(secrets.token_hex(16))' 2>/dev/null || true)
+        elif command -v openssl >/dev/null 2>&1; then
+            _sec=$(openssl rand -hex 16 2>/dev/null || true)
+        else
+            _sec=$(head -c 16 /dev/urandom 2>/dev/null | od -An -tx1 | tr -d ' \n' || true)
+        fi
+        [ -n "$_sec" ] || { _failcat '生成密钥失败（缺少 python3/openssl/urandom）'; return 1; }
+
+        secret_file="${CLASH_BASE_DIR:-$HOME/.local/share/clash}/controller.secret"
+        umask 077
+        mkdir -p "$(dirname "$secret_file")" 2>/dev/null || true
+        printf '%s\n' "$_sec" > "$secret_file" 2>/dev/null || { _failcat "写入失败: $secret_file"; return 1; }
+        chmod 600 "$secret_file" 2>/dev/null || true
+
+        CLASH_SECRET_NEW="$_sec" "$BIN_YQ" -i '.secret = strenv(CLASH_SECRET_NEW)' "$CLASH_CONFIG_MIXIN" || {
+            _failcat "密钥写入 mixin 失败，请检查：$CLASH_CONFIG_MIXIN"
+            return 1
+        }
+        _merge_sanitize_restart
+        _okcat "密钥已初始化并写入（未在终端回显）。保存位置：$secret_file"
+        return 0
+    fi
+
+    if [ $# -eq 1 ]; then
         # Avoid YAML injection by writing via strenv.
         CLASH_SECRET_NEW="$1" "$BIN_YQ" -i '.secret = strenv(CLASH_SECRET_NEW)' "$CLASH_CONFIG_MIXIN" || {
             _failcat "密钥更新失败，请重新输入"
@@ -544,11 +637,10 @@ function clashsecret() {
         }
         _merge_sanitize_restart
         _okcat "密钥更新成功，已重启生效"
-        ;;
-    *)
-        _failcat "用法：clashsecret [NEW_SECRET]"
-        ;;
-    esac
+        return 0
+    fi
+
+    _failcat "用法：clashctl secret [init|NEW_SECRET]"
 }
 
 _tunstatus() {

@@ -91,7 +91,7 @@ vpn-tools/
 | **🚀 快速开始** | [QUICK_START.md](QUICK_START.md)         | 5分钟快速上手                  |
 | **📦 安装配置** | [docs/installation/](docs/installation/) | 安装指南、环境配置、安全设置   |
 | **🌐 网络优化** | [docs/network/](docs/network/)           | 网络优化指南、系统审查         |
-| **🔌 功能集成** | [docs/integrations/](docs/integrations/) | Docker、AI服务、VSCode Copilot |
+| **🔌 功能集成** | [docs/integrations/](docs/integrations/) | Docker、AI服务、VSCode Copilot、科研/学术分流 |
 | **🛠️ 开发调试** | [docs/development/](docs/development/)   | Bug修复、技术文档、更新说明    |
 | **📝 变更日志** | [CHANGELOG.md](CHANGELOG.md)             | 版本历史和更新记录             |
 
@@ -171,8 +171,8 @@ git clone --depth 1 https://gh-proxy.com/https://github.com/zxkjack123/clash-for
 > 如遇问题，请在查阅[常见问题](https://github.com/nelvko/clash-for-linux-install/wiki/FAQ)及 [issue](https://github.com/nelvko/clash-for-linux-install/issues?q=is%3Aissue) 未果后进行反馈。
 
 - 上述克隆命令使用了[加速前缀](https://gh-proxy.com/)，如失效请更换其他[可用链接](https://ghproxy.link/)。
-- 默认通过远程订阅获取配置进行安装，本地配置安装详见：[#39](https://github.com/nelvko/clash-for-linux-install/issues/39)
-- 没有订阅？[click me](https://次元.net/auth/register?code=oUbI)
+- 本仓库默认使用 `resources/config.yaml` 作为安装配置来源（适合个人自建/单出口方案）。
+- 如需订阅安装/自动转换，请参考 upstream 版本或自行恢复 `install.sh` 的订阅交互流程。
 
 ### 命令一览
 
@@ -191,7 +191,7 @@ Commands:
   status                  内核状况
   tun      [on|off]       Tun 模式
   mixin    [-e|-r]        Mixin 配置
-  secret   [SECRET]       Web 密钥
+  secret   [init|SECRET]  Web 密钥
   update   [auto|log]     更新订阅
   diag | doctor           一键诊断
 ```
@@ -276,22 +276,24 @@ $ clashctl ui
 ║                😼 Web 控制台                  ║
 ║═══════════════════════════════════════════════║
 ║                                               ║
-║     🔓 注意放行端口：9090                      ║
-║     🏠 内网：http://192.168.0.1:9090/ui       ║
-║     🌏 公网：http://255.255.255.255:9090/ui   ║
-║     ☁️ 公共：http://board.zash.run.place      ║
+║     🔒 控制器：127.0.0.1:9090                  ║
+║     🖥️  本机：http://127.0.0.1:9090/ui        ║
+║     🏠 局域网：(disabled by localhost-only)    ║
+║     🌏 公网：(disabled by localhost-only)      ║
+║     ☁️  公共：http://board.zash.run.place       ║
 ║                                               ║
 ╚═══════════════════════════════════════════════╝
 
-$ clashctl secret 666
-😼 密钥更新成功，已重启生效
+$ clashctl secret init
+😼 密钥已初始化并写入（未在终端回显）。保存位置：~/.local/share/clash/controller.secret
 
 $ clashctl secret
-😼 当前密钥：666
+😼 当前密钥：已设置（长度：32）
 ```
 
 - 通过浏览器打开 Web 控制台，实现可视化操作：切换节点、查看日志等。
-- 控制台密钥默认为空，若暴露到公网使用建议更新密钥。
+- **安全默认**：`external-controller` 默认仅监听 `127.0.0.1`（不对局域网/公网暴露）。
+- 建议设置 controller 密钥：`clashctl secret init`（密钥会写入 `mixin.yaml` 并重启生效，且不会在终端回显）。
 
 ### 更新订阅
 

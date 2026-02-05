@@ -25,11 +25,12 @@ _set_bin "${CLASH_BASE_DIR}/bin"
 url=""
 
 _valid_config "$RESOURCES_CONFIG" || {
-    echo -n "$(_okcat '✈️ ' '输入订阅：')"
-    read -r url
-    _okcat '⏳' '正在下载...'
-    _download_config "$RESOURCES_CONFIG" "$url" || _error_quit "下载失败: 请将配置内容写入 $RESOURCES_CONFIG 后重新安装"
-    _valid_config "$RESOURCES_CONFIG" || _error_quit "配置无效，请检查配置：$RESOURCES_CONFIG，转换日志：$BIN_SUBCONVERTER_LOG"
+    # echo -n "$(_okcat '✈️ ' '输入订阅：')"
+    # read -r url
+    # _okcat '⏳' '正在下载...'
+    # _download_config "$RESOURCES_CONFIG" "$url" || _error_quit "下载失败: 请将配置内容写入 $RESOURCES_CONFIG 后重新安装"
+    # _valid_config "$RESOURCES_CONFIG" || _error_quit "配置无效，请检查配置：$RESOURCES_CONFIG，转换日志：$BIN_SUBCONVERTER_LOG"
+    _error_quit "配置无效，请检查 $RESOURCES_CONFIG"
 }
 _okcat '✅' '配置可用'
 

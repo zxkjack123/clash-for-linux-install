@@ -117,9 +117,11 @@ if [ -x "$YQ_BIN" ]; then
     # Best-effort auto pick (never guess a non-existent group)
     GOOGLE_SCHOLAR_TARGET=$("$YQ_BIN" -r '
       ((.["proxy-groups"] // []) | map(.name)) as $names |
-      if ($names | index("AUTO-SMART")) != null then "AUTO-SMART"
+      if ($names | index("ACADEMIC")) != null then "ACADEMIC"
+      elif ($names | index("AUTO-SMART")) != null then "AUTO-SMART"
       elif ($names | index("速云梯")) != null then "速云梯"
       elif ($names | index("PROXY")) != null then "PROXY"
+      elif ($names | index("Proxy")) != null then "Proxy"
       else ""
       end
     ' "$RUNTIME" 2>/dev/null || echo "")

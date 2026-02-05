@@ -72,7 +72,7 @@ detect_port_from_config() {
     echo "$fallback"
 }
 
-: "${CLASH_PROXY_PORT:=$(detect_port_from_config "mixed-port" "$DEFAULT_PROXY_PORT")}"
+: "${CLASH_PROXY_PORT:=$(detect_port_from_config "mixed-port" "$(detect_port_from_config "port" "$DEFAULT_PROXY_PORT")")}"
 : "${CLASH_API_PORT:=$(detect_port_from_config "external-controller" "$DEFAULT_API_PORT")}"
 
 # If load_env.sh populated CLASH_API (e.g., http://127.0.0.1:9090), prefer its port.

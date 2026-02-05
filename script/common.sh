@@ -191,27 +191,85 @@ _get_random_port() {
 }
 
 function _get_proxy_port() {
-    local mixed_port=$("$BIN_YQ" '.mixed-port // ""' $CLASH_CONFIG_RUNTIME)
-    MIXED_PORT=${mixed_port:-7890}
+    # Detect actual proxy ports from runtime.yaml.
+    # - mixed-port: provides HTTP + SOCKS on the same port
+    # - port + socks-port: split mode
+    local mixed_port http_port socks_port
 
+    mixed_port=$("$BIN_YQ" -r '."mixed-port" // ""' "$CLASH_CONFIG_RUNTIME" 2>/dev/null || true)
+    mixed_port=${mixed_port//$'\n'/}
+    mixed_port=${mixed_port//\"/}
+    mixed_port=${mixed_port//\'/}
+
+    if [[ "$mixed_port" =~ ^[0-9]+$ ]]; then
+        MIXED_PORT="$mixed_port"
+        SOCKS_PORT="$mixed_port"
+
+        _is_already_in_use "$MIXED_PORT" "$BIN_KERNEL_NAME" && {
+            local newPort=$(_get_random_port)
+            local msg="端口占用：${MIXED_PORT} 🎲 随机分配：$newPort"
+            "$BIN_YQ" -i '."mixed-port" = '"$newPort" "$CLASH_CONFIG_RUNTIME"
+            MIXED_PORT=$newPort
+            SOCKS_PORT=$newPort
+            _failcat '🎯' "$msg"
+        }
+        return 0
+    fi
+
+    http_port=$("$BIN_YQ" -r '.port // ""' "$CLASH_CONFIG_RUNTIME" 2>/dev/null || true)
+    http_port=${http_port//$'\n'/}
+    http_port=${http_port//\"/}
+    http_port=${http_port//\'/}
+
+    socks_port=$("$BIN_YQ" -r '."socks-port" // ""' "$CLASH_CONFIG_RUNTIME" 2>/dev/null || true)
+    socks_port=${socks_port//$'\n'/}
+    socks_port=${socks_port//\"/}
+    socks_port=${socks_port//\'/}
+
+    [[ "$http_port" =~ ^[0-9]+$ ]] || http_port=7890
+    MIXED_PORT="$http_port"
+    [[ "$socks_port" =~ ^[0-9]+$ ]] && SOCKS_PORT="$socks_port" || SOCKS_PORT=""
+
+    # If ports are already in use by other process, reassign to a random available one.
     _is_already_in_use "$MIXED_PORT" "$BIN_KERNEL_NAME" && {
         local newPort=$(_get_random_port)
         local msg="端口占用：${MIXED_PORT} 🎲 随机分配：$newPort"
-        "$BIN_YQ" -i ".mixed-port = $newPort" $CLASH_CONFIG_RUNTIME
+        "$BIN_YQ" -i '.port = '"$newPort" "$CLASH_CONFIG_RUNTIME"
         MIXED_PORT=$newPort
         _failcat '🎯' "$msg"
     }
+    if [[ -n "${SOCKS_PORT:-}" ]]; then
+        _is_already_in_use "$SOCKS_PORT" "$BIN_KERNEL_NAME" && {
+            local newPort=$(_get_random_port)
+            local msg="端口占用：${SOCKS_PORT} 🎲 随机分配：$newPort"
+            "$BIN_YQ" -i '."socks-port" = '"$newPort" "$CLASH_CONFIG_RUNTIME"
+            SOCKS_PORT=$newPort
+            _failcat '🎯' "$msg"
+        }
+    fi
 }
 
 function _get_ui_port() {
-    local ext_addr=$("$BIN_YQ" '.external-controller // ""' $CLASH_CONFIG_RUNTIME)
-    local ext_port=${ext_addr##*:}
+    local ext_addr ext_host ext_port
+    ext_addr=$("$BIN_YQ" -r '.external-controller // ""' "$CLASH_CONFIG_RUNTIME" 2>/dev/null || echo "")
+    ext_addr=${ext_addr//$'\n'/}
+    ext_addr=${ext_addr//\"/}
+    ext_addr=${ext_addr//\'/}
+
+    # Default to localhost-only.
+    if [ -z "$ext_addr" ]; then
+        ext_addr="127.0.0.1:9090"
+    fi
+
+    ext_port=${ext_addr##*:}
+    ext_host=${ext_addr%:*}
+    [ -z "$ext_host" ] && ext_host="127.0.0.1"
     UI_PORT=${ext_port:-9090}
 
     _is_already_in_use "$UI_PORT" "$BIN_KERNEL_NAME" && {
         local newPort=$(_get_random_port)
         local msg="端口占用：${UI_PORT} 🎲 随机分配：$newPort"
-        "$BIN_YQ" -i ".external-controller = \"0.0.0.0:$newPort\"" $CLASH_CONFIG_RUNTIME
+        "$BIN_YQ" -i ".external-controller = \"${ext_host}:${newPort}\"" "$CLASH_CONFIG_RUNTIME"
         UI_PORT=$newPort
         _failcat '🎯' "$msg"
     }

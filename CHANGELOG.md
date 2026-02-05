@@ -1,4 +1,26 @@
 # Changelog
+## [2.5.8] - 2026-02-05
+
+### ✨ New
+- Added `docs/integrations/RESEARCH_ACADEMIC_PROFILE.md`: a minimal **JP-only** dev/academic routing profile (Copilot / Docker / Scholar / common publishers).
+- `resources/config.yaml` now ships a JP-only template with observable groups (`DEV` / `COPILOT` / `DOCKER` / `ACADEMIC`) while keeping a conservative default (`MATCH,DIRECT`).
+
+### 🛠 Fixes
+- Safer controller UX and secret handling:
+  - `script/clashctl.sh`: added `clashctl secret init` (generates a random secret, writes to `~/.local/share/clash/controller.secret`, updates `mixin.yaml`, and restarts; never prints secrets).
+  - `script/common.sh`: when `external-controller` port is occupied, reassigns the port while preserving the original bind host (avoids accidental `0.0.0.0` exposure).
+- Diagnostics and dev checks refreshed for split-port setups:
+  - `script/clash_diagnose.sh`: clearer guidance for secret init and localhost-only controller defaults.
+  - `vpn-tools/quick_vpn_check.sh`: improved developer endpoint coverage and port/controller auto-detection.
+
+### 🔧 Improvements
+- `resources/mixin.yaml` is now an empty map (`{}`) by default, keeping this fork’s “config.yaml as the single source of truth” workflow predictable.
+
+### ✅ Verification
+- `bash -n` on changed shell scripts
+- `mihomo -t` on `resources/config.yaml` and the active `~/.local/share/clash/runtime.yaml`
+- `script/clash_diagnose.sh --fast --json`
+
 ## [2.5.7] - 2026-01-27
 
 ### ✨ New

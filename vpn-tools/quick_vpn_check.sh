@@ -21,18 +21,66 @@ SECRET="${CLASH_SECRET:-}"
 PROXY_HOST=127.0.0.1
 HTTP_PORT=7890
 SOCKS_PORT=7891
+SOCKS_CONFIGURED=1
 MODE=${1:-text}
 TIMEOUT=6
 
 have() { command -v "$1" >/dev/null 2>&1; }
-json_escape() { sed 's/\\/\\\\/g; s/"/\\"/g'; }
+
+json_escape_str() {
+	# Escape a string for JSON value context (without surrounding quotes).
+	# Handles backslash, double quote, and common control characters.
+	local s="${1-}"
+	s=${s//\\/\\\\}
+	s=${s//\"/\\\"}
+	s=${s//$'\n'/\\n}
+	s=${s//$'\r'/\\r}
+	s=${s//$'\t'/\\t}
+	printf '%s' "$s"
+}
 timed_curl() { curl -s -o /dev/null -w '%{http_code},%{time_total}' --connect-timeout "$TIMEOUT" --max-time "$((TIMEOUT+2))" "$@" 2>/dev/null || echo "000,$TIMEOUT"; }
 curl_body() { curl -sS --connect-timeout "$TIMEOUT" --max-time "$((TIMEOUT+3))" "$@" 2>/dev/null || true; }
+
+# Detect ports from runtime.yaml (supports mixed-port or split port/socks-port)
+RUNTIME_FILE=""
+if command -v clash_runtime_file >/dev/null 2>&1; then
+	RUNTIME_FILE="$(clash_runtime_file 2>/dev/null || true)"
+fi
+[[ -z "$RUNTIME_FILE" ]] && RUNTIME_FILE="$HOME/.local/share/clash/runtime.yaml"
+
+if [[ -f "$RUNTIME_FILE" ]] && command -v clash_yq_bin >/dev/null 2>&1; then
+	YQ_BIN="$(clash_yq_bin 2>/dev/null || true)"
+	if [[ -n "$YQ_BIN" && -x "$YQ_BIN" ]]; then
+		mp=$("$YQ_BIN" -r '."mixed-port" // ""' "$RUNTIME_FILE" 2>/dev/null || true)
+		hp=$("$YQ_BIN" -r '.port // ""' "$RUNTIME_FILE" 2>/dev/null || true)
+		sp=$("$YQ_BIN" -r '."socks-port" // ""' "$RUNTIME_FILE" 2>/dev/null || true)
+		if [[ "$mp" =~ ^[0-9]{2,5}$ ]]; then
+			HTTP_PORT="$mp"
+			SOCKS_PORT="$mp"
+			SOCKS_CONFIGURED=0
+		else
+			[[ "$hp" =~ ^[0-9]{2,5}$ ]] && HTTP_PORT="$hp"
+			if [[ "$sp" =~ ^[0-9]{2,5}$ ]]; then
+				SOCKS_PORT="$sp"
+				SOCKS_CONFIGURED=1
+			else
+				SOCKS_CONFIGURED=0
+			fi
+		fi
+	fi
+fi
 
 declare -A RESULTS
 # Scoring baseline components: controller + ports(2) + proxy_http + youtube + github_web + github_api + copilot_edge = 8
 # We'll dynamically increase max_score as we add more tests below (Docker Hub/Registry, PyPI, ProtonVPN, Copilot Proxy).
 score=0; max_score=8
+
+# Only count/test SOCKS separately when a dedicated socks-port is configured and differs from HTTP.
+DO_SOCKS_TEST=1
+if [[ "${SOCKS_CONFIGURED:-1}" != "1" || "${SOCKS_PORT:-}" == "${HTTP_PORT:-}" ]]; then
+	DO_SOCKS_TEST=0
+	((max_score--))
+fi
 
 controller_status_details=""
 
@@ -46,6 +94,7 @@ test_step() {
 	if [[ $http =~ ^[23][0-9][0-9]$ ]]; then status=OK; ((++score)); fi
 	RESULTS[$key]="$status($http,$t)"
 	[[ $MODE == text ]] && printf "%-28s %s\n" "$desc" "$status ($http $t s)"
+	return 0
 }
 
 echo "=== Quick VPN Check ($(date '+%F %T')) ===" >&2
@@ -80,20 +129,16 @@ fi
 [[ $MODE == text ]] && printf "%-28s %s\n" "$controller_label" "${RESULTS[controller]}"
 
 # Port reachability (TCP SYN)
-for p in $HTTP_PORT $SOCKS_PORT; do
-	# Skip SOCKS test if no dedicated socks-port configured (only mixed-port 7890 present)
-	if [[ $p -eq $SOCKS_PORT ]]; then
-		if ! ss -ltn | grep -q ":$SOCKS_PORT"; then
-			RESULTS[port_$p]=SKIP
-			# Adjust denominator since SOCKS not active
-			((max_score--))
-			[[ $MODE == text ]] && printf "%-28s %s\n" "Port $p" "SKIP (not configured)"
-			continue
-		fi
-	fi
+ports=("$HTTP_PORT")
+if (( DO_SOCKS_TEST == 1 )); then
+	ports+=("$SOCKS_PORT")
+fi
+for p in "${ports[@]}"; do
 	if timeout 1 bash -c "</dev/tcp/$PROXY_HOST/$p" 2>/dev/null; then
 		RESULTS[port_$p]=OK; ((++score))
-	else RESULTS[port_$p]=FAIL; fi
+	else
+		RESULTS[port_$p]=FAIL
+	fi
 	[[ $MODE == text ]] && printf "%-28s %s\n" "Port $p" "${RESULTS[port_$p]}"
 done
 
@@ -215,13 +260,19 @@ else
 	# JSON output
 	{
 		echo '{'
-		echo '  "timestamp": '"$(date +%s)",
-		for k in controller port_$HTTP_PORT port_$SOCKS_PORT proxy_http youtube upwork github_web github_api copilot_edge pypi pypi_files docker_hub docker_registry protonvpn_repo copilot_proxy geo; do
-			v=${RESULTS[$k]:-NA}; printf '  "%s": "%s",\n' "$k" "$v" | json_escape
+		printf '  "timestamp": %s,\n' "$(date +%s)"
+		keys=(controller "port_${HTTP_PORT}")
+		if (( DO_SOCKS_TEST == 1 )); then
+			keys+=("port_${SOCKS_PORT}")
+		fi
+		keys+=(proxy_http youtube upwork github_web github_api copilot_edge pypi pypi_files docker_hub docker_registry protonvpn_repo copilot_proxy geo)
+		for k in "${keys[@]}"; do
+			v=${RESULTS[$k]:-NA}
+			printf '  "%s": "%s",\n' "$k" "$(json_escape_str "$v")"
 		done
-		echo '  "score": '"$score",'
-		echo '  "max_score": '"$max_score",'
-		echo '  "percent": '"$SUMMARY"
+		printf '  "score": %s,\n' "$score"
+		printf '  "max_score": %s,\n' "$max_score"
+		printf '  "percent": %s\n' "$SUMMARY"
 		echo '}'
 	}
 fi
