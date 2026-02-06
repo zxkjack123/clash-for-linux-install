@@ -72,6 +72,63 @@ _guard_metrics_write() {
 LOCK_FILE="${CLASH_LOCK_FILE:-/tmp/.clash_update.lock}"
 LOCK_FD=0
 
+# Output helpers.
+# In JSON mode, keep stdout machine-readable; send human logs to stderr.
+say(){
+  $QUIET && return 0
+  if $JSON_OUT; then
+    echo "$*" >&2
+  else
+    echo "$*"
+  fi
+}
+health_line(){ echo "$*"; }
+
+json_escape() {
+  # Minimal JSON string escape (no surrounding quotes).
+  local s=${1-}
+  s=${s//\\/\\\\}
+  s=${s//\"/\\\"}
+  s=${s//$'\n'/\\n}
+  s=${s//$'\r'/\\r}
+  s=${s//$'\t'/\\t}
+  printf '%s' "$s"
+}
+
+json_array() {
+  # Print a JSON array from args, escaping each string.
+  local first=1 item
+  printf '['
+  for item in "$@"; do
+    if [ $first -eq 0 ]; then printf ','; else first=0; fi
+    printf '"%s"' "$(json_escape "$item")"
+  done
+  printf ']'
+}
+
+fail(){
+  if $JSON_OUT; then
+    echo "[guard][FAIL] $*" >&2
+  else
+    say "[guard][FAIL] $*"
+  fi
+  exit 1
+}
+warn(){
+  if $JSON_OUT; then
+    echo "[guard][WARN] $*" >&2
+  else
+    say "[guard][WARN] $*"
+  fi
+}
+ok(){
+  if $JSON_OUT; then
+    echo "[guard][OK] $*" >&2
+  else
+    say "[guard][OK] $*"
+  fi
+}
+
 _acquire_lock() {
   local mode="shared"
   $AUTO_FIX && mode="exclusive"
@@ -80,9 +137,19 @@ _acquire_lock() {
   # Avoid eval here: CLASH_LOCK_FILE is user-controlled and eval would allow injection.
   exec {LOCK_FD}>"$LOCK_FILE"
   if [ "$mode" = "exclusive" ]; then
-    flock -w 10 -x "$LOCK_FD" || fail "获取独占锁超时: $LOCK_FILE"
+    if ! flock -w 10 -x "$LOCK_FD"; then
+      if $JSON_OUT; then
+        printf '{"timestamp":"%s","status":"ERROR","message":"lock-timeout","lockMode":"exclusive","lockFile":"%s"}\n' "$(date +%Y%m%d_%H%M%S)" "$LOCK_FILE"
+      fi
+      fail "获取独占锁超时: $LOCK_FILE"
+    fi
   else
-    flock -w 10 -s "$LOCK_FD" || fail "获取共享锁超时: $LOCK_FILE"
+    if ! flock -w 10 -s "$LOCK_FD"; then
+      if $JSON_OUT; then
+        printf '{"timestamp":"%s","status":"ERROR","message":"lock-timeout","lockMode":"shared","lockFile":"%s"}\n' "$(date +%Y%m%d_%H%M%S)" "$LOCK_FILE"
+      fi
+      fail "获取共享锁超时: $LOCK_FILE"
+    fi
   fi
   END_LOCK_ACQUIRE_MS=$(date +%s%3N 2>/dev/null || echo $(($(date +%s)*1000)))
   local delta=$((END_LOCK_ACQUIRE_MS-START_LOCK_ATTEMPT_MS))
@@ -92,7 +159,12 @@ _acquire_lock() {
 _upgrade_to_exclusive() {
   $AUTO_FIX || return 0
   flock -u "$LOCK_FD" 2>/dev/null || true
-  flock -w 10 -x "$LOCK_FD" || fail "升级独占锁失败: $LOCK_FILE"
+  if ! flock -w 10 -x "$LOCK_FD"; then
+    if $JSON_OUT; then
+      printf '{"timestamp":"%s","status":"ERROR","message":"lock-upgrade-failed","lockFile":"%s"}\n' "$(date +%Y%m%d_%H%M%S)" "$LOCK_FILE"
+    fi
+    fail "升级独占锁失败: $LOCK_FILE"
+  fi
   LOCK_MODE="exclusive"
 }
 
@@ -149,12 +221,6 @@ if [[ -n "${ALERT_SCRIPT:-}" && ( -z "${ALERT_MODE:-}" || "${ALERT_MODE}" == "no
 fi
 
 _acquire_lock
-
-say(){ $QUIET || echo "$*"; }
-health_line(){ echo "$*"; }
-fail(){ say "[guard][FAIL] $*"; exit 1; }
-warn(){ say "[guard][WARN] $*"; }
-ok(){ say "[guard][OK] $*"; }
 
 _build_alert_message() {
   # Keep message short and safe (no secrets).
@@ -272,19 +338,22 @@ if $REPORT; then
 fi
 
 if [ $STATUS -eq 0 ]; then
-  $CRON_MODE && health_line "GUARD OK $TS" || { $JSON_OUT || ok "健康 (无异常)"; }
-  if $JSON_OUT; then
-    printf '{"timestamp":"%s","status":"OK","issues":[],"fails_5m":0,"lockMode":"%s","lockWaitSeconds":%s}' "$TS" "$LOCK_MODE" "${LOCK_WAIT_SECONDS:-0}"; echo
-  fi
-  _guard_metrics_write clash_guard_lock_wait_seconds "${LOCK_WAIT_SECONDS:-0}"
+  fails=0
+  grade="A"
   if $BASELINE_REPORT; then
     fails=$(journalctl --user -u "$SERVICE" --since "5 min ago" --no-pager 2>/dev/null | grep -c 'connect error' 2>/dev/null || true)
     fails=$(echo "${fails:-0}" | tail -n 1)
-    grade=A; [ $fails -gt 5 ] && grade=B; [ $fails -gt 15 ] && grade=C; [ $fails -gt 30 ] && grade=D
+    grade=A; [ "$fails" -gt 5 ] && grade=B; [ "$fails" -gt 15 ] && grade=C; [ "$fails" -gt 30 ] && grade=D
+  fi
+
+  $CRON_MODE && health_line "GUARD OK $TS" || { $JSON_OUT || ok "健康 (无异常)"; }
+  if $JSON_OUT; then
+    printf '{"timestamp":"%s","status":"OK","issues":%s,"fails_5m":%s,"grade":"%s","lockMode":"%s","lockWaitSeconds":%s}' \
+      "$TS" "$(json_array)" "$fails" "$grade" "$LOCK_MODE" "${LOCK_WAIT_SECONDS:-0}"; echo
+  fi
+  _guard_metrics_write clash_guard_lock_wait_seconds "${LOCK_WAIT_SECONDS:-0}"
+  if $BASELINE_REPORT; then
     ok "节点失败(5m):$fails 等级:$grade"
-    if $JSON_OUT; then
-      printf '{"timestamp":"%s","status":"OK","fails_5m":%s,"grade":"%s","lockMode":"%s","lockWaitSeconds":%s}' "$TS" "$fails" "$grade" "$LOCK_MODE" "${LOCK_WAIT_SECONDS:-0}"; echo
-    fi
   fi
   exit 0
 fi
@@ -292,7 +361,8 @@ fi
 $CRON_MODE && health_line "GUARD ISSUE $TS ${ISSUES[*]}" || { $JSON_OUT || warn "发现问题: ${ISSUES[*]}"; }
 if ! $AUTO_FIX; then
   if $JSON_OUT; then
-    printf '{"timestamp":"%s","status":"ISSUE","issues":["%s"],"autoFix":false,"lockMode":"%s","lockWaitSeconds":%s}' "$TS" "${ISSUES[*]}" "$LOCK_MODE" "${LOCK_WAIT_SECONDS:-0}"; echo
+    printf '{"timestamp":"%s","status":"ISSUE","issues":%s,"autoFix":false,"lockMode":"%s","lockWaitSeconds":%s}' \
+      "$TS" "$(json_array "${ISSUES[@]}")" "$LOCK_MODE" "${LOCK_WAIT_SECONDS:-0}"; echo
   fi
   _guard_metrics_write clash_guard_lock_wait_seconds "${LOCK_WAIT_SECONDS:-0}"
   exit 1
@@ -320,7 +390,8 @@ if diff -q "$RUNTIME" "$TMP_FIX" >/dev/null 2>&1; then
   rm -f "$TMP_FIX"
   _guard_metrics_write clash_guard_lock_wait_seconds "${LOCK_WAIT_SECONDS:-0}"
   if $JSON_OUT; then
-    printf '{"timestamp":"%s","status":"ISSUE","issues":["%s"],"autoFix":true,"note":"no-change" ,"lockMode":"%s","lockWaitSeconds":%s}' "$TS" "${ISSUES[*]}" "$LOCK_MODE" "${LOCK_WAIT_SECONDS:-0}"; echo
+    printf '{"timestamp":"%s","status":"ISSUE","issues":%s,"autoFix":true,"note":"no-change","lockMode":"%s","lockWaitSeconds":%s}' \
+      "$TS" "$(json_array "${ISSUES[@]}")" "$LOCK_MODE" "${LOCK_WAIT_SECONDS:-0}"; echo
   fi
   exit 1
 fi
@@ -347,6 +418,7 @@ _guard_metrics_write clash_guard_lock_wait_seconds "${LOCK_WAIT_SECONDS:-0}"
 $CRON_MODE && health_line "GUARD FIXED $TS" || { $JSON_OUT || ok "完成自愈"; }
 [ -n "$REPORT_FILE" ] && ok "报告: $REPORT_FILE"
 if $JSON_OUT; then
-  printf '{"timestamp":"%s","status":"FIXED","issues":["%s"],"autoFix":true,"lockMode":"%s","lockWaitSeconds":%s}' "$TS" "${ISSUES[*]}" "$LOCK_MODE" "${LOCK_WAIT_SECONDS:-0}"; echo
+  printf '{"timestamp":"%s","status":"FIXED","issues":%s,"autoFix":true,"lockMode":"%s","lockWaitSeconds":%s}' \
+    "$TS" "$(json_array "${ISSUES[@]}")" "$LOCK_MODE" "${LOCK_WAIT_SECONDS:-0}"; echo
 fi
 exit 0

@@ -46,6 +46,25 @@ fi
 log(){ printf '[diag] %s\n' "$*" >&2; }
 dbg(){ [ $VERBOSE -eq 1 ] && log "DEBUG: $*" || true; }
 
+json_escape() {
+  # Minimal JSON string escape (no surrounding quotes).
+  # Handles backslash, double quote, newline, carriage return, tab.
+  local s=${1-}
+  s=${s//\\/\\\\}
+  s=${s//\"/\\\"}
+  s=${s//$'\n'/\\n}
+  s=${s//$'\r'/\\r}
+  s=${s//$'\t'/\\t}
+  printf '%s' "$s"
+}
+
+json_is_number() {
+  # Strict JSON number (no leading zeros except "0").
+  # Accepts integers and decimals.
+  local s=${1-}
+  [[ "$s" =~ ^-?(0|[1-9][0-9]*)(\.[0-9]+)?$ ]]
+}
+
 ok(){ printf '\033[32m✔ %s\033[0m\n' "$*"; }
 warn(){ printf '\033[33m⚠ %s\033[0m\n' "$*"; }
 fail(){ printf '\033[31m✘ %s\033[0m\n' "$*"; }
@@ -169,18 +188,18 @@ fi
 API_BASE="http://127.0.0.1:$UI_PORT"
 AUTH_HDR=()
 [ -n "$SECRET" ] && AUTH_HDR=(-H "Authorization: Bearer $SECRET")
-CTRL_VERSION=$(curl -fsS --max-time 2 "${AUTH_HDR[@]}" "$API_BASE/version" 2>/dev/null || true)
+CTRL_VERSION=$(curl -fsS --connect-timeout 1 --max-time 2 "${AUTH_HDR[@]}" "$API_BASE/version" 2>/dev/null || true)
 if echo "$CTRL_VERSION" | grep -q '{'; then ok "控制接口可访问"; add_json controller_ok true; else fail "控制接口不可访问"; add_json controller_ok false; STATUS=1; fi
 
 # 5. 代理连通性 (HTTP)
 TEST_URL=${TEST_URL:-http://www.gstatic.com/generate_204}
-HTTP_CODE=$(curl -o /dev/null -s -w '%{http_code}' --max-time 6 --proxy "http://127.0.0.1:$HTTP_TEST_PORT" "$TEST_URL" 2>/dev/null || true)
+HTTP_CODE=$(curl -o /dev/null -s -w '%{http_code}' --connect-timeout 3 --max-time 6 --proxy "http://127.0.0.1:$HTTP_TEST_PORT" "$TEST_URL" 2>/dev/null || true)
 [ -z "$HTTP_CODE" ] && HTTP_CODE=000
 if [ "$HTTP_CODE" = 204 ] || [ "$HTTP_CODE" = 200 ]; then ok "HTTP 代理成功 $HTTP_CODE"; add_json http_proxy_ok true; else fail "HTTP 代理失败 code=$HTTP_CODE"; add_json http_proxy_ok false; STATUS=1; fi
 
 # 6. SOCKS5 (使用 curl 支持)
 if [ -n "$SOCKS_TEST_PORT" ]; then
-  SOCKS_CODE=$(curl -o /dev/null -s -w '%{http_code}' --max-time 8 --socks5-hostname "127.0.0.1:$SOCKS_TEST_PORT" "$TEST_URL" 2>/dev/null || true)
+  SOCKS_CODE=$(curl -o /dev/null -s -w '%{http_code}' --connect-timeout 3 --max-time 8 --socks5-hostname "127.0.0.1:$SOCKS_TEST_PORT" "$TEST_URL" 2>/dev/null || true)
   [ -z "$SOCKS_CODE" ] && SOCKS_CODE=000
   if [ "$SOCKS_CODE" = 204 ] || [ "$SOCKS_CODE" = 200 ]; then
     ok "SOCKS5 代理成功 $SOCKS_CODE"
@@ -197,7 +216,7 @@ else
 fi
 
 # 7. 直连对比 (无代理, 不走 127.0.0.1 代理) – 仅测一次
-DIRECT_CODE=$(curl -o /dev/null -s -w '%{http_code}' --max-time 6 --noproxy '*' "$TEST_URL" || echo 000)
+DIRECT_CODE=$(curl -o /dev/null -s -w '%{http_code}' --connect-timeout 3 --max-time 6 --noproxy '*' "$TEST_URL" || echo 000)
 add_json direct_code "$DIRECT_CODE"
 dbg "direct=$DIRECT_CODE proxy=$HTTP_CODE"
 
@@ -257,11 +276,16 @@ if [ $JSON -eq 1 ]; then
   for kv in "${JSON_KV[@]}"; do
     k=${kv%%=*}; v=${kv#*=}
     if [ $first -eq 0 ]; then json_out+=","; else first=0; fi
-    json_out+="\"$k\":"
-    case "$v" in
-      true|false|[0-9]*) json_out+="$v" ;;
-      *) json_out+="\"$v\"" ;;
-    esac
+    k_esc=$(json_escape "$k")
+    json_out+="\"$k_esc\":"
+    if [ "$v" = true ] || [ "$v" = false ]; then
+      json_out+="$v"
+    elif json_is_number "$v"; then
+      json_out+="$v"
+    else
+      v_esc=$(json_escape "$v")
+      json_out+="\"$v_esc\""
+    fi
   done
   # append exit_status
   if [ $first -eq 0 ]; then json_out+=","; fi
