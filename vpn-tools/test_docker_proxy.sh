@@ -25,6 +25,7 @@ NC='\033[0m' # No Color
 # Configuration
 HOST_IP=$(hostname -I | awk '{print $1}')
 TIMEOUT=10
+MAX_TIME=$((TIMEOUT + 5))
 
 # Docker network mode:
 # - host: recommended on Linux; allows accessing controller bound to 127.0.0.1 safely
@@ -352,11 +353,11 @@ echo -e "${YELLOW}=================================${NC}"
 
 run_test "API Version Check" \
     "version" 0 \
-    docker run --rm "${DOCKER_RUN_NET_ARGS[@]}" "${DOCKER_ENV_SECRET_ARGS[@]}" "${TEST_IMAGE}" sh -c "if [ -n \"\${CLASH_SECRET:-}\" ]; then curl --connect-timeout ${TIMEOUT} -s -H \"Authorization: Bearer \$CLASH_SECRET\" http://${TARGET_HOST}:${CLASH_API_PORT}/version; else curl --connect-timeout ${TIMEOUT} -s http://${TARGET_HOST}:${CLASH_API_PORT}/version; fi"
+    docker run --rm "${DOCKER_RUN_NET_ARGS[@]}" "${DOCKER_ENV_SECRET_ARGS[@]}" "${TEST_IMAGE}" sh -c "if [ -n \"\${CLASH_SECRET:-}\" ]; then curl --connect-timeout ${TIMEOUT} --max-time ${MAX_TIME} -s -H \"Authorization: Bearer \$CLASH_SECRET\" http://${TARGET_HOST}:${CLASH_API_PORT}/version; else curl --connect-timeout ${TIMEOUT} --max-time ${MAX_TIME} -s http://${TARGET_HOST}:${CLASH_API_PORT}/version; fi"
 
 run_test "API Config Check" \
     "allow-lan" 0 \
-    docker run --rm "${DOCKER_RUN_NET_ARGS[@]}" "${DOCKER_ENV_SECRET_ARGS[@]}" "${TEST_IMAGE}" sh -c "if [ -n \"\${CLASH_SECRET:-}\" ]; then curl --connect-timeout ${TIMEOUT} -s -H \"Authorization: Bearer \$CLASH_SECRET\" http://${TARGET_HOST}:${CLASH_API_PORT}/configs; else curl --connect-timeout ${TIMEOUT} -s http://${TARGET_HOST}:${CLASH_API_PORT}/configs; fi"
+    docker run --rm "${DOCKER_RUN_NET_ARGS[@]}" "${DOCKER_ENV_SECRET_ARGS[@]}" "${TEST_IMAGE}" sh -c "if [ -n \"\${CLASH_SECRET:-}\" ]; then curl --connect-timeout ${TIMEOUT} --max-time ${MAX_TIME} -s -H \"Authorization: Bearer \$CLASH_SECRET\" http://${TARGET_HOST}:${CLASH_API_PORT}/configs; else curl --connect-timeout ${TIMEOUT} --max-time ${MAX_TIME} -s http://${TARGET_HOST}:${CLASH_API_PORT}/configs; fi"
 
 # Test 2: Proxy functionality tests
 echo -e "\n${YELLOW}🧪 Test Suite 2: Basic Proxy Functionality Tests${NC}"
@@ -367,7 +368,7 @@ for url in "${BASIC_TEST_URLS[@]}"; do
     test_name="Basic Proxy Test: $url (Direct IP)"
     run_test "$test_name" \
     "" 0 \
-    docker run --rm "${DOCKER_RUN_NET_ARGS[@]}" "${TEST_IMAGE}" curl --connect-timeout "${TIMEOUT}" -s -x "http://${TARGET_HOST}:${CLASH_PROXY_PORT}" "$url"
+    docker run --rm "${DOCKER_RUN_NET_ARGS[@]}" "${TEST_IMAGE}" curl --connect-timeout "${TIMEOUT}" --max-time "${MAX_TIME}" -s -x "http://${TARGET_HOST}:${CLASH_PROXY_PORT}" "$url"
 done
 
 # Test 2.5: AI/LLM API endpoints
@@ -378,7 +379,7 @@ for url in "${AI_TEST_URLS[@]}"; do
     test_name="AI API Test: $url"
     run_test "$test_name" \
     "" 0 \
-    docker run --rm "${DOCKER_RUN_NET_ARGS[@]}" "${TEST_IMAGE}" curl --connect-timeout "${TIMEOUT}" -s -I -x "http://${TARGET_HOST}:${CLASH_PROXY_PORT}" "$url"
+    docker run --rm "${DOCKER_RUN_NET_ARGS[@]}" "${TEST_IMAGE}" curl --connect-timeout "${TIMEOUT}" --max-time "${MAX_TIME}" -s -I -x "http://${TARGET_HOST}:${CLASH_PROXY_PORT}" "$url"
 done
 
 # Test 2.6: Streaming and Social Media
@@ -389,7 +390,7 @@ for url in "${STREAMING_TEST_URLS[@]}"; do
     test_name="Streaming Test: $url"
     run_test "$test_name" \
     "" 0 \
-    docker run --rm "${DOCKER_RUN_NET_ARGS[@]}" "${TEST_IMAGE}" curl --connect-timeout "${TIMEOUT}" -s -I -x "http://${TARGET_HOST}:${CLASH_PROXY_PORT}" "$url"
+    docker run --rm "${DOCKER_RUN_NET_ARGS[@]}" "${TEST_IMAGE}" curl --connect-timeout "${TIMEOUT}" --max-time "${MAX_TIME}" -s -I -x "http://${TARGET_HOST}:${CLASH_PROXY_PORT}" "$url"
 done
 
 # Test 2.7: Development Tools and Registries
@@ -400,7 +401,7 @@ for url in "${DEV_TEST_URLS[@]}"; do
     test_name="Dev Tools Test: $url"
     run_test "$test_name" \
     "" 0 \
-    docker run --rm "${DOCKER_RUN_NET_ARGS[@]}" "${TEST_IMAGE}" curl --connect-timeout "${TIMEOUT}" -s -I -x "http://${TARGET_HOST}:${CLASH_PROXY_PORT}" "$url"
+    docker run --rm "${DOCKER_RUN_NET_ARGS[@]}" "${TEST_IMAGE}" curl --connect-timeout "${TIMEOUT}" --max-time "${MAX_TIME}" -s -I -x "http://${TARGET_HOST}:${CLASH_PROXY_PORT}" "$url"
 done
 
 # Test 2.8: Chinese AI Platforms (Direct Connection Test)
@@ -414,11 +415,11 @@ for url in "${CHINESE_AI_URLS[@]}"; do
     # Test both with and without proxy to verify direct connection
     run_test "$test_name (without proxy)" \
         "" 0 \
-        docker run --rm "${DOCKER_RUN_NET_ARGS[@]}" "${TEST_IMAGE}" curl --connect-timeout "${TIMEOUT}" -s -I "$url"
+        docker run --rm "${DOCKER_RUN_NET_ARGS[@]}" "${TEST_IMAGE}" curl --connect-timeout "${TIMEOUT}" --max-time "${MAX_TIME}" -s -I "$url"
     
     run_test "$test_name (with proxy - should still work)" \
         "" 0 \
-        docker run --rm "${DOCKER_RUN_NET_ARGS[@]}" "${TEST_IMAGE}" curl --connect-timeout "${TIMEOUT}" -s -I -x "http://${TARGET_HOST}:${CLASH_PROXY_PORT}" "$url"
+        docker run --rm "${DOCKER_RUN_NET_ARGS[@]}" "${TEST_IMAGE}" curl --connect-timeout "${TIMEOUT}" --max-time "${MAX_TIME}" -s -I -x "http://${TARGET_HOST}:${CLASH_PROXY_PORT}" "$url"
 done
 
 # Test 3: host.docker.internal tests (bridge mode only)
@@ -428,7 +429,7 @@ echo -e "${YELLOW}===========================================${NC}"
 if [[ "${DOCKER_NET_MODE}" == "bridge" ]]; then
     run_test "API Access via host.docker.internal" \
         "version" 0 \
-        docker run --rm "${DOCKER_ADD_HOST_ARGS[@]}" "${DOCKER_ENV_SECRET_ARGS[@]}" "${TEST_IMAGE}" sh -c "if [ -n \"\${CLASH_SECRET:-}\" ]; then curl --connect-timeout ${TIMEOUT} -s -H \"Authorization: Bearer \$CLASH_SECRET\" http://host.docker.internal:${CLASH_API_PORT}/version; else curl --connect-timeout ${TIMEOUT} -s http://host.docker.internal:${CLASH_API_PORT}/version; fi"
+        docker run --rm "${DOCKER_ADD_HOST_ARGS[@]}" "${DOCKER_ENV_SECRET_ARGS[@]}" "${TEST_IMAGE}" sh -c "if [ -n \"\${CLASH_SECRET:-}\" ]; then curl --connect-timeout ${TIMEOUT} --max-time ${MAX_TIME} -s -H \"Authorization: Bearer \$CLASH_SECRET\" http://host.docker.internal:${CLASH_API_PORT}/version; else curl --connect-timeout ${TIMEOUT} --max-time ${MAX_TIME} -s http://host.docker.internal:${CLASH_API_PORT}/version; fi"
 
     # Test a few key URLs through host.docker.internal
     KEY_URLS=(
@@ -441,7 +442,7 @@ if [[ "${DOCKER_NET_MODE}" == "bridge" ]]; then
         test_name="Proxy Test: $url (host.docker.internal)"
         run_test "$test_name" \
             "" 0 \
-            docker run --rm "${DOCKER_ADD_HOST_ARGS[@]}" "${TEST_IMAGE}" curl --connect-timeout "${TIMEOUT}" -s -x "http://host.docker.internal:${CLASH_PROXY_PORT}" "$url"
+            docker run --rm "${DOCKER_ADD_HOST_ARGS[@]}" "${TEST_IMAGE}" curl --connect-timeout "${TIMEOUT}" --max-time "${MAX_TIME}" -s -x "http://host.docker.internal:${CLASH_PROXY_PORT}" "$url"
     done
 else
     print_status "INFO" "Skipping host.docker.internal tests (DOCKER_NET_MODE=host)"
@@ -453,11 +454,11 @@ echo -e "${YELLOW}===========================================${NC}"
 
 run_test "HTTP_PROXY Environment Variable" \
     "origin" 0 \
-    docker run --rm "${DOCKER_RUN_NET_ARGS[@]}" -e "HTTP_PROXY=http://${TARGET_HOST}:${CLASH_PROXY_PORT}" "${TEST_IMAGE}" curl --connect-timeout "${TIMEOUT}" -s http://httpbin.org/ip
+    docker run --rm "${DOCKER_RUN_NET_ARGS[@]}" -e "HTTP_PROXY=http://${TARGET_HOST}:${CLASH_PROXY_PORT}" "${TEST_IMAGE}" curl --connect-timeout "${TIMEOUT}" --max-time "${MAX_TIME}" -s http://httpbin.org/ip
 
 run_test "HTTPS_PROXY Environment Variable" \
     "origin" 0 \
-    docker run --rm "${DOCKER_RUN_NET_ARGS[@]}" -e "HTTPS_PROXY=http://${TARGET_HOST}:${CLASH_PROXY_PORT}" "${TEST_IMAGE}" curl --connect-timeout "${TIMEOUT}" -s https://httpbin.org/ip
+    docker run --rm "${DOCKER_RUN_NET_ARGS[@]}" -e "HTTPS_PROXY=http://${TARGET_HOST}:${CLASH_PROXY_PORT}" "${TEST_IMAGE}" curl --connect-timeout "${TIMEOUT}" --max-time "${MAX_TIME}" -s https://httpbin.org/ip
 
 # Test 5: Docker Compose simulation
 echo -e "\n${YELLOW}🧪 Test Suite 5: Docker Compose Simulation${NC}"
@@ -476,7 +477,7 @@ services:
             - HTTP_PROXY=http://${TARGET_HOST}:${CLASH_PROXY_PORT}
             - HTTPS_PROXY=http://${TARGET_HOST}:${CLASH_PROXY_PORT}
             - NO_PROXY=localhost,127.0.0.1
-        command: curl --connect-timeout ${TIMEOUT} -s http://httpbin.org/ip
+        command: curl --connect-timeout ${TIMEOUT} --max-time ${MAX_TIME} -s http://httpbin.org/ip
 EOF
 else
         cat > "${TEMP_COMPOSE_FILE}" << EOF
@@ -514,17 +515,17 @@ echo -e "${YELLOW}=================================${NC}"
 
 run_test "Proxy Response Time Test" \
     "Time:" 0 \
-    docker run --rm "${DOCKER_RUN_NET_ARGS[@]}" "${TEST_IMAGE}" curl --connect-timeout "${TIMEOUT}" -s -w "Time: %{time_total}s\\n" -o /dev/null -x "http://${TARGET_HOST}:${CLASH_PROXY_PORT}" http://www.gstatic.com/generate_204
+    docker run --rm "${DOCKER_RUN_NET_ARGS[@]}" "${TEST_IMAGE}" curl --connect-timeout "${TIMEOUT}" --max-time "${MAX_TIME}" -s -w "Time: %{time_total}s\\n" -o /dev/null -x "http://${TARGET_HOST}:${CLASH_PROXY_PORT}" http://www.gstatic.com/generate_204
 
 # Test 7: Error handling tests
 echo -e "\n${YELLOW}🧪 Test Suite 7: Error Handling Tests${NC}"
 echo -e "${YELLOW}====================================${NC}"
 
 run_test_expect_fail "Invalid Proxy Port Test (should fail)" \
-    docker run --rm "${DOCKER_RUN_NET_ARGS[@]}" "${TEST_IMAGE}" curl --connect-timeout 5 -s -x "http://${TARGET_HOST}:9999" http://httpbin.org/ip
+    docker run --rm "${DOCKER_RUN_NET_ARGS[@]}" "${TEST_IMAGE}" curl --connect-timeout 5 --max-time 8 -s -x "http://${TARGET_HOST}:9999" http://httpbin.org/ip
 
 run_test_expect_fail "Non-existent Host Test (should fail)" \
-    docker run --rm "${DOCKER_RUN_NET_ARGS[@]}" "${TEST_IMAGE}" curl --connect-timeout 5 -s -x "http://192.168.255.255:${CLASH_PROXY_PORT}" http://httpbin.org/ip
+    docker run --rm "${DOCKER_RUN_NET_ARGS[@]}" "${TEST_IMAGE}" curl --connect-timeout 5 --max-time 8 -s -x "http://192.168.255.255:${CLASH_PROXY_PORT}" http://httpbin.org/ip
 
 # Summary
 echo -e "\n${BLUE}📊 Test Summary${NC}"

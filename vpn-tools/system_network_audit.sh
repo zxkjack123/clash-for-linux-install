@@ -178,7 +178,7 @@ collect_bandwidth(){
   [[ $DO_BANDWIDTH -eq 1 ]] || return 0
   section "简易下载速度测试"
   test_file=https://speed.hetzner.de/10MB.bin
-  out=$(curl -m 20 -w '%{size_download},%{time_total}' -o /dev/null -s "$test_file" || true)
+  out=$(curl --connect-timeout 5 -m 20 -w '%{size_download},%{time_total}' -o /dev/null -s "$test_file" || true)
   size=${out%%,*}; t=${out##*,}
   if [[ -n $size && -n $t && $t != 0 ]]; then
     mbps=$(awk -v s="$size" -v t="$t" 'BEGIN{printf "%.2f", (s*8/1000/1000)/t}')
@@ -186,7 +186,7 @@ collect_bandwidth(){
   else
     echo "Direct test failed"
   fi
-  out2=$(curl -x "$PROXY" -m 25 -w '%{size_download},%{time_total}' -o /dev/null -s "$test_file" || true)
+  out2=$(curl -x "$PROXY" --connect-timeout 5 -m 25 -w '%{size_download},%{time_total}' -o /dev/null -s "$test_file" || true)
   size2=${out2%%,*}; t2=${out2##*,}
   if [[ -n $size2 && -n $t2 && $t2 != 0 ]]; then
     mbps2=$(awk -v s="$size2" -v t="$t2" 'BEGIN{printf "%.2f", (s*8/1000/1000)/t}')

@@ -64,7 +64,7 @@ echo
 
 test_head() {
   local label="$1"; shift
-  local cmd=(curl -I -sS -m 8 "$@" https://repo.protonvpn.com/debian)
+  local cmd=(curl -I -sS --connect-timeout 3 -m 8 "$@" https://repo.protonvpn.com/debian)
   local out status=0
   if ! out=$("${cmd[@]}" 2>&1); then
     status=$?

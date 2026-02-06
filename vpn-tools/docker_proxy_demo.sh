@@ -23,28 +23,28 @@ echo -e "Clash Proxy: http://${HOST_IP}:7890"
 echo ""
 
 echo -e "${YELLOW}📋 Demo 1: Simple HTTP request with proxy${NC}"
-echo -e "${CYAN}Command:${NC} docker run --rm curlimages/curl curl -x http://${HOST_IP}:7890 -s http://httpbin.org/ip"
-docker run --rm curlimages/curl curl -x http://${HOST_IP}:7890 -s http://httpbin.org/ip
+echo -e "${CYAN}Command:${NC} docker run --rm curlimages/curl curl -x http://${HOST_IP}:7890 --connect-timeout 3 --max-time 10 -s http://httpbin.org/ip"
+docker run --rm curlimages/curl curl -x http://${HOST_IP}:7890 --connect-timeout 3 --max-time 10 -s http://httpbin.org/ip
 echo ""
 
 echo -e "${YELLOW}📋 Demo 2: Using environment variables${NC}"
-echo -e "${CYAN}Command:${NC} docker run --rm -e HTTP_PROXY=http://${HOST_IP}:7890 curlimages/curl curl -s http://httpbin.org/ip"
-docker run --rm -e HTTP_PROXY=http://${HOST_IP}:7890 curlimages/curl curl -s http://httpbin.org/ip
+echo -e "${CYAN}Command:${NC} docker run --rm -e HTTP_PROXY=http://${HOST_IP}:7890 curlimages/curl curl --connect-timeout 3 --max-time 10 -s http://httpbin.org/ip"
+docker run --rm -e HTTP_PROXY=http://${HOST_IP}:7890 curlimages/curl curl --connect-timeout 3 --max-time 10 -s http://httpbin.org/ip
 echo ""
 
 echo -e "${YELLOW}📋 Demo 3: Using host.docker.internal${NC}"
-echo -e "${CYAN}Command:${NC} docker run --rm --add-host=host.docker.internal:${HOST_IP} -e HTTP_PROXY=http://host.docker.internal:7890 curlimages/curl curl -s http://httpbin.org/ip"
-docker run --rm --add-host=host.docker.internal:${HOST_IP} -e HTTP_PROXY=http://host.docker.internal:7890 curlimages/curl curl -s http://httpbin.org/ip
+echo -e "${CYAN}Command:${NC} docker run --rm --add-host=host.docker.internal:${HOST_IP} -e HTTP_PROXY=http://host.docker.internal:7890 curlimages/curl curl --connect-timeout 3 --max-time 10 -s http://httpbin.org/ip"
+docker run --rm --add-host=host.docker.internal:${HOST_IP} -e HTTP_PROXY=http://host.docker.internal:7890 curlimages/curl curl --connect-timeout 3 --max-time 10 -s http://httpbin.org/ip
 echo ""
 
 echo -e "${YELLOW}📋 Demo 4: Testing HTTPS proxy${NC}"
-echo -e "${CYAN}Command:${NC} docker run --rm -e HTTPS_PROXY=http://${HOST_IP}:7890 curlimages/curl curl -s https://httpbin.org/ip"
-docker run --rm -e HTTPS_PROXY=http://${HOST_IP}:7890 curlimages/curl curl -s https://httpbin.org/ip
+echo -e "${CYAN}Command:${NC} docker run --rm -e HTTPS_PROXY=http://${HOST_IP}:7890 curlimages/curl curl --connect-timeout 3 --max-time 10 -s https://httpbin.org/ip"
+docker run --rm -e HTTPS_PROXY=http://${HOST_IP}:7890 curlimages/curl curl --connect-timeout 3 --max-time 10 -s https://httpbin.org/ip
 echo ""
 
 echo -e "${YELLOW}📋 Demo 5: Accessing Clash API from container${NC}"
-echo -e "${CYAN}Command:${NC} docker run --rm curlimages/curl curl -s http://${HOST_IP}:9090/version"
-docker run --rm curlimages/curl curl -s http://${HOST_IP}:9090/version
+echo -e "${CYAN}Command:${NC} docker run --rm curlimages/curl curl --connect-timeout 2 --max-time 5 -s http://${HOST_IP}:9090/version"
+docker run --rm curlimages/curl curl --connect-timeout 2 --max-time 5 -s http://${HOST_IP}:9090/version
 echo ""
 
 echo -e "${GREEN}✅ All demos completed successfully!${NC}"

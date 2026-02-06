@@ -68,7 +68,7 @@ _snapshot_route(){
 
 _snapshot_pubip(){
   [ $CURL_AVAILABLE -eq 1 ] || return 0
-  (curl -m 2 -s https://api64.ipify.org || true) | awk '{print;}' | while read -r ip; do
+  (curl --connect-timeout 1 -m 2 -s https://api64.ipify.org || true) | awk '{print;}' | while read -r ip; do
      [ -n "$ip" ] && _emit PUBIP "-" "$ip"
   done &
 }

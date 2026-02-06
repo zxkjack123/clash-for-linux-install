@@ -86,7 +86,7 @@ declare -A seen_ids=()
 DELIM=$'\x1f'
 
 while [ $(date +%s) -lt "$end" ]; do
-  json=$(curl -sS --max-time 2 "${hdr[@]}" "${api}/connections" 2>/dev/null || echo '{}')
+  json=$(curl -sS --connect-timeout 1 --max-time 2 "${hdr[@]}" "${api}/connections" 2>/dev/null || echo '{}')
 
   while IFS="$DELIM" read -r id proc host dst rule payload chains; do
     [ -z "${id:-}" ] && continue
