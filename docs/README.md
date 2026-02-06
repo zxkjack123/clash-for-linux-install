@@ -38,6 +38,7 @@ docs/
 
 - **[Bug 修复报告](development/BUG_FIX_REPORT.md)** - 已知问题和修复记录
 - **[服务修复技术](development/SERVICE_FIX_TECHNICAL.md)** - 技术性故障排查和修复
+- **[静态门禁（Static Gates）](development/STATIC_GATES.md)** - 提交前的脚本可靠性静态检查（curl 超时 / errexit 算术陷阱 / JSON stdout 纯度）
 - **[SiliconFlow 修复](development/SILICONFLOW_FIX.md)** - SiliconFlow API 连接问题修复
 - **[个人节点部署指南](development/JP_PERSONAL_PROXY_NODE.md)** - 将阿里云日本服务器构建为专用代理出口
 - **[完成报告](development/COMPLETION_REPORT.md)** - 项目里程碑和完成情况
@@ -56,5 +57,5 @@ docs/
 
 ---
 
-**最后更新**: 2026-02-05  
-**版本**: v2.5.8
+**最后更新**: 2026-02-06  
+**版本**: v2.5.9
