@@ -94,7 +94,7 @@ while true; do
 	read -rp "Select: " ans
 	case ${ans,,} in
 		1)
-			i=1; for n in "${nodes[@]}"; do printf "%2d) %s\n" $i "$n"; ((i++)); done; read -rp "Enter to continue" _;;
+			i=1; for n in "${nodes[@]}"; do printf "%2d) %s\n" $i "$n"; ((++i)); done; read -rp "Enter to continue" _;;
 		2)
 			echo "Node,HTTP,Time"; for n in "${nodes[@]:0:8}"; do probe "$n"; done | sort -t, -k2,2 -k3,3n; read -rp "Enter to continue" _;;
 		3)

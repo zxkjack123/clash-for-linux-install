@@ -165,10 +165,10 @@ check_ai_services() {
          esac
         result=$(test_url "$url" "$label" "$proxy_mode" "$regex")
         IFS='|' read -r lbl code latency succ <<< "$result"
-        
-        ((total++))
-        ((success+=succ))
-        ((total_latency+=latency))
+
+        total=$((total + 1))
+        success=$((success + succ))
+        total_latency=$((total_latency + latency))
         
         log "  $lbl: ${code} (${latency}ms) [$([ $succ -eq 1 ] && echo 'OK' || echo 'FAIL')]" >&2
     done
@@ -195,10 +195,10 @@ check_dev_services() {
         IFS='|' read -r url label pattern <<< "$service"
         result=$(test_url "$url" "$label" "yes" "${pattern:-^[23]}")
         IFS='|' read -r lbl code latency succ <<< "$result"
-        
-        ((total++))
-        ((success+=succ))
-        ((total_latency+=latency))
+
+        total=$((total + 1))
+        success=$((success + succ))
+        total_latency=$((total_latency + latency))
         
         log "  $lbl: ${code} (${latency}ms) [$([ $succ -eq 1 ] && echo 'OK' || echo 'FAIL')]" >&2
     done
@@ -224,10 +224,10 @@ check_streaming_services() {
         IFS='|' read -r url label <<< "$service"
         result=$(test_url "$url" "$label" "yes")
         IFS='|' read -r lbl code latency succ <<< "$result"
-        
-        ((total++))
-        ((success+=succ))
-        ((total_latency+=latency))
+
+        total=$((total + 1))
+        success=$((success + succ))
+        total_latency=$((total_latency + latency))
         
         log "  $lbl: ${code} (${latency}ms) [$([ $succ -eq 1 ] && echo 'OK' || echo 'FAIL')]" >&2
     done
@@ -254,10 +254,10 @@ check_domestic_sites() {
         IFS='|' read -r url label <<< "$site"
         result=$(test_url "$url" "$label" "no")
         IFS='|' read -r lbl code latency succ <<< "$result"
-        
-        ((total++))
-        ((success+=succ))
-        ((total_latency+=latency))
+
+        total=$((total + 1))
+        success=$((success + succ))
+        total_latency=$((total_latency + latency))
         
         log "  $lbl: ${code} (${latency}ms) [$([ $succ -eq 1 ] && echo 'OK' || echo 'FAIL')]" >&2
     done

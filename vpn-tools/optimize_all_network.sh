@@ -267,12 +267,12 @@ check_domestic() {
     
     for site in "${sites[@]}"; do
         IFS='|' read -r url name <<< "$site"
-        ((total++))
+        total=$((total + 1))
         
         log_info "测试 $name..."
         if timeout 10 curl -fsS --noproxy '*' "$url" >/dev/null 2>&1; then
             log_success "$name 连接正常"
-            ((success++))
+            success=$((success + 1))
         else
             log_warn "$name 连接异常"
         fi

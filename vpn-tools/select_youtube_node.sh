@@ -118,7 +118,7 @@ test_url() { # url label
 	out=$(curl -s -o /dev/null -w '%{http_code},%{time_total}' --connect-timeout 6 --max-time 10 "${CURL_PROXY_OPTS[@]}" "$1" 2>/dev/null || echo "000,9.999")
 	http=${out%%,*}; t=${out##*,}
 	local pts=0
-	if [[ $http =~ ^2|3 ]]; then
+	if [[ $http =~ ^[23][0-9][0-9]$ ]]; then
 		if (( $(echo "$t <= 1.2" | bc -l 2>/dev/null || echo 0) )); then pts=6
 		elif (( $(echo "$t <= 2.5" | bc -l 2>/dev/null || echo 0) )); then pts=5
 		elif (( $(echo "$t <= 4" | bc -l 2>/dev/null || echo 0) )); then pts=4

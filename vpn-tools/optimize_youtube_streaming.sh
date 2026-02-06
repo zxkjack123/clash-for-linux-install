@@ -118,7 +118,7 @@ metric() { # url weight label
 	local url="$1" weight="$2" label="$3" out http t s=0
 	out=$(curl -s -o /dev/null -w '%{http_code},%{time_total}' --connect-timeout "$TIMEOUT" --max-time "$((TIMEOUT+4))" "${CURL_PROXY_OPTS[@]}" "$url" 2>/dev/null || echo "000,9.999")
 	http=${out%%,*}; t=${out##*,}
-	if [[ $http =~ ^2|3 ]]; then
+	if [[ $http =~ ^[23][0-9][0-9]$ ]]; then
 		if (( $(echo "$t <= 1.5" | bc -l 2>/dev/null || echo 0) )); then s=$((5*weight))
 		elif (( $(echo "$t <= 3" | bc -l 2>/dev/null || echo 0) )); then s=$((4*weight))
 		elif (( $(echo "$t <= 5" | bc -l 2>/dev/null || echo 0) )); then s=$((3*weight))
@@ -142,7 +142,7 @@ for n in "${nodes[@]}"; do
 	for r in "${res[@]}"; do IFS=':' read -r label code t s <<<"$r"; printf "  %-8s code=%s time=%s score=%s\n" "$label" "$code" "$t" "$s"; total=$((total+s)); done
 	echo "  Stability pixel (3 repeats):"
 	stab=0
-	for i in {1..3}; do out=$(curl -s -o /dev/null -w '%{http_code},%{time_total}' --connect-timeout 4 --max-time 6 "${CURL_PROXY_OPTS[@]}" https://i.ytimg.com/generate_204 2>/dev/null || echo "000,9.999"); c=${out%%,*}; tt=${out##*,}; [[ $c =~ ^2|3 ]] && stab=$((stab+1)); printf "    #%d %s %ss\n" $i "$c" "$tt"; done
+	for i in {1..3}; do out=$(curl -s -o /dev/null -w '%{http_code},%{time_total}' --connect-timeout 4 --max-time 6 "${CURL_PROXY_OPTS[@]}" https://i.ytimg.com/generate_204 2>/dev/null || echo "000,9.999"); c=${out%%,*}; tt=${out##*,}; [[ $c =~ ^[23][0-9][0-9]$ ]] && stab=$((stab+1)); printf "    #%d %s %ss\n" $i "$c" "$tt"; done
 	echo "  => Node composite score: $total (+stab $stab)"
 	total=$((total + stab))
 	if (( total > best_score )); then best_score=$total; best_node=$n; fi

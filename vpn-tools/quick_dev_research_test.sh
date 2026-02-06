@@ -7,6 +7,16 @@ MODE=${1:-text}
 TIMEOUT=${TIMEOUT:-6}
 PROXY=${PROXY:-http://127.0.0.1:7890}
 
+json_escape_str() {
+  local s="${1-}"
+  s=${s//\\/\\\\}
+  s=${s//\"/\\\"}
+  s=${s//$'\n'/\\n}
+  s=${s//$'\r'/\\r}
+  s=${s//$'\t'/\\t}
+  printf '%s' "$s"
+}
+
 have(){ command -v "$1" >/dev/null 2>&1; }
 
 test_curl(){ curl -s -o /dev/null -w '%{http_code},%{time_total}' --connect-timeout "$TIMEOUT" --max-time "$((TIMEOUT+2))" --proxy "$PROXY" "$1" 2>/dev/null || echo "000,$TIMEOUT"; }
@@ -42,9 +52,9 @@ order=(github gitlab ghcr docker npm pypi pypi_files crates rustup go_proxy k8s 
 declare -A res
 for k in "${order[@]}"; do
   url=${targets[$k]}
-  ((total++))
+  ((++total))
   out=$(test_curl "$url"); code=${out%%,*}; t=${out##*,}; status=FAIL
-  if [[ $code =~ ^2|3 ]]; then status=OK; ((status_ok++)); fi
+  if [[ $code =~ ^[23][0-9][0-9]$ ]]; then status=OK; ((++status_ok)); fi
   res[$k]="$status($code,$t)"
   [[ $MODE == text ]] && printf "%-10s %s\n" "$k" "${res[$k]}"
 done
@@ -53,7 +63,7 @@ percent=$((status_ok*100/total))
 if [[ $MODE == text ]]; then
   echo "-----------------------"
   echo "Score $status_ok/$total (${percent}%)"
-  if (( percent>=85 )); then echo "Status: ✅ DEV/RESEARCH READY"; elif (( percent>=60 )); then echo "Status: ⚠️ PARTIAL"; else echo "Status: ❌ ISSUE"; fi
+  if (( percent>=85 )); then echo "Status: ✅ DEV/RESEARCH READY"; status_exit=0; elif (( percent>=60 )); then echo "Status: ⚠️ PARTIAL"; status_exit=1; else echo "Status: ❌ ISSUE"; status_exit=2; fi
 else
   printf '{\n'
   printf '  "score": %s, "max": %s, "percent": %s,\n' "$status_ok" "$total" "$percent"
@@ -62,8 +72,11 @@ else
   for k in "${order[@]}"; do
     v=${res[$k]}
     if [[ $first -eq 0 ]]; then printf ',\n'; fi
-    printf '    "%s": "%s"' "$k" "$v"
+    printf '    "%s": "%s"' "$k" "$(json_escape_str "$v")"
     first=0
   done
   printf '\n  }\n}\n'
+  if (( percent>=85 )); then status_exit=0; elif (( percent>=60 )); then status_exit=1; else status_exit=2; fi
 fi
+
+exit ${status_exit:-0}

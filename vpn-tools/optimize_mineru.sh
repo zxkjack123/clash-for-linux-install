@@ -69,6 +69,23 @@ EOF
 err(){ echo "[ERR] $*" >&2; }
 info(){ echo "[INFO] $*" >&2; }
 
+json_escape_str() {
+  # Escape a string for JSON value context (without surrounding quotes).
+  local s="${1-}"
+  s=${s//\\/\\\\}
+  s=${s//\"/\\\"}
+  s=${s//$'\n'/\\n}
+  s=${s//$'\r'/\\r}
+  s=${s//$'\t'/\\t}
+  printf '%s' "$s"
+}
+
+is_json_number() {
+  # Strict JSON number matcher (subset for our use): int/float without exponent.
+  # - No leading zeros unless the number is exactly 0 or starts with 0.
+  [[ ${1-} =~ ^-?(0|[1-9][0-9]*)(\.[0-9]+)?$ ]]
+}
+
 # URL 编码
 urlencode(){
   local raw="$1"
@@ -188,15 +205,26 @@ if [ -n "$LIMIT" ]; then
   candidates=$(echo "$candidates" | head -n "$LIMIT")
 fi
 
+mapfile -t CANDIDATES < <(printf '%s\n' "$candidates")
+
 info "开始测试: group=$GROUP controller=$CONTROLLER domains=${TARGET_DOMAINS[*]} 节点数=$(echo "$candidates" | wc -l)"
 
 declare -A NODE_SUCCESS NODE_TIME NODE_DETAIL
 RESULT_LINES=""
 JSON_ITEMS=""
 
+best_node=""
+best_success=-1
+best_time=""
+
+float_lt(){
+  # args: a b  (return 0 when a < b)
+  awk -v a="$1" -v b="$2" 'BEGIN{exit !(a+0 < b+0)}'
+}
+
 switch_node(){
   local node="$1"
-  ctrl_put_json "$API/proxies/$ENC_GROUP" '{"name":"'"$node"'"}' || return 1
+  ctrl_put_json "$API/proxies/$ENC_GROUP" "{\"name\":\"$(json_escape_str "$node")\"}" || return 1
   sleep "$SLEEP_AFTER_SWITCH"
   return 0
 }
@@ -204,7 +232,7 @@ switch_node(){
 test_domain(){
   local domain="$1"
   local out code ttotal
-  out=$(curl -x "http://127.0.0.1:7890" -s -o /dev/null -w '%{http_code},%{time_total}' --connect-timeout 4 --max-time "$TIMEOUT" "https://$domain/" 2>&1 || true)
+  out=$(curl -x "http://127.0.0.1:7890" -s -o /dev/null -w '%{http_code},%{time_total}' --connect-timeout 4 --max-time "$TIMEOUT" "https://$domain/" 2>/dev/null || echo "000,$TIMEOUT")
   code=${out%%,*}
   ttotal=${out##*,}
   [[ $code =~ ^[0-9]{3}$ ]] || code=000
@@ -216,12 +244,12 @@ test_domain(){
   fi
 }
 
-for node in $candidates; do
+for node in "${CANDIDATES[@]}"; do
   switch_node "$node" || { err "切换失败: $node"; continue; }
   local_success=0
   total_time=0
   details=""
-  domain_json=""
+  domain_json_items=""
   for d in "${TARGET_DOMAINS[@]}"; do
     r=$(test_domain "$d")
     code=$(echo "$r" | cut -d',' -f1)
@@ -230,32 +258,26 @@ for node in $candidates; do
     total_time=$(awk -v a="$total_time" -v b="$t" 'BEGIN{printf "%.4f", a+b}')
     [ "$st" = OK ] && local_success=$((local_success+1))
     details+="$d:$code(${t}s) "
-    domain_json+="{\"domain\":\"$d\",\"code\":$code,\"time\":$t,\"ok\":$( [ "$st" = OK ] && echo true || echo false )},"
+    domain_json_items+="{\"domain\":\"$(json_escape_str "$d")\",\"code\":\"$(json_escape_str "$code")\",\"time\":$t,\"ok\":$( [ "$st" = OK ] && echo true || echo false )},"
   done
-  NODE_SUCCESS[$node]=$local_success
-  NODE_TIME[$node]=$total_time
-  NODE_DETAIL[$node]="$details"
-  RESULT_LINES+="$node\t$local_success\t$total_time\t$details\n"
-  JSON_ITEMS+="{\"node\":\"$node\",\"success\":$local_success,\"total_time\":$total_time,\"probes\":[${domain_json%,}]},"
+  NODE_SUCCESS["$node"]=$local_success
+  NODE_TIME["$node"]=$total_time
+  NODE_DETAIL["$node"]="$details"
+  RESULT_LINES+="$node"$'\t'"$local_success"$'\t'"$total_time"$'\t'"$details"$'\n'
+  JSON_ITEMS+="{\"node\":\"$(json_escape_str "$node")\",\"success\":$local_success,\"total_time\":$total_time,\"probes\":[${domain_json_items%,}]},"
   echo "[NODE] $node success=$local_success time=$total_time $details" >&2
+
+  if [ "$local_success" -gt "$best_success" ]; then
+    best_node="$node"; best_success="$local_success"; best_time="$total_time"
+  elif [ "$local_success" -eq "$best_success" ] && [ -n "$best_time" ] && float_lt "$total_time" "$best_time"; then
+    best_node="$node"; best_success="$local_success"; best_time="$total_time"
+  elif [ "$local_success" -eq "$best_success" ] && [ -z "$best_time" ]; then
+    best_node="$node"; best_success="$local_success"; best_time="$total_time"
+  fi
 done
 
-# 选择最佳
-best_node=""
-best_success=-1
-best_time=999999
-while read -r line; do
-  [ -z "$line" ] && continue
-  n=$(echo "$line" | awk '{print $1}')
-  s=$(echo "$line" | awk '{print $2}')
-  t=$(echo "$line" | awk '{print $3}')
-  if [ "$s" -gt "$best_success" ] || { [ "$s" -eq "$best_success" ] && awk "BEGIN{exit !($t < $best_time)}"; }; then
-    best_node="$n"; best_success="$s"; best_time="$t"
-  fi
-done < <(printf "%s" "$RESULT_LINES")
-
 echo "\n结果表: (节点\t成功数\t总耗时\t详情)";
-echo -e "$RESULT_LINES" | sort -k2,2nr -k3,3n | column -t -s $'\t' || echo -e "$RESULT_LINES" | sort -k2,2nr -k3,3n
+printf '%s' "$RESULT_LINES" | sort -t $'\t' -k2,2nr -k3,3n | column -t -s $'\t' || printf '%s' "$RESULT_LINES" | sort -t $'\t' -k2,2nr -k3,3n
 
 echo "\n最佳节点: $best_node (success=$best_success total_time=$best_time)"
 
@@ -268,7 +290,33 @@ if [ -n "$best_node" ] && [ "$APPLY" -eq 1 ]; then
 fi
 
 if [ "$JSON_OUTPUT" -eq 1 ]; then
-  echo "{\"group\":\"$GROUP\",\"domains\":[\"${TARGET_DOMAINS[*]}\"],\"best\":{\"node\":\"$best_node\",\"success\":$best_success,\"total_time\":$best_time},\"results\":[${JSON_ITEMS%,}]}"
+  # Emit strict JSON to stdout.
+  printf '{'
+  printf '"group":"%s",' "$(json_escape_str "$GROUP")"
+  printf '"domains":['
+  d_first=1
+  for d in "${TARGET_DOMAINS[@]}"; do
+    [ $d_first -eq 1 ] || printf ','
+    d_first=0
+    printf '"%s"' "$(json_escape_str "$d")"
+  done
+  printf '],'
+
+  # best.total_time: numeric when parseable, otherwise string
+  best_time_json="0"
+  if [ -n "${best_time:-}" ] && is_json_number "$best_time"; then
+    best_time_json="$best_time"
+  else
+    best_time_json="\"$(json_escape_str "${best_time:-0}")\""
+  fi
+
+  printf '"best":{'
+  printf '"node":"%s","success":%s,"total_time":%s' \
+    "$(json_escape_str "${best_node:-}")" "${best_success:-0}" "$best_time_json"
+  printf '},'
+  printf '"results":[%s]' "${JSON_ITEMS%,}"
+  printf '}'
+  printf '\n'
 fi
 
 if [ -z "$best_node" ] || [ "$best_success" -le 0 ]; then

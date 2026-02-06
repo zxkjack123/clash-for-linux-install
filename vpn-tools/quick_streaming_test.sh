@@ -25,11 +25,13 @@ declare -A sites=(
 	[dash]="https://dash.akamaized.net/envivio/EnvivioDash3/manifest.mpd"
 )
 
+order=(youtube yt_pixel netflix dash)
+
 declare -A res
-score=0; max=4
-for k in "${!sites[@]}"; do
+score=0; max=${#order[@]}
+for k in "${order[@]}"; do
 	out=$(test_curl "${sites[$k]}"); code=${out%%,*}; t=${out##*,}; status=FAIL
-	if [[ $code =~ ^[23][0-9][0-9]$ ]]; then status="$NH_OK"; ((score++)); else status="$NH_FAIL"; fi
+	if [[ $code =~ ^[23][0-9][0-9]$ ]]; then status="$NH_OK"; ((++score)); else status="$NH_FAIL"; fi
 	res[$k]="$status($code,$t)"
 	[[ $MODE == text ]] && printf "%-10s %s\n" "$k" "${res[$k]}"
 done
@@ -38,19 +40,26 @@ percent=$(nh_percent "$score" "$max")
 if [[ $MODE == text ]]; then
 	echo "-----------------------"
 	echo "Score $score/$max (${percent}%)"
-	if (( percent>=75 )); then echo "Status: $NH_READY"; elif (( percent>=50 )); then echo "Status: $NH_PARTIAL"; else echo "Status: $NH_ISSUE"; fi
+	if (( percent>=75 )); then echo "Status: $NH_READY"; status_exit=0; elif (( percent>=50 )); then echo "Status: $NH_PARTIAL"; status_exit=1; else echo "Status: $NH_ISSUE"; status_exit=2; fi
 else
 	# JSON 输出
 	printf '{\n'
 	printf '  "score": %s, "max": %s, "percent": %s,\n' "$score" "$max" "$percent"
 	printf '  "results": {\n'
 	first=1
-	for k in youtube yt_pixel netflix dash; do
+	for k in "${order[@]}"; do
 		v=${res[$k]}
 		if [[ $first -eq 0 ]]; then printf ',\n'; fi
-		printf '    "%s": "%s"' "$k" "$v"
+		if declare -F nh_json_escape_str >/dev/null 2>&1; then
+			printf '    "%s": "%s"' "$k" "$(nh_json_escape_str "$v")"
+		else
+			printf '    "%s": "%s"' "$k" "$v"
+		fi
 		first=0
 	done
 	printf '\n  }\n}\n'
+	if (( percent>=75 )); then status_exit=0; elif (( percent>=50 )); then status_exit=1; else status_exit=2; fi
 fi
+
+exit ${status_exit:-0}
 

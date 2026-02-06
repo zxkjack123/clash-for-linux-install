@@ -76,7 +76,11 @@ else
 	for k in "${order[@]}"; do
 		v=${res[$k]}
 		if [[ $first -eq 0 ]]; then printf ',\n'; fi
-		printf '    "%s": "%s"' "$k" "$v"
+		if declare -F nh_json_escape_str >/dev/null 2>&1; then
+			printf '    "%s": "%s"' "$k" "$(nh_json_escape_str "$v")"
+		else
+			printf '    "%s": "%s"' "$k" "$v"
+		fi
 		first=0
 	done
 	printf '\n  }\n}\n'

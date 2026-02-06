@@ -51,7 +51,7 @@ for name in "${!urls[@]}"; do
     echo "$count. $name"
     echo "   ${urls[$name]}"
     echo ""
-    ((count++))
+    ((++count))
 done
 
 if [[ $OPEN -ne 1 ]]; then

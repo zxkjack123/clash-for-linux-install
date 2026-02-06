@@ -79,7 +79,7 @@ score=0; max_score=8
 DO_SOCKS_TEST=1
 if [[ "${SOCKS_CONFIGURED:-1}" != "1" || "${SOCKS_PORT:-}" == "${HTTP_PORT:-}" ]]; then
 	DO_SOCKS_TEST=0
-	((max_score--))
+	((--max_score))
 fi
 
 controller_status_details=""
@@ -160,7 +160,7 @@ if (( proxy_ok )); then RESULTS[proxy_http]="OK($proxy_code,$proxy_t)"; ((++scor
 # Streaming quick (YouTube base HTML)
 test_step youtube "YouTube" --proxy http://$PROXY_HOST:$HTTP_PORT https://www.youtube.com/
 # Upwork access check (common geo-verify issue, ensure proxied works)
-((max_score++))
+((++max_score))
 test_step upwork "Upwork" --proxy http://$PROXY_HOST:$HTTP_PORT https://www.upwork.com/
 test_step github_web "GitHub Web" --proxy http://$PROXY_HOST:$HTTP_PORT https://github.com/
 # GitHub API: be resilient against sporadic network hiccups and rate-limit edges
@@ -194,19 +194,19 @@ RESULTS[copilot_edge]="$status($code,$t)"
 # Additional developer/infra endpoints (requested): Docker Hub, Docker Registry, PyPI, ProtonVPN, Copilot Proxy
 
 # PyPI main index
-((max_score++))
+((++max_score))
 test_step pypi "PyPI" --proxy http://$PROXY_HOST:$HTTP_PORT https://pypi.org/simple/
 
 # PyPI file CDN
-((max_score++))
+((++max_score))
 test_step pypi_files "PyPI Files" --proxy http://$PROXY_HOST:$HTTP_PORT https://files.pythonhosted.org/
 
 # Docker Hub web
-((max_score++))
+((++max_score))
 test_step docker_hub "Docker Hub" --proxy http://$PROXY_HOST:$HTTP_PORT https://hub.docker.com/
 
 # Docker Registry v2 endpoint (401/403 are acceptable as reachability)
-((max_score++))
+((++max_score))
 out=$(timed_curl --proxy http://$PROXY_HOST:$HTTP_PORT https://registry-1.docker.io/v2/); code=${out%%,*}; t=${out##*,}
 status=FAIL
 if [[ $code =~ ^([23][0-9][0-9]|401|403)$ ]]; then status=OK; ((++score)); fi
@@ -214,7 +214,7 @@ RESULTS[docker_registry]="$status($code,$t)"
 [[ $MODE == text ]] && printf "%-28s %s\n" "Docker Registry" "${RESULTS[docker_registry]}"
 
 # ProtonVPN repository (package mirror) – accept 2xx/3xx/403 as reachable
-((max_score++))
+((++max_score))
 out=$(timed_curl --proxy http://$PROXY_HOST:$HTTP_PORT https://repo.protonvpn.com/); code=${out%%,*}; t=${out##*,}
 status=FAIL
 if [[ $code =~ ^([23][0-9][0-9]|403)$ ]]; then status=OK; ((++score)); fi
@@ -222,7 +222,7 @@ RESULTS[protonvpn_repo]="$status($code,$t)"
 [[ $MODE == text ]] && printf "%-28s %s\n" "ProtonVPN Repo" "${RESULTS[protonvpn_repo]}"
 
 # Copilot Proxy endpoint (401/403/404 acceptable)
-((max_score++))
+((++max_score))
 out=$(timed_curl --proxy http://$PROXY_HOST:$HTTP_PORT https://copilot-proxy.githubusercontent.com/); code=${out%%,*}; t=${out##*,}
 status=FAIL
 if [[ $code =~ ^([23][0-9][0-9]|401|403|404)$ ]]; then status=OK; ((++score)); fi

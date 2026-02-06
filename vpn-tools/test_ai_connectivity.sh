@@ -30,6 +30,16 @@ AUTH_HEADER=()
 have(){ command -v "$1" >/dev/null 2>&1; }
 log(){ [[ $QUIET -eq 1 ]] || echo "$@" >&2; }
 
+json_escape_str(){
+  local s="${1-}"
+  s=${s//\\/\\\\}
+  s=${s//\"/\\\"}
+  s=${s//$'\n'/\\n}
+  s=${s//$'\r'/\\r}
+  s=${s//$'\t'/\\t}
+  printf '%s' "$s"
+}
+
 while [[ $# -gt 0 ]]; do
   case $1 in
     --group) GROUP=$2; shift 2;;
@@ -180,9 +190,39 @@ echo; echo "Best node: $decoded_best (score=${MET[$best.score]:-0}) Elapsed:${el
 [[ $APPLY -eq 1 ]] && { apply_group "$decoded_best" && echo "Applied best to $GROUP" || echo "Apply failed" >&2; }
 
 if [[ -n $JSON_OUT ]]; then
-  { echo '{"group":"'$GROUP'","rounds":'$ROUNDS',"elapsed":'$elapsed',"best":"'${decoded_best//"/\\"}'","nodes":['; f=1; for n in "${NODES[@]}"; do [[ $f -eq 1 ]] || echo ','; f=0; printf '{"name":"%s","score":%s,"success_ratio":%.4f,"latency_med":%.4f,"latency_p95":%.4f,"rounds":%s}' "${n//%20/ }" "${MET[$n.score]:-0}" "${MET[$n.sr]:-0}" "${MET[$n.med]:-0}" "${MET[$n.p95]:-0}" "${MET[$n.rounds]:-0}"; done; echo ']}'; } > "$JSON_OUT"; echo "Wrote JSON $JSON_OUT"; fi
+  {
+    printf '{"group":"%s","rounds":%s,"elapsed":%s,"best":"%s","nodes":[' \
+      "$(json_escape_str "$GROUP")" "$ROUNDS" "$elapsed" "$(json_escape_str "$decoded_best")"
+
+    f=1
+    for n in "${NODES[@]}"; do
+      [[ $f -eq 1 ]] || printf ','
+      f=0
+      name_dec="${n//%20/ }"
+      printf '{"name":"%s","score":%s,"success_ratio":%.4f,"latency_med":%.4f,"latency_p95":%.4f,"rounds":%s}' \
+        "$(json_escape_str "$name_dec")" "${MET[$n.score]:-0}" "${MET[$n.sr]:-0}" "${MET[$n.med]:-0}" "${MET[$n.p95]:-0}" "${MET[$n.rounds]:-0}"
+    done
+    printf ']}'
+    printf '\n'
+  } > "$JSON_OUT"
+  log "Wrote JSON $JSON_OUT"
+fi
 
 if [[ -n $MD_OUT ]]; then
-  { echo "# AI Connectivity Test"; echo; echo "Group: $GROUP  Rounds: $ROUNDS  Elapsed: ${elapsed}s  Generated: $(date '+%F %T')"; echo; echo "Best Node: **$decoded_best** (Score ${MET[$best.score]:-0})"; echo; echo '| Node | Score | Success% | Median | P95 | Rounds |'; echo '|------|------:|---------:|------:|----:|-------:|'; for n in "${NODES[@]}"; do printf '| %s | %s | %.0f | %.2f | %.2f | %s |\n' "${n//%20/ }" "${MET[$n.score]:-0}" "$(awk -v v=${MET[$n.sr]:-0} 'BEGIN{print v*100}')" "${MET[$n.med]:-0}" "${MET[$n.p95]:-0}" "${MET[$n.rounds]:-0}"; done | sort -t '|' -k3 -nr; } > "$MD_OUT"; echo "Wrote markdown $MD_OUT"; fi
+  {
+    echo "# AI Connectivity Test"
+    echo
+    echo "Group: $GROUP  Rounds: $ROUNDS  Elapsed: ${elapsed}s  Generated: $(date '+%F %T')"
+    echo
+    echo "Best Node: **$decoded_best** (Score ${MET[$best.score]:-0})"
+    echo
+    echo '| Node | Score | Success% | Median | P95 | Rounds |'
+    echo '|------|------:|---------:|------:|----:|-------:|'
+    for n in "${NODES[@]}"; do
+      printf '| %s | %s | %.0f | %.2f | %.2f | %s |\n' "${n//%20/ }" "${MET[$n.score]:-0}" "$(awk -v v=${MET[$n.sr]:-0} 'BEGIN{print v*100}')" "${MET[$n.med]:-0}" "${MET[$n.p95]:-0}" "${MET[$n.rounds]:-0}"
+    done | sort -t '|' -k3 -nr
+  } > "$MD_OUT"
+  log "Wrote markdown $MD_OUT"
+fi
 
 exit 0

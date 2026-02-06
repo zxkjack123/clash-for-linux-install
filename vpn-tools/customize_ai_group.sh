@@ -119,7 +119,7 @@ print_menu() {
 		lat=$(test_latency "$n")
 		mark=" "; [[ $n == "$current" ]] && mark="*"
 		printf '%3d%s %-50s %6s\n' "$i" "$mark" "$n" "$lat"
-		((i++))
+		((++i))
 	done
 	printf '\nActions: [number]=switch  r=refresh  f=filter  q=quit\n'
 }

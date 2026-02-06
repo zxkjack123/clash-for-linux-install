@@ -171,8 +171,8 @@ analyze_category() {
             result=$(test_node_performance "$node" "$domain" || echo "$node|$domain|9999|DELAY|0")
             IFS='|' read -r n d lat code succ <<< "$result"
             
-            ((test_count++))
-            ((total_latency+=lat))
+            ((++test_count))
+            total_latency=$((total_latency + lat))
             
             if [ "$succ" -eq 1 ]; then
                 # 根据延迟给分

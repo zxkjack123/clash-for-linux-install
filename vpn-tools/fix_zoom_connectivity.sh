@@ -119,9 +119,9 @@ test_zoom_basic(){
   local base="https://$host/"
   local out code t pass=0 total=0
   for url in "$base" "https://zoom.us/" "https://r.zoom.us/" "https://static.zoom.us/"; do
-    ((total++))
+    ((++total))
     out=$(curl_test "$url"); code=${out%%,*}; t=${out##*,}; status=FAIL
-    if [[ $code =~ ^2|3 ]]; then status=OK; ((pass++)); fi
+    if [[ $code =~ ^[23][0-9][0-9]$ ]]; then status=OK; ((++pass)); fi
     printf '%-35s %s (%s s)\n' "$url" "$status/$code" "$t"
   done
   echo "$pass/$total"
@@ -197,11 +197,11 @@ if (( api_up )); then
     echo "Candidates: ${#nodes[@]} (testing up to 8)"
     count=0
     for n in "${nodes[@]}"; do
-      ((count++)); ((count>8)) && break
+      ((++count)); ((count>8)) && break
       echo "- Probing $n ..." >&2
       switch_node "$n"; sleep 1
       out=$(curl_test "https://$host/"); code=${out%%,*}; t=${out##*,}
-      if [[ $code =~ ^2|3 ]]; then
+      if [[ $code =~ ^[23][0-9][0-9]$ ]]; then
         ok "$n OK ($code in ${t}s)"
         # use smaller time as better
         # compute integer ms for compare

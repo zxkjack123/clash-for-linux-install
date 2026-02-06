@@ -40,6 +40,17 @@ nh_percent(){
   awk -v a="$1" -v b="$2" 'BEGIN{ if(b==0)print 0; else print int((a*100)/b) }'
 }
 
+# Escape a string for JSON value context (without surrounding quotes).
+nh_json_escape_str(){
+  local s="${1-}"
+  s=${s//\\/\\\\}
+  s=${s//\"/\\\"}
+  s=${s//$'\n'/\\n}
+  s=${s//$'\r'/\\r}
+  s=${s//$'\t'/\\t}
+  printf '%s' "$s"
+}
+
 # Regex OK per default or provided allow pattern; echoes OK/FAIL
 nh_ok_by_code(){
   local code="$1"; local pattern="${2:-^[23][0-9][0-9]$}"

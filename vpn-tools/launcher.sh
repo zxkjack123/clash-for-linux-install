@@ -95,7 +95,7 @@ submenu() {
 		clear
 		echo "=== $title ==="; echo
 		local i=1
-		for s in "${arr[@]}"; do printf "%2d) %s\n" $i "$s"; ((i++)); done
+		for s in "${arr[@]}"; do printf "%2d) %s\n" $i "$s"; ((++i)); done
 		echo " Q) Back"
 		read -rp "Select script: " sel
 		case ${sel,,} in

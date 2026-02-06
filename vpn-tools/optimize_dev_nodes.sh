@@ -139,7 +139,7 @@ test_endpoint() {
 	code=${out%%,*}
 	time=${out##*,}
 	local ok=0
-	if [[ $code =~ ^2|3 ]]; then
+	if [[ $code =~ ^[23][0-9][0-9]$ ]]; then
 		ok=1
 	elif [[ "$code" == "401" || "$code" == "403" || "$code" == "405" ]]; then
 		ok=1
@@ -156,8 +156,8 @@ score_node() {
 		result=$(test_endpoint "$label" "$url")
 		IFS='|' read -r _ code time ok <<< "$result"
 		details+=("$label:$code@${time}s${ok}")
-		(( total++ ))
-		(( success+=ok ))
+		total=$((total + 1))
+		success=$((success + ok))
 		local state
 		if (( ok == 1 )); then
 			state="OK"
