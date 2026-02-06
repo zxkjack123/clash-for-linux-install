@@ -7,6 +7,48 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 
+usage() {
+    cat <<'EOF'
+VSCode Copilot 网络优化 / 诊断
+
+Usage:
+  optimize_vscode_copilot.sh              # 默认：优化 + 检查
+  optimize_vscode_copilot.sh --check      # 仅检查（不切换节点/不运行 optimize_ai.sh）
+
+Options:
+  --check, --no-optimize   Skip optimization (fast, non-invasive)
+  --optimize               Force run optimization (default)
+  --proxy URL              Override local proxy URL (default: http://127.0.0.1:7890)
+  --api URL                Override Clash controller API (default: http://127.0.0.1:9090)
+  -h, --help               Show help
+EOF
+}
+
+DO_OPTIMIZE=1
+PROXY_URL="http://127.0.0.1:7890"
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --check|--no-optimize)
+            DO_OPTIMIZE=0; shift ;;
+        --optimize)
+            DO_OPTIMIZE=1; shift ;;
+        --proxy)
+            [[ $# -ge 2 ]] || { echo "[ERROR] --proxy requires a URL" >&2; exit 2; }
+            PROXY_URL="$2"; shift 2 ;;
+        --api)
+            [[ $# -ge 2 ]] || { echo "[ERROR] --api requires a URL" >&2; exit 2; }
+            CLASH_API="$2"; shift 2 ;;
+        -h|--help)
+            usage; exit 0 ;;
+        *)
+            echo "[ERROR] Unknown arg: $1" >&2
+            usage
+            exit 2
+            ;;
+    esac
+done
+
 echo "=== VSCode Copilot 网络优化 ($(date '+%Y-%m-%d %H:%M:%S')) ==="
 
 # Load env (optional) and bootstrap controller/secret
@@ -32,42 +74,66 @@ echo "✅ Clash 服务正常"
 # 2. 优化 AI 节点 (包括 GitHub Copilot)
 echo ""
 echo "🔧 优化 AI 服务节点..."
-if [ -f "$SCRIPT_DIR/optimize_ai.sh" ]; then
-    bash "$SCRIPT_DIR/optimize_ai.sh" 2>&1 | tail -10 || true
+if [[ "$DO_OPTIMIZE" -eq 1 ]]; then
+    if [ -f "$SCRIPT_DIR/optimize_ai.sh" ]; then
+        bash "$SCRIPT_DIR/optimize_ai.sh" 2>&1 | tail -10 || true
+    else
+        echo "⚠️  optimize_ai.sh 不存在，跳过"
+    fi
 else
-    echo "⚠️  optimize_ai.sh 不存在，跳过"
+    echo "ℹ️  --check 模式：跳过节点优化（不切换节点）"
 fi
 
 # 3. 测试关键服务连接
 echo ""
 echo "🧪 测试关键服务连接..."
 
-PROXY_URL="http://127.0.0.1:7890"
+_curl_code_time() {
+    # Print: <code> <time_total>
+    # If curl errors, return code=000.
+    local url="$1"; shift
+    local out rc code t
+    out=$(curl -sS -o /dev/null -w '%{http_code} %{time_total}' \
+        --connect-timeout 6 --max-time 10 \
+        --proxy "$PROXY_URL" "$url" 2>/dev/null) || rc=$?
+    rc=${rc:-0}
+    code=${out%% *}
+    t=${out#* }
+    [[ -n "${code:-}" ]] || code=000
+    [[ -n "${t:-}" && "$t" != "$code" ]] || t=0
+    if [[ $rc -ne 0 ]]; then
+        code=000
+    fi
+    printf '%s %s\n' "$code" "$t"
+}
+
+_is_ok_code() {
+    local code="$1" allow_re="$2"
+    [[ "$code" =~ $allow_re ]]
+}
 
 test_endpoint() {
-    local name="$1"
-    local url="$2"
-    local result
-    result=$(curl -s -w "HTTP:%{http_code} Time:%{time_total}s" -o /dev/null \
-        --connect-timeout 6 --max-time 10 \
-        --proxy "$PROXY_URL" "$url" 2>&1 || true)
-    if echo "$result" | grep -q "HTTP:"; then
-        echo "  ✓ $name - $result"
+    local name="$1" url="$2" allow_re="$3"
+    local code t
+    read -r code t < <(_curl_code_time "$url")
+    if _is_ok_code "$code" "$allow_re"; then
+        echo "  ✓ $name - HTTP:$code Time:${t}s"
     else
-        echo "  ✗ $name - 连接失败"
+        echo "  ✗ $name - HTTP:$code Time:${t}s"
     fi
 }
 
-test_endpoint "GitHub API (proxy)" "https://api.github.com/"
-test_endpoint "Copilot API (proxy)" "https://api.githubcopilot.com/healthz"
-test_endpoint "Copilot Proxy (proxy)" "https://copilot-proxy.githubusercontent.com/"
-test_endpoint "OpenAI API (proxy)" "https://api.openai.com/v1/models"
+# NOTE: treat 404 as reachable for Copilot endpoints (healthz / proxy root often returns 404).
+test_endpoint "GitHub API (proxy)" "https://api.github.com/" '^(200|301|302|401|403)$'
+test_endpoint "Copilot API (proxy)" "https://api.githubcopilot.com/healthz" '^(200|204|301|302|404)$'
+test_endpoint "Copilot Proxy (proxy)" "https://copilot-proxy.githubusercontent.com/" '^(200|301|302|404)$'
+test_endpoint "OpenAI API (proxy)" "https://api.openai.com/v1/models" '^(200|401|403)$'
 
 # If Copilot endpoints fail via proxy, check direct path and recommend VS Code relaunch with NO_PROXY bypass
 echo ""
 echo "🔍 Copilot endpoint bypass check (direct vs proxy) ..."
-direct_copilot=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 4 --max-time 6 --noproxy '*' https://api.githubcopilot.com/healthz || echo 000)
-proxy_copilot=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 6 --max-time 10 --proxy "$PROXY_URL" https://api.githubcopilot.com/healthz || echo 000)
+direct_copilot=$(curl -sS -o /dev/null -w "%{http_code}" --connect-timeout 4 --max-time 6 --noproxy '*' https://api.githubcopilot.com/healthz 2>/dev/null); rc=$?; [[ $rc -eq 0 ]] || direct_copilot=000
+proxy_copilot=$(curl -sS -o /dev/null -w "%{http_code}" --connect-timeout 6 --max-time 10 --proxy "$PROXY_URL" https://api.githubcopilot.com/healthz 2>/dev/null); rc=$?; [[ $rc -eq 0 ]] || proxy_copilot=000
 echo "  Direct: $direct_copilot  |  Proxy: $proxy_copilot"
 if [[ "$proxy_copilot" == "000" || "$proxy_copilot" == "408" ]] && [[ "$direct_copilot" =~ ^(200|204|301|302|404)$ ]]; then
     echo ""
