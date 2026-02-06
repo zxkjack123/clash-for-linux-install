@@ -1,5 +1,9 @@
 .idea
 .vscode
+
+# Python transient artifacts
+__pycache__/
+*.pyc
 config.yaml
 resources/bin/**
 resources/backup/**
