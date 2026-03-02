@@ -18,14 +18,15 @@ Usage:
 Options:
   --check, --no-optimize   Skip optimization (fast, non-invasive)
   --optimize               Force run optimization (default)
-  --proxy URL              Override local proxy URL (default: http://127.0.0.1:7890)
+    --proxy URL              Override local proxy URL (default: auto-detect from runtime.yaml; fallback http://127.0.0.1:7890)
   --api URL                Override Clash controller API (default: http://127.0.0.1:9090)
   -h, --help               Show help
 EOF
 }
 
 DO_OPTIMIZE=1
-PROXY_URL="http://127.0.0.1:7890"
+PROXY_URL=""
+PROXY_URL_USER_SET=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -35,7 +36,7 @@ while [[ $# -gt 0 ]]; do
             DO_OPTIMIZE=1; shift ;;
         --proxy)
             [[ $# -ge 2 ]] || { echo "[ERROR] --proxy requires a URL" >&2; exit 2; }
-            PROXY_URL="$2"; shift 2 ;;
+            PROXY_URL="$2"; PROXY_URL_USER_SET=1; shift 2 ;;
         --api)
             [[ $# -ge 2 ]] || { echo "[ERROR] --api requires a URL" >&2; exit 2; }
             CLASH_API="$2"; shift 2 ;;
@@ -54,6 +55,29 @@ echo "=== VSCode Copilot 网络优化 ($(date '+%Y-%m-%d %H:%M:%S')) ==="
 # Load env (optional) and bootstrap controller/secret
 # shellcheck source=/dev/null
 . "${SCRIPT_DIR}/load_env.sh" 2>/dev/null || true
+
+# Auto-detect local HTTP proxy port from runtime.yaml unless user overrides.
+# This repo may randomize the HTTP port (e.g. 62268), so hard-coding 7890 can cause false negatives.
+if [[ "$PROXY_URL_USER_SET" -eq 0 ]]; then
+    _default_proxy="http://127.0.0.1:7890"
+    _runtime="$(clash_runtime_file 2>/dev/null || true)"
+    _proxy_port=""
+    if [[ -n "${_runtime:-}" && -f "$_runtime" ]]; then
+        _yq_bin="$(clash_yq_bin 2>/dev/null || true)"
+        if [[ -n "${_yq_bin:-}" ]]; then
+            _proxy_port=$($_yq_bin -r '.port // ."mixed-port" // ""' "$_runtime" 2>/dev/null || true)
+        fi
+        if [[ -z "${_proxy_port:-}" ]]; then
+            _proxy_port=$(grep -E '^ *(port|mixed-port):' "$_runtime" 2>/dev/null | head -n1 | cut -d':' -f2- | tr -d ' "\t\r' || true)
+        fi
+    fi
+
+    if [[ "${_proxy_port:-}" =~ ^[0-9]+$ ]] && [[ "$_proxy_port" -gt 0 ]]; then
+        PROXY_URL="http://127.0.0.1:${_proxy_port}"
+    else
+        PROXY_URL="${_default_proxy}"
+    fi
+fi
 
 API="${CLASH_API:-http://127.0.0.1:9090}"
 API="${API%/}"

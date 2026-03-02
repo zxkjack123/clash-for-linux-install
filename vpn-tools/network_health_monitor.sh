@@ -85,6 +85,7 @@ check_clash_service() {
     if ! systemctl --user is-active "$SERVICE" &>/dev/null; then
         status="CRITICAL"
         msg="Clash服务未运行"
+        echo "$status|$msg"
         return 1
     fi
     
@@ -92,12 +93,14 @@ check_clash_service() {
         if ! clash_api_get /version >/dev/null 2>&1; then
             status="CRITICAL"
             msg="Clash API不可访问"
+            echo "$status|$msg"
             return 1
         fi
     else
-        if ! curl -fsS --noproxy '*' "${CURL_CTRL_OPTS[@]}" "${AUTH_HDR[@]}" "$API/version" >/dev/null 2>&1; then
+        if ! curl -fsS --noproxy '*' "${CURL_CTRL_OPTS[@]}" ${AUTH_HDR[@]+"${AUTH_HDR[@]}"} "$API/version" >/dev/null 2>&1; then
             status="CRITICAL"
             msg="Clash API不可访问"
+            echo "$status|$msg"
             return 1
         fi
     fi
@@ -279,10 +282,10 @@ calculate_health_score() {
     local score=0
     
     # 成功率贡献 (70%)
-    score=$((score + ai_rate * 30 / 100 * 70 / 100))
-    score=$((score + dev_rate * 25 / 100 * 70 / 100))
-    score=$((score + stream_rate * 20 / 100 * 70 / 100))
-    score=$((score + domestic_rate * 25 / 100 * 70 / 100))
+    score=$((score + ai_rate * 30 * 70 / 10000))
+    score=$((score + dev_rate * 25 * 70 / 10000))
+    score=$((score + stream_rate * 20 * 70 / 10000))
+    score=$((score + domestic_rate * 25 * 70 / 10000))
     
     # 延迟贡献 (30%)
     local latency_score=0

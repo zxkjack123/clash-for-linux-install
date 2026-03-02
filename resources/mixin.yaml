@@ -1,1 +1,23 @@
-{}
+# User overrides (mixin)
+#
+# Why mixin:
+# - Subscription updates may overwrite resources/config.yaml.
+# - Mixin is merged into runtime.yaml and has higher priority.
+#
+# Notes:
+# - Rule order matters. This project’s runtime sanitizer will keep GEOIP/MATCH at the end,
+#   so these rules won’t be shadowed by a trailing MATCH,DIRECT.
+
+rules:
+  # Wikipedia / Wikimedia family (force proxy; direct may be blocked or DNS-poisoned)
+  - DOMAIN-SUFFIX,wikipedia.org,PROXY
+  - DOMAIN-SUFFIX,wikimedia.org,PROXY
+  - DOMAIN-SUFFIX,wikidata.org,PROXY
+  - DOMAIN-SUFFIX,mediawiki.org,PROXY
+  - DOMAIN-SUFFIX,wiktionary.org,PROXY
+  - DOMAIN-SUFFIX,wikisource.org,PROXY
+  - DOMAIN-SUFFIX,wikibooks.org,PROXY
+  - DOMAIN-SUFFIX,wikiquote.org,PROXY
+  - DOMAIN-SUFFIX,wikinews.org,PROXY
+  - DOMAIN-SUFFIX,wikiversity.org,PROXY
+  - DOMAIN-SUFFIX,w.wiki,PROXY

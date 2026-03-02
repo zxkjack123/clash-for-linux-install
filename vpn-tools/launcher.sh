@@ -31,7 +31,7 @@ info() { echo "[INFO] $*" >&2; }
 
 check_basics() {
 	for b in curl; do have "$b" || { err "Missing dependency: $b"; exit 1; }; done
-	if ! curl -fsS --noproxy '*' --connect-timeout 2 --max-time 3 "${AUTH_HDR[@]}" "$API/version" >/dev/null 2>&1; then
+	if ! curl -fsS --noproxy '*' --connect-timeout 2 --max-time 3 ${AUTH_HDR[@]+"${AUTH_HDR[@]}"} "$API/version" >/dev/null 2>&1; then
 		err "Clash controller not reachable at $API (start service?)"; return 0
 	fi
 }
@@ -42,7 +42,7 @@ scripts_net=(quick_vpn_check.sh network_connectivity_test.sh proxy_connectivity_
 scripts_cn=(fix_openxlab_connectivity.sh quick_openxlab_access.sh test_chinese_ai_platforms.sh test_openxlab_direct_rules.sh)
 
 run_script() {
-	local s="$1"
+	local s="$1"; shift
 	if [[ ! -x $s ]]; then err "Script $s missing or not executable"; exit 2; fi
 	echo "---- Running $s ----"; echo
 	"./$s" "$@" || err "$s exited with code $?"; echo

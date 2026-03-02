@@ -5,14 +5,11 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-WorkingDirectory=%h/opt/clash-for-linux-install
+WorkingDirectory=%h/.local/share/clash
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/snap/bin
 Environment=RUN_OPTIMIZE_AFTER_REFRESH=1
 Environment=OPTIMIZE_DELAY=900
-Environment=OPTIMIZE_SCRIPT=%h/opt/clash-for-linux-install/vpn-tools/optimize_all_network.sh
-ExecStart=%h/opt/clash-for-linux-install/script/refresh_subscription_direct.sh
+Environment=OPTIMIZE_SCRIPT=%h/.local/share/clash/vpn-tools/optimize_all_network.sh
+ExecStart=%h/.local/share/clash/script/refresh_subscription_direct.sh
 # Optional: adjust timeout if provider is slow
 TimeoutStartSec=45min
-
-[Install]
-WantedBy=default.target

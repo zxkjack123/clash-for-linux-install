@@ -1,4 +1,19 @@
 # Changelog
+## [2.5.10] - 2026-03-02
+
+### 🔒 Security & hardening
+- Eliminated predictable `/tmp` state/temp artifacts across scripts by moving them to a per-user state directory (prefers `$XDG_RUNTIME_DIR`, falls back to `~/.local/share/clash`) while keeping legacy cleanup where needed.
+- Safer JSON payload construction for controller selector switching and webhook notifications (proper string escaping; uses `jq` when available).
+
+### 🛠 Fixes
+- Subscription refresh automation is now effective: `script/refresh_subscription_direct.sh` applies changes and restarts (`--apply --restart`).
+- `systemd/clash-subscription-refresh.service` now targets the installed path (`%h/.local/share/clash`) and avoids an `[Install]` section to prevent accidental login-trigger refresh.
+- `install.sh` / `uninstall.sh` now fail fast when not run from the repository root; systemd unit `ExecStart` paths are properly quoted.
+
+### 🧪 Diagnostics & developer tooling
+- Added a comprehensive audit write-up: `docs/development/BUG_AUDIT_2026-03-01.md`.
+- Improved static gate accuracy for heredoc and multiline block detection in audit scripts.
+
 ## [2.5.9] - 2026-02-06
 
 ### ✨ New

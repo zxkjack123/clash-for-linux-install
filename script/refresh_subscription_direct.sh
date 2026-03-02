@@ -38,7 +38,7 @@ env -u https_proxy \
     -u no_proxy \
     -u NO_PROXY \
     SUB_URL="${SUB_URL}" \
-    "${ROOT_DIR}/script/update_clash_subscription.sh"
+    "${ROOT_DIR}/script/update_clash_subscription.sh" --apply --restart
 log "Subscription refresh complete"
 
 if [[ "${RUN_OPTIMIZE_AFTER_REFRESH}" == "1" && -x "${OPTIMIZE_SCRIPT}" ]]; then

@@ -222,7 +222,10 @@ analyze_all_categories() {
     log "开始智能规则分析"
     log "========================================="
     
-    local results_file="/tmp/rule_analysis_$(date +%Y%m%d_%H%M%S).txt"
+    local results_file
+    results_file=$(mktemp "$HOME/.local/share/clash/logs/rule_analysis.XXXXXX.txt" 2>/dev/null || true)
+    [ -n "$results_file" ] || results_file="$HOME/.local/share/clash/logs/rule_analysis_$(date +%Y%m%d_%H%M%S).txt"
+    : > "$results_file"
     
     for category in "${!SITE_CATEGORIES[@]}"; do
         # 跳过国内类别（应该DIRECT）
@@ -265,7 +268,7 @@ EOF
     # 为每个类别生成推荐的分组
     while IFS='|' read -r timestamp category best_node score latency; do
         cat >> "$recommendations_file" <<EOF
-  - name: $(echo $category | tr '[:lower:]' '[:upper:]')
+    - name: $(echo "$category" | tr '[:lower:]' '[:upper:]')
     type: select
     proxies:
       - $best_node
@@ -286,7 +289,7 @@ EOF
     
     # 为每个类别生成规则
     for category in "${!SITE_CATEGORIES[@]}"; do
-        local group_name=$(echo $category | tr '[:lower:]' '[:upper:]')
+        local group_name=$(echo "$category" | tr '[:lower:]' '[:upper:]')
         local domains="${SITE_CATEGORIES[$category]}"
         
         cat >> "$recommendations_file" <<EOF

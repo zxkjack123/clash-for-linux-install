@@ -52,11 +52,12 @@ echo -e "ts\ttype\tiface\tinfo" >> "$LOG_FILE"
 _emit(){
   local typ="$1" iface="$2" info="$3" ts
   ts="$(date --iso-8601=seconds)"
-  local line="${ts}\t${typ}\t${iface}\t${info}"
+  local line
+  printf -v line '%s\t%s\t%s\t%s' "$ts" "$typ" "$iface" "$info"
   if [ -n "$HILIGHT_TS" ] && [[ $ts == ${HILIGHT_TS}* ]]; then
-    printf "*** %s\n" "$line" | tee -a "$LOG_FILE"
+    printf '*** %s\n' "$line" | tee -a "$LOG_FILE"
   else
-    printf "%s\n" "$line" | tee -a "$LOG_FILE"
+    printf '%s\n' "$line" | tee -a "$LOG_FILE"
   fi
 }
 
@@ -68,9 +69,15 @@ _snapshot_route(){
 
 _snapshot_pubip(){
   [ $CURL_AVAILABLE -eq 1 ] || return 0
-  (curl --connect-timeout 1 -m 2 -s https://api64.ipify.org || true) | awk '{print;}' | while read -r ip; do
-     [ -n "$ip" ] && _emit PUBIP "-" "$ip"
-  done &
+  if [ -n "${PUBIP_PID:-}" ] && kill -0 "$PUBIP_PID" 2>/dev/null; then
+    kill "$PUBIP_PID" 2>/dev/null || true
+  fi
+  {
+    (curl --connect-timeout 1 -m 2 -s https://api64.ipify.org || true) | awk '{print;}' | while read -r ip; do
+       [ -n "$ip" ] && _emit PUBIP "-" "$ip"
+    done
+  } &
+  PUBIP_PID=$!
 }
 
 _count_veth(){
@@ -122,8 +129,8 @@ _process_resolved(){
 }
 
 # Launch background taps
-IP_FIFO=$(mktemp -t ipmon.fifo.XXXXXX)
-rm -f -- "$IP_FIFO"
+FIFO_DIR=$(mktemp -d -t netprobe.fifo.XXXXXX)
+IP_FIFO="$FIFO_DIR/ipmon.fifo"
 mkfifo "$IP_FIFO"
 ip monitor link addr route neigh > "$IP_FIFO" 2>/dev/null &
 IP_MON_PID=$!
@@ -131,8 +138,7 @@ _process_ip < "$IP_FIFO" &
 BG_IP=$!
 
 if [ $NM_MONITOR_AVAILABLE -eq 1 ]; then
-  NM_FIFO=$(mktemp -t nmmon.fifo.XXXXXX)
-  rm -f -- "$NM_FIFO"
+  NM_FIFO="$FIFO_DIR/nmmon.fifo"
   mkfifo "$NM_FIFO"
   nmcli monitor > "$NM_FIFO" 2>/dev/null &
   NM_MON_PID=$!
@@ -140,8 +146,7 @@ if [ $NM_MONITOR_AVAILABLE -eq 1 ]; then
   BG_NM=$!
 fi
 if [ $RESOLVED_JOURNAL_AVAILABLE -eq 1 ]; then
-  RES_FIFO=$(mktemp -t resolved.fifo.XXXXXX)
-  rm -f -- "$RES_FIFO"
+  RES_FIFO="$FIFO_DIR/resolved.fifo"
   mkfifo "$RES_FIFO"
   journalctl -u systemd-resolved -f -n 0 > "$RES_FIFO" 2>/dev/null &
   RES_MON_PID=$!
@@ -156,17 +161,14 @@ cleanup(){
   [ -n "${BG_IP:-}" ] && kill "$BG_IP" 2>/dev/null || true
   [ -n "${BG_NM:-}" ] && kill "$BG_NM" 2>/dev/null || true
   [ -n "${BG_DNS:-}" ] && kill "$BG_DNS" 2>/dev/null || true
+  [ -n "${PUBIP_PID:-}" ] && kill "$PUBIP_PID" 2>/dev/null || true
 
   # Also stop producer processes; otherwise they may keep running after Ctrl-C.
   [ -n "${IP_MON_PID:-}" ] && kill "$IP_MON_PID" 2>/dev/null || true
   [ -n "${NM_MON_PID:-}" ] && kill "$NM_MON_PID" 2>/dev/null || true
   [ -n "${RES_MON_PID:-}" ] && kill "$RES_MON_PID" 2>/dev/null || true
 
-  local -a to_rm=()
-  [ -n "${IP_FIFO:-}" ] && to_rm+=("$IP_FIFO")
-  [ -n "${NM_FIFO:-}" ] && to_rm+=("$NM_FIFO")
-  [ -n "${RES_FIFO:-}" ] && to_rm+=("$RES_FIFO")
-  [ ${#to_rm[@]} -gt 0 ] && rm -f -- "${to_rm[@]}" || true
+  [ -n "${FIFO_DIR:-}" ] && rm -rf -- "$FIFO_DIR" 2>/dev/null || true
 }
 trap cleanup INT TERM EXIT
 

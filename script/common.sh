@@ -19,10 +19,10 @@ RESOURCES_CONFIG="${RESOURCES_BASE_DIR}/config.yaml"
 RESOURCES_CONFIG_MIXIN="${RESOURCES_BASE_DIR}/mixin.yaml"
 
 ZIP_BASE_DIR="${RESOURCES_BASE_DIR}/zip"
-ZIP_CLASH=$(echo ${ZIP_BASE_DIR}/clash*)
-ZIP_MIHOMO=$(echo ${ZIP_BASE_DIR}/mihomo*)
+ZIP_CLASH=$(find "$ZIP_BASE_DIR" -maxdepth 1 -type f -name 'clash*' -print -quit 2>/dev/null || true)
+ZIP_MIHOMO=$(find "$ZIP_BASE_DIR" -maxdepth 1 -type f -name 'mihomo*' -print -quit 2>/dev/null || true)
 ZIP_YQ="${ZIP_BASE_DIR}/yq_linux_amd64.tar.gz"
-ZIP_SUBCONVERTER=$(echo ${ZIP_BASE_DIR}/subconverter*)
+ZIP_SUBCONVERTER=$(find "$ZIP_BASE_DIR" -maxdepth 1 -type f -name 'subconverter*' -print -quit 2>/dev/null || true)
 ZIP_UI="${ZIP_BASE_DIR}/yacd.tar.xz"
 
 # Use user's home directory for installation.
@@ -59,11 +59,11 @@ if [ -z "${USER_HOME}" ]; then
 fi
 unset _u_candidate 2>/dev/null || true
 CLASH_BASE_DIR="${USER_HOME}/.local/share/clash"
-CLASH_SCRIPT_DIR="${CLASH_BASE_DIR}/$(basename $SCRIPT_BASE_DIR)"
+CLASH_SCRIPT_DIR="${CLASH_BASE_DIR}/$(basename "$SCRIPT_BASE_DIR")"
 CLASH_CONFIG_URL="${CLASH_BASE_DIR}/url"
-CLASH_CONFIG_RAW="${CLASH_BASE_DIR}/$(basename $RESOURCES_CONFIG)"
+CLASH_CONFIG_RAW="${CLASH_BASE_DIR}/$(basename "$RESOURCES_CONFIG")"
 CLASH_CONFIG_RAW_BAK="${CLASH_CONFIG_RAW}.bak"
-CLASH_CONFIG_MIXIN="${CLASH_BASE_DIR}/$(basename $RESOURCES_CONFIG_MIXIN)"
+CLASH_CONFIG_MIXIN="${CLASH_BASE_DIR}/$(basename "$RESOURCES_CONFIG_MIXIN")"
 CLASH_CONFIG_RUNTIME="${CLASH_BASE_DIR}/runtime.yaml"
 CLASH_UPDATE_LOG="${CLASH_BASE_DIR}/clashupdate.log"
 CLASH_DIFF_DIR="${CLASH_BASE_DIR}/diff-history"
@@ -115,6 +115,7 @@ _set_bin() {
     BIN_SUBCONVERTER_PORT="25500"
     BIN_SUBCONVERTER="${BIN_SUBCONVERTER_DIR}/subconverter"
     BIN_SUBCONVERTER_LOG="${BIN_SUBCONVERTER_DIR}/latest.log"
+    BIN_KERNEL="$BIN_MIHOMO"
 
     [ -f "$BIN_CLASH" ] && {
         BIN_KERNEL=$BIN_CLASH
@@ -185,9 +186,13 @@ function _get_kernel() {
 }
 
 _get_random_port() {
-    local randomPort=$(shuf -i 1024-65535 -n 1)
-    ! _is_bind "$randomPort" && { echo "$randomPort" && return; }
-    _get_random_port
+    local attempts=0 randomPort
+    while [ "$attempts" -lt 50 ]; do
+        randomPort=$(shuf -i 1024-65535 -n 1)
+        ! _is_bind "$randomPort" && { echo "$randomPort"; return 0; }
+        attempts=$((attempts + 1))
+    done
+    _error_quit "无法分配空闲端口 (尝试 50 次失败)"
 }
 
 function _get_proxy_port() {
@@ -342,7 +347,7 @@ _is_already_in_use() {
 }
 
 function _valid_env() {
-    [ -n "${ZSH_VERSION:-}" ] && [ -n "${BASH_VERSION:-}" ] && _error_quit "仅支持：bash、zsh"
+    [ -z "${ZSH_VERSION:-}" ] && [ -z "${BASH_VERSION:-}" ] && _error_quit "仅支持：bash、zsh"
     [ "$(ps -p 1 -o comm=)" != "systemd" ] && _error_quit "系统不具备 systemd"
     # Create user systemd directory if it doesn't exist
     mkdir -p "${USER_HOME}/.config/systemd/user"
@@ -404,7 +409,7 @@ _download_clash() {
         --retry 1 \
         --output "$clash_zip" \
         "$url"
-    echo $sha256sum "$clash_zip" | sha256sum -c ||
+    printf '%s  %s\n' "$sha256sum" "$clash_zip" | sha256sum -c ||
         _error_quit "下载失败：请自行下载对应版本至 ${ZIP_BASE_DIR} 目录下：https://downloads.clash.wiki/ClashPremium/"
 }
 
@@ -489,12 +494,13 @@ _start_convert() {
         BIN_SUBCONVERTER_PORT=$newPort
     }
     local start=$(date +%s)
+    local startup_timeout="${CLASH_SUBCONVERTER_START_TIMEOUT:-10}"
     # 子shell运行，屏蔽kill时的输出
     ("$BIN_SUBCONVERTER" 2>&1 | tee "$BIN_SUBCONVERTER_LOG" >/dev/null &)
     while ! _is_bind "$BIN_SUBCONVERTER_PORT" >&/dev/null; do
         sleep 1s
         local now=$(date +%s)
-        [ $((now - start)) -gt 1 ] && _error_quit "订阅转换服务未启动，请检查日志：$BIN_SUBCONVERTER_LOG"
+        [ $((now - start)) -gt "$startup_timeout" ] && _error_quit "订阅转换服务未启动，请检查日志：$BIN_SUBCONVERTER_LOG"
     done
 }
 _stop_convert() {

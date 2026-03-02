@@ -52,8 +52,12 @@ EOF
 }
 
 AUTH_HDR=()
-_hdr="$(clash_auth_header 2>/dev/null || true)"
-[[ -n "${_hdr:-}" ]] && AUTH_HDR=(-H "${_hdr}")
+init_auth_hdr() {
+    AUTH_HDR=()
+    local _hdr
+    _hdr="$(clash_auth_header 2>/dev/null || true)"
+    [[ -n "${_hdr:-}" ]] && AUTH_HDR=(-H "${_hdr}")
+}
 
 CURL_CTRL_OPTS=(--noproxy '*' --connect-timeout 2 --max-time 4)
 PROXY="${PROXY:-http://127.0.0.1:7890}"
@@ -118,8 +122,8 @@ check_clash_status() {
         log_success "Clash服务运行正常"
     fi
     
-    if curl -fsS "${CURL_CTRL_OPTS[@]}" "${AUTH_HDR[@]}" "$API/version" >/dev/null 2>&1; then
-        local version=$(curl -s "${CURL_CTRL_OPTS[@]}" "${AUTH_HDR[@]}" "$API/version" | grep -oP '"version":"\K[^"]+' || echo "未知")
+    if curl -fsS "${CURL_CTRL_OPTS[@]}" ${AUTH_HDR[@]+"${AUTH_HDR[@]}"} "$API/version" >/dev/null 2>&1; then
+        local version=$(curl -s "${CURL_CTRL_OPTS[@]}" ${AUTH_HDR[@]+"${AUTH_HDR[@]}"} "$API/version" | grep -oP '"version":"\K[^"]+' || echo "未知")
         log_success "Clash API可访问 (版本: $version)"
     else
         log_error "Clash API不可访问"
@@ -336,6 +340,7 @@ show_summary() {
 # 主流程
 main() {
     parse_args "$@"
+    init_auth_hdr
     show_banner
     
     # 检查服务状态

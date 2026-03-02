@@ -64,14 +64,14 @@ fi
 if declare -F clash_api_get >/dev/null 2>&1; then
   clash_api_get "$API_BASE/version" >/dev/null 2>&1 || { echo "[ERR] Clash controller not reachable at $API_BASE" >&2; exit 2; }
 else
-  curl -fsS --noproxy '*' --connect-timeout 2 --max-time 3 "${AUTH_HDR[@]}" "$API_BASE/version" >/dev/null || { echo "[ERR] Clash controller not reachable at $API_BASE" >&2; exit 2; }
+  curl -fsS --noproxy '*' --connect-timeout 2 --max-time 3 ${AUTH_HDR[@]+"${AUTH_HDR[@]}"} "$API_BASE/version" >/dev/null || { echo "[ERR] Clash controller not reachable at $API_BASE" >&2; exit 2; }
 fi
 
 # Fetch group info
 if declare -F clash_api_get >/dev/null 2>&1; then
   group_json=$(clash_api_get "$API_BASE/proxies/$group_enc" 2>/dev/null || true)
 else
-  group_json=$(curl -s --noproxy '*' --connect-timeout 2 --max-time 3 "$API_BASE/proxies/$group_enc" "${AUTH_HDR[@]}" || true)
+  group_json=$(curl -s --noproxy '*' --connect-timeout 2 --max-time 3 "$API_BASE/proxies/$group_enc" ${AUTH_HDR[@]+"${AUTH_HDR[@]}"} || true)
 fi
 if [ -z "$group_json" ] || echo "$group_json" | grep -q 'Not Found'; then
   echo "[ERR] Cannot get group $GROUP_LABEL from controller at $API_BASE" >&2
@@ -136,22 +136,30 @@ probe() {
   if declare -F clash_api_put_json >/dev/null 2>&1; then
     clash_api_put_json "$API_BASE/proxies/$group_enc" "$data" >/dev/null 2>&1 || true
   else
-    curl -s --noproxy '*' --connect-timeout 2 --max-time 4 -X PUT "$API_BASE/proxies/$group_enc" -H 'Content-Type: application/json' "${AUTH_HDR[@]}" --data "$data" >/dev/null || true
+    curl -s --noproxy '*' --connect-timeout 2 --max-time 4 -X PUT "$API_BASE/proxies/$group_enc" -H 'Content-Type: application/json' ${AUTH_HDR[@]+"${AUTH_HDR[@]}"} --data "$data" >/dev/null || true
   fi
   sleep 1
   local res code t
   res=$(curl -I -s -o /dev/null -w '%{http_code},%{time_total}' --connect-timeout 6 --max-time 10 --proxy "http://127.0.0.1:${PROXY_PORT}" "$URL" || echo "000,10.000")
   code=${res%%,*}
   t=${res##*,}
-  printf '[%3s] %ss  %s\n' "$code" "$t" "$name"
-  if [[ "$code" =~ ^2[0-9]{2}$ || "$code" =~ ^3[0-9]{2}$ || "$code" == 403 ]]; then
-    awk "BEGIN{exit !($t < $best_time)}" >/dev/null 2>&1 && { best_time="$t"; best_name="$name"; }
-  fi
+  printf '%s,%s,%s\n' "$code" "$t" "$name"
 }
 
 printf '\n# Probing %s across nodes (via local proxy 127.0.0.1:%s)\n' "$URL" "$PROXY_PORT"
 for n in "${test_nodes[@]}"; do
-  probe "$n"
+  out=$(probe "$n")
+  code=${out%%,*}
+  rest=${out#*,}
+  t=${rest%%,*}
+  name=${rest#*,}
+  printf '[%3s] %ss  %s\n' "$code" "$t" "$name"
+  if [[ "$code" =~ ^2[0-9]{2}$ || "$code" =~ ^3[0-9]{2}$ || "$code" == 403 ]]; then
+    if awk "BEGIN{exit !($t < $best_time)}" >/dev/null 2>&1; then
+      best_time="$t"
+      best_name="$name"
+    fi
+  fi
 done
 
 printf '\n# Summary\n'
@@ -161,7 +169,7 @@ if [ -n "$best_name" ]; then
   if declare -F clash_api_put_json >/dev/null 2>&1; then
     clash_api_put_json "$API_BASE/proxies/$group_enc" "$data" >/dev/null 2>&1 || true
   else
-    curl -s --noproxy '*' --connect-timeout 2 --max-time 4 -X PUT "$API_BASE/proxies/$group_enc" -H 'Content-Type: application/json' "${AUTH_HDR[@]}" --data "$data" >/dev/null || true
+    curl -s --noproxy '*' --connect-timeout 2 --max-time 4 -X PUT "$API_BASE/proxies/$group_enc" -H 'Content-Type: application/json' ${AUTH_HDR[@]+"${AUTH_HDR[@]}"} --data "$data" >/dev/null || true
   fi
   echo "Applied selection to group: $GROUP_LABEL"
 else

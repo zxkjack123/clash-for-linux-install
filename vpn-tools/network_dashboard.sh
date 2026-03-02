@@ -21,7 +21,7 @@ HISTORY_LOG="$HOME/.local/share/clash/logs/health_history.log"
 
 # 加载环境变量配置（.env文件）
 if [[ -f "$BASE_DIR/load_env.sh" ]]; then
-    source "$BASE_DIR/load_env.sh"
+    source "$BASE_DIR/load_env.sh" 2>/dev/null || true
 fi
 
 clash_env_bootstrap 2>/dev/null || true
@@ -36,7 +36,7 @@ api_get() {
     else
         local hdr=()
         if declare -p AUTH_HDR >/dev/null 2>&1; then
-            hdr=("${AUTH_HDR[@]}")
+            hdr=(${AUTH_HDR[@]+"${AUTH_HDR[@]}"})
         fi
         curl -fsS --noproxy '*' --connect-timeout 2 --max-time 4 "${hdr[@]}" "$API${1}" 2>/dev/null
     fi

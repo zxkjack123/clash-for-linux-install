@@ -9,6 +9,13 @@ export CLASH_LIB_MODE=1
 # shellcheck source=/dev/null
 . "$ROOT_DIR/script/clashctl.sh" >/dev/null 2>&1 || true
 
+CLASH_BASE_DIR_EFFECTIVE="${CLASH_BASE_DIR:-$HOME/.local/share/clash}"
+CLASH_STATE_DIR_EFFECTIVE="${CLASH_STATE_DIR:-${XDG_RUNTIME_DIR:-$CLASH_BASE_DIR_EFFECTIVE}}"
+CLASH_APT_PROXY_STAGE_FILE_EFFECTIVE="${CLASH_APT_PROXY_STAGE_FILE:-${CLASH_STATE_DIR_EFFECTIVE}/95clash-proxy}"
+CLASH_APT_PROXY_STAGE_FILE_LEGACY="${CLASH_APT_PROXY_STAGE_FILE_LEGACY:-/tmp/95clash-proxy}"
+CLASH_PROXY_STATE_FILE_EFFECTIVE="${CLASH_PROXY_STATE_FILE:-${CLASH_STATE_DIR_EFFECTIVE}/.clash_system_proxy_state}"
+CLASH_PROXY_STATE_FILE_LEGACY="/tmp/.clash_system_proxy_state"
+
 echo "[stop_vpn] Stopping proxy service and removing system proxy..."
 if type -t clashctl >/dev/null 2>&1; then
   if clashctl off >/dev/null 2>&1; then
@@ -38,8 +45,10 @@ if command -v gsettings >/dev/null 2>&1; then
   if [ "$mode" != "'none'" ]; then echo "[stop_vpn] ❌ GNOME proxy mode is $mode"; residual=1; fi
 fi
 
-[ -f /tmp/95clash-proxy ] && { echo "[stop_vpn] ❌ /tmp/95clash-proxy exists"; residual=1; }
-[ -f /tmp/.clash_system_proxy_state ] && { echo "[stop_vpn] ❌ system proxy state exists"; residual=1; }
+[ -f "$CLASH_APT_PROXY_STAGE_FILE_EFFECTIVE" ] && { echo "[stop_vpn] ❌ ${CLASH_APT_PROXY_STAGE_FILE_EFFECTIVE} exists"; residual=1; }
+[ -f "$CLASH_APT_PROXY_STAGE_FILE_LEGACY" ] && { echo "[stop_vpn] ❌ ${CLASH_APT_PROXY_STAGE_FILE_LEGACY} exists"; residual=1; }
+[ -f "$CLASH_PROXY_STATE_FILE_EFFECTIVE" ] && { echo "[stop_vpn] ❌ system proxy state exists: ${CLASH_PROXY_STATE_FILE_EFFECTIVE}"; residual=1; }
+[ -f "$CLASH_PROXY_STATE_FILE_LEGACY" ] && { echo "[stop_vpn] ❌ legacy system proxy state exists: ${CLASH_PROXY_STATE_FILE_LEGACY}"; residual=1; }
 
 if [ $residual -eq 0 ]; then
   echo "[stop_vpn] 🧹 Environment clean (no residual proxy settings)"

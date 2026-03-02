@@ -28,7 +28,8 @@ set -euo pipefail
 MODE=standard
 OUT=""
 DO_BANDWIDTH=0
-PROXY=http://127.0.0.1:7890
+PROXY=""
+PROXY_USER_SET=0
 
 # Optional env bootstrap (controller URL + secret)
 SCRIPT_DIR="$(cd "${BASH_SOURCE[0]%/*}" && pwd)"
@@ -49,7 +50,7 @@ while [[ $# -gt 0 ]]; do
     --quick) MODE=quick; shift;;
     --bandwidth) DO_BANDWIDTH=1; shift;;
     --out) OUT="$2"; shift 2;;
-    --proxy) PROXY="$2"; shift 2;;
+    --proxy) PROXY="$2"; PROXY_USER_SET=1; shift 2;;
     --controller) CTRL="$2"; shift 2;;
     --secret) SECRET="$2"; shift 2;;
     -h|--help)
@@ -57,6 +58,36 @@ while [[ $# -gt 0 ]]; do
     *) echo "Unknown arg: $1" >&2; exit 2;;
   esac
 done
+
+# Auto-detect local HTTP proxy port from runtime.yaml unless user overrides.
+if [[ "$PROXY_USER_SET" -eq 0 ]]; then
+  _default_proxy="http://127.0.0.1:7890"
+  _runtime=""
+  if command -v clash_runtime_file >/dev/null 2>&1; then
+    _runtime="$(clash_runtime_file 2>/dev/null || true)"
+  fi
+  [[ -n "${_runtime:-}" ]] || _runtime="$HOME/.local/share/clash/runtime.yaml"
+
+  _proxy_port=""
+  if [[ -f "$_runtime" ]]; then
+    _yq_bin=""
+    if command -v clash_yq_bin >/dev/null 2>&1; then
+      _yq_bin="$(clash_yq_bin 2>/dev/null || true)"
+    fi
+    if [[ -n "${_yq_bin:-}" ]]; then
+      _proxy_port=$($_yq_bin -r '."mixed-port" // .port // ""' "$_runtime" 2>/dev/null || true)
+    fi
+    if [[ -z "${_proxy_port:-}" ]]; then
+      _proxy_port=$(grep -E '^ *(mixed-port|port):' "$_runtime" 2>/dev/null | head -n1 | cut -d':' -f2- | tr -d ' "\t\r' || true)
+    fi
+  fi
+
+  if [[ "${_proxy_port:-}" =~ ^[0-9]+$ ]] && [[ "$_proxy_port" -gt 0 ]]; then
+    PROXY="http://127.0.0.1:${_proxy_port}"
+  else
+    PROXY="${_default_proxy}"
+  fi
+fi
 
 section(){ echo; printf '===== %s =====\n' "$1"; }
 have(){ command -v "$1" >/dev/null 2>&1; }
@@ -89,11 +120,17 @@ collect_env(){
 collect_if(){
   section "网络接口 / MTU"
   ip -o link show | awk -F': ' '{print $2}' | while read -r dev; do
+    # ip(8) prints veth peers as "vethXXXX@ifY"; strip the "@ifY" suffix for queries.
+    dev=${dev%%@*}
     [[ $dev == lo ]] && continue
     state=$(ip -o link show "$dev" | awk '{print $9}')
     mtu=$(ip -o link show "$dev" | awk '{for(i=1;i<=NF;i++) if($i ~ /mtu/) {print $(i+1); exit}}')
     addr=$(ip -o -4 addr show dev "$dev" | awk '{print $4}' | paste -sd ',')
-    speed=""; have ethtool && speed=$(ethtool "$dev" 2>/dev/null | awk -F': ' '/Speed:/{print $2}')
+    speed=""
+    if have ethtool; then
+      # ethtool returns non-zero on many virtual interfaces; keep audit non-fatal.
+      speed=$(ethtool "$dev" 2>/dev/null | awk -F': ' '/Speed:/{print $2}' || true)
+    fi
     printf '%-12s state=%-6s mtu=%-5s addr=%s %s\n' "$dev" "$state" "$mtu" "${addr:-NONE}" "${speed:+speed=$speed}"
   done
 }
@@ -148,7 +185,7 @@ collect_proxy(){
 collect_dns_test(){
   section "关键域名解析"
   for d in "${DNS_TEST[@]}"; do
-    ans=$(getent ahostsv4 "$d" 2>/dev/null | awk '{print $1}' | paste -sd ',' )
+    ans=$(getent ahostsv4 "$d" 2>/dev/null | awk '{print $1}' | paste -sd ',' || true)
     printf '%-25s %s\n' "$d" "${ans:-RESOLVE_FAIL}"
   done
 }
@@ -168,7 +205,7 @@ collect_http(){
 collect_ping(){
   section "基础连通性 (Ping)"
   for h in "${PING_HOSTS[@]}"; do
-    rtt=$(ping -c1 -W1 "$h" 2>/dev/null | awk -F'/' '/rtt|round-trip/{print $5"ms"}')
+    rtt=$(ping -c1 -W1 "$h" 2>/dev/null | awk -F'/' '/rtt|round-trip/{print $5"ms"}' || true)
     status=OK; [[ -z $rtt ]] && status=FAIL
     printf '%-20s %-8s %s\n' "$h" "$status" "${rtt:-}" 
   done

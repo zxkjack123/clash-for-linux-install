@@ -13,12 +13,27 @@ if [ -z "$CLASH_ENV_INITIALIZED" ]; then
     fi
 fi
 
-CLASH_PROXY_STATE_FILE=${CLASH_PROXY_STATE_FILE:-/tmp/.clash_system_proxy_state}
-CLASH_NO_PROXY_STATE_FILE=${CLASH_NO_PROXY_STATE_FILE:-/tmp/.clash_no_proxy}
+CLASH_STATE_DIR="${CLASH_STATE_DIR:-${XDG_RUNTIME_DIR:-${CLASH_BASE_DIR:-$HOME/.local/share/clash}}}"
+mkdir -p "$CLASH_STATE_DIR" 2>/dev/null || true
+CLASH_PROXY_STATE_FILE=${CLASH_PROXY_STATE_FILE:-${CLASH_STATE_DIR}/.clash_system_proxy_state}
+CLASH_NO_PROXY_STATE_FILE=${CLASH_NO_PROXY_STATE_FILE:-${CLASH_STATE_DIR}/.clash_no_proxy}
+CLASH_APT_PROXY_STAGE_FILE=${CLASH_APT_PROXY_STAGE_FILE:-${CLASH_STATE_DIR}/95clash-proxy}
+CLASH_APT_PROXY_STAGE_FILE_LEGACY=${CLASH_APT_PROXY_STAGE_FILE_LEGACY:-/tmp/95clash-proxy}
 
 # 安全辅助: sed 正则转义 (用于节点名可能包含特殊字符)
 _escape_sed() {
     printf '%s' "$1" | sed -e 's/[\/\\&.*$^[]/\\&/g' -e 's/]/\\]/g' -e 's/(/\\(/g' -e 's/)/\\)/g' -e 's/+\\?/+/g'
+}
+
+_json_name_payload() {
+    local name="$1"
+    if command -v jq >/dev/null 2>&1; then
+        jq -cn --arg name "$name" '{"name":$name}'
+    else
+        local esc
+        esc=$(printf '%s' "$name" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e ':a;N;$!ba;s/\n/\\n/g')
+        printf '{"name":"%s"}' "$esc"
+    fi
 }
 
 # Build GNOME ignore-hosts best-practice list (LAN + Tailscale + optional MagicDNS suffix + local services)
@@ -217,7 +232,8 @@ _set_system_proxy() {
     }
 
     # Configure APT proxy (create/update configuration file)
-    local apt_proxy_file="/tmp/95clash-proxy"
+    local apt_proxy_file="${CLASH_APT_PROXY_STAGE_FILE}"
+    mkdir -p "$(dirname "$apt_proxy_file")" 2>/dev/null || true
     cat > "$apt_proxy_file" 2>/dev/null << EOF || true
 Acquire::http::Proxy "$http_proxy_addr";
 Acquire::https::Proxy "$http_proxy_addr";
@@ -256,7 +272,7 @@ _unset_system_proxy() {
     git config --global --unset https.proxy 2>/dev/null || true
 
     # Remove APT proxy configuration
-    rm -f /tmp/95clash-proxy 2>/dev/null || true
+    rm -f "${CLASH_APT_PROXY_STAGE_FILE}" "${CLASH_APT_PROXY_STAGE_FILE_LEGACY}" 2>/dev/null || true
     [ -f /etc/apt/apt.conf.d/95clash-proxy ] && _okcat '📦' "APT代理配置需要手动删除: sudo rm /etc/apt/apt.conf.d/95clash-proxy"
 
     # Clear state files so next enable actually re-applies.
@@ -416,10 +432,11 @@ function clashui() {
 _merge_build_runtime() {
     # 构建合并结果到指定输出文件 (参数1=输出路径)
     local out_file="$1"; shift || true
-    local backup="/tmp/rt.backup"
-    cat "$CLASH_CONFIG_RUNTIME" 2>/dev/null | tee $backup >&/dev/null
     # 合并策略: 多级回退 (eval-all -> slurp -s -> 简单三向覆盖) 确保不同发行版的 yq 构建兼容。
-    local merge_err="/tmp/.clash_merge_err"; : > "$merge_err"
+    local merge_err
+    merge_err=$(mktemp -t clash_merge_err.XXXXXX 2>/dev/null || true)
+    [ -n "$merge_err" ] || merge_err="${CLASH_STATE_DIR}/.clash_merge_err.$$.$RANDOM"
+    : > "$merge_err"
     if ! "$BIN_YQ" eval-all '
         (select(fileIndex==0)."proxy-groups" // []) as $m1 |
         (select(fileIndex==1)."proxy-groups" // []) as $raw |
@@ -460,6 +477,7 @@ _merge_build_runtime() {
     "$BIN_YQ" -i '.proxy-groups |= ( . // [] | group_by(.name) | map(.[-1]) )' "$out_file" 2>/dev/null || true
     # 再次清理 select 探测字段
     "$BIN_YQ" -i '.proxy-groups |= map( if .type=="select" then del(.url,.interval,.tolerance) else . end )' "$out_file" 2>/dev/null || true
+    rm -f "$merge_err" 2>/dev/null || true
 }
 
 _annotate_runtime() {
@@ -474,7 +492,7 @@ _annotate_runtime() {
 }
 
 _merge_sanitize_restart() {
-    local lock_file="/tmp/.clash_update.lock"
+    local lock_file="${CLASH_STATE_DIR}/.clash_update.lock"
     exec 9>"$lock_file" || _error_quit '无法创建锁文件'
     flock -n 9 || _error_quit '有并发更新在进行 (锁获取失败)'
     local tmp_out="${CLASH_CONFIG_RUNTIME}.merge.$$"
@@ -547,6 +565,7 @@ _merge_sanitize_restart() {
     clashrestart
     _okcat '🔁' '合并+清洗完成 (单次重启)'
     _cleanup_probe_fields >/dev/null 2>&1 || true
+    exec 9>&- 2>/dev/null || true
 }
 
 # 兼容旧函数名 (外部脚本若仍调用旧名称不报错)
@@ -747,7 +766,9 @@ function clashupdate() {
 
     mkdir -p "$CLASH_DIFF_DIR" 2>/dev/null || true
     # 生成合并前后 diff 报告 (P1) —— 复制旧 runtime
-    local pre_runtime_copy="/tmp/runtime_before_update.$$"
+    local pre_runtime_copy
+    pre_runtime_copy=$(mktemp -t runtime_before_update.XXXXXX 2>/dev/null || true)
+    [ -n "$pre_runtime_copy" ] || pre_runtime_copy="${CLASH_STATE_DIR}/runtime_before_update.$$.$RANDOM"
     [ -f "$CLASH_CONFIG_RUNTIME" ] && cp -f "$CLASH_CONFIG_RUNTIME" "$pre_runtime_copy" 2>/dev/null || true
     # 预备: 指纹期待校验 (若不匹配将会回滚, 需要先保存下载的 RAW 指纹并比较)
     local raw_sha_pre
@@ -799,7 +820,6 @@ function clashupdate() {
                 tail -n "$keep" "$CLASH_DIFF_INDEX_FILE" >"${CLASH_DIFF_INDEX_FILE}.tmp" && mv "${CLASH_DIFF_INDEX_FILE}.tmp" "$CLASH_DIFF_INDEX_FILE"
             fi
         fi
-        rm -f "$pre_runtime_copy" 2>/dev/null || true
     fi
     # 订阅指纹记录 & 验证 (URL -> sha256)
     if [ -f "$CLASH_CONFIG_RAW" ]; then
@@ -820,6 +840,7 @@ function clashupdate() {
                        # 回滚 raw + runtime
                        [ -f "$CLASH_CONFIG_RAW_BAK" ] && cp -f "$CLASH_CONFIG_RAW_BAK" "$CLASH_CONFIG_RAW" 2>/dev/null || true
                        [ -f "$pre_runtime_copy" ] && cp -f "$pre_runtime_copy" "$CLASH_CONFIG_RUNTIME" 2>/dev/null || true
+                           rm -f "$pre_runtime_copy" 2>/dev/null || true
                        clashrestart
                        echo "[ROLLBACK-$ts] fingerprint mismatch" >> "$CLASH_UPDATE_LOG" 2>/dev/null || true
                        return 1
@@ -838,6 +859,7 @@ function clashupdate() {
         _okcat '⚠️' "过去5分钟失败: $recent_fail -> 执行降权标记"
         _downgrade_failed_nodes 10 5
     fi
+    rm -f "$pre_runtime_copy" 2>/dev/null || true
 }
 
 function clashmixin() {
@@ -990,7 +1012,8 @@ _clash_health() {
     [ "$direct1" = miss ] && score=$((score-25))
     [ "$direct8" = miss ] && score=$((score-25))
     [ "$hijack" = risk ] && score=$((score-30))
-    [ "$fails" -gt 20 ] && score=$((score-20)) || [ "$fails" -gt 5 ] && score=$((score-10))
+    if [ "$fails" -gt 20 ]; then score=$((score-20))
+    elif [ "$fails" -gt 5 ]; then score=$((score-10)); fi
     if   [ $score -ge 90 ]; then grade=A;
     elif [ $score -ge 75 ]; then grade=B;
     elif [ $score -ge 60 ]; then grade=C; else grade=D; fi
@@ -1023,7 +1046,8 @@ _clash_metrics() {
     [ $direct1 -eq 0 ] && score=$((score-25))
     [ $direct8 -eq 0 ] && score=$((score-25))
     [ $hijack -eq 1 ] && score=$((score-30))
-    [ $fails -gt 20 ] && score=$((score-20)) || [ $fails -gt 5 ] && score=$((score-10))
+    if [ $fails -gt 20 ]; then score=$((score-20))
+    elif [ $fails -gt 5 ]; then score=$((score-10)); fi
     grade=3 # A=3 B=2 C=1 D=0 (映射成数值)
     if   [ $score -ge 90 ]; then grade=3;
     elif [ $score -ge 75 ]; then grade=2;
@@ -1138,7 +1162,7 @@ EOFPM
 # 聚合最近连接失败上游并为超阈值节点打标签/从特定分组降权
 _downgrade_failed_nodes() {
     # 获取共享写锁防止与其他合并/清洗并发
-    local lock_file="/tmp/.clash_update.lock"
+    local lock_file="${CLASH_STATE_DIR}/.clash_update.lock"
     exec 8>"$lock_file" || { _failcat '无法创建锁文件'; return 1; }
     flock -n 8 || { _failcat '降权操作等待其他更新完成(锁冲突)'; return 1; }
     local since_min=10 threshold=5 mode=tag try_switch=1 tag_suffix='[FAIL]'
@@ -1153,15 +1177,15 @@ _downgrade_failed_nodes() {
     done
     local raw bad tmp_yaml changed=0
     raw=$(journalctl --user -u "$BIN_KERNEL_NAME" --since "${since_min} min ago" --no-pager 2>/dev/null | grep 'connect error' || true)
-    [ -z "$raw" ] && { _okcat "无失败记录 (since=${since_min}m)"; return 0; }
+    [ -z "$raw" ] && { _okcat "无失败记录 (since=${since_min}m)"; exec 8>&- 2>/dev/null || true; return 0; }
     bad=$(echo "$raw" | sed -E 's/.*error: ([^ ]+) connect error.*/\1/' | sort | uniq -c | awk -v t=$threshold '$1>=t {print $2}')
     # 回退解析：若为空，再尝试 grep -Eo
     if [ -z "$bad" ]; then
         bad=$(echo "$raw" | grep -Eo 'error: [^ ]+ connect error' | awk '{print $2}' | sort | uniq -c | awk -v t=$threshold '$1>=t {print $2}')
     fi
-    [ -z "$bad" ] && { _okcat "无达到阈值节点 (阈值=${threshold})"; return 0; }
+    [ -z "$bad" ] && { _okcat "无达到阈值节点 (阈值=${threshold})"; exec 8>&- 2>/dev/null || true; return 0; }
     tmp_yaml="${CLASH_CONFIG_MIXIN}.failtag.$$"
-    cp -f "$CLASH_CONFIG_MIXIN" "$tmp_yaml" || return 0
+    cp -f "$CLASH_CONFIG_MIXIN" "$tmp_yaml" || { exec 8>&- 2>/dev/null || true; return 0; }
     while read -r node; do
         [ -z "$node" ] && continue
         local node_esc
@@ -1200,10 +1224,10 @@ _downgrade_failed_nodes() {
                     first_good=$(echo "$proxies_json" | jq -r --arg n "$name" '.proxies[$n].all | map(select(test("\\[FAIL\\]")==false))[0] // ""')
                     [ -n "$first_good" ] && [ "$first_good" != "$current" ] && \
                         curl -s --noproxy '*' --connect-timeout 2 --max-time 4 -X PUT "${api_base}/proxies/${name}" -H 'Content-Type: application/json' "${hdr[@]}" \
-                            --data "{\"name\":\"$first_good\"}" >/dev/null 2>&1 && _infocat "Selector $name 切换 $current -> $first_good"
+                            --data "$(_json_name_payload "$first_good")" >/dev/null 2>&1 && _infocat "Selector $name 切换 $current -> $first_good"
                 done
             else
-                echo "$proxies_json" | grep '"type":"Selector"' >/dev/null || return 0
+                echo "$proxies_json" | grep '"type":"Selector"' >/dev/null || { exec 8>&- 2>/dev/null || true; return 0; }
                 echo "$proxies_json" | tr '\n' ' ' | sed 's/},/\n/g' | grep '"type":"Selector"' | while read -r line; do
                     local name current all first_good item
                     name=$(echo "$line" | grep -Eo '"name":"[^"]+"' | head -n1 | cut -d '"' -f4)
@@ -1221,7 +1245,7 @@ _downgrade_failed_nodes() {
                     done
                     if [ -n "$first_good" ] && [ "$current" != "$first_good" ]; then
                         curl -s --noproxy '*' --connect-timeout 2 --max-time 4 -X PUT "${api_base}/proxies/${name}" -H 'Content-Type: application/json' "${hdr[@]}" \
-                            --data "{\"name\":\"$first_good\"}" >/dev/null 2>&1 && \
+                            --data "$(_json_name_payload "$first_good")" >/dev/null 2>&1 && \
                             _infocat "Selector $name 切换 $current -> $first_good"
                     fi
                 done
@@ -1230,18 +1254,19 @@ _downgrade_failed_nodes() {
     else
         _okcat '无需更新 (已有标记或无差异)'
     fi
+    exec 8>&- 2>/dev/null || true
 }
 
 # 清理所有 [FAIL] 标记 (仅移除标签, 不改排序) 并记录日志
 _cleanup_fail_tags() {
-    local lock_file="/tmp/.clash_update.lock"
+    local lock_file="${CLASH_STATE_DIR}/.clash_update.lock"
     exec 8>"$lock_file" || { _failcat '无法创建锁文件'; return 1; }
     flock -n 8 || { _failcat '清理操作等待其他更新完成(锁冲突)'; return 1; }
-    [ -f "$CLASH_CONFIG_MIXIN" ] || { _failcat '缺少 mixin'; return 1; }
-    grep '\[FAIL\]' "$CLASH_CONFIG_MIXIN" >/dev/null 2>&1 || { _okcat '无 [FAIL] 标签'; return 0; }
+    [ -f "$CLASH_CONFIG_MIXIN" ] || { _failcat '缺少 mixin'; exec 8>&- 2>/dev/null || true; return 1; }
+    grep '\[FAIL\]' "$CLASH_CONFIG_MIXIN" >/dev/null 2>&1 || { _okcat '无 [FAIL] 标签'; exec 8>&- 2>/dev/null || true; return 0; }
     local tmp="${CLASH_CONFIG_MIXIN}.cleanfail.$$"
     # 仅对 proxy-groups 段列表项移除标签，避免误伤其它注释/上下文
-    awk 'BEGIN{inpg=0} /^proxy-groups:/ {inpg=1; print; next} /^[^ \t-]/ {inpg=0; print; next} { if(inpg && $0 ~ /^ *-/){ gsub(/\[FAIL\] ?/,"",$0); print; next } print }' "$CLASH_CONFIG_MIXIN" > "$tmp" 2>/dev/null || return 1
+    awk 'BEGIN{inpg=0} /^proxy-groups:/ {inpg=1; print; next} /^[^ \t-]/ {inpg=0; print; next} { if(inpg && $0 ~ /^ *-/){ gsub(/\[FAIL\] ?/,"",$0); print; next } print }' "$CLASH_CONFIG_MIXIN" > "$tmp" 2>/dev/null || { exec 8>&- 2>/dev/null || true; return 1; }
     if ! diff -q "$CLASH_CONFIG_MIXIN" "$tmp" >/dev/null 2>&1; then
     mv "$tmp" "$CLASH_CONFIG_MIXIN"
         local ts_cf
@@ -1252,6 +1277,7 @@ _cleanup_fail_tags() {
     else
         rm -f "$tmp"
     fi
+    exec 8>&- 2>/dev/null || true
 }
 
 # 统计最近失败上游节点 (默认2分钟, 可传分钟值) 并列出前10个目标 (host:port)

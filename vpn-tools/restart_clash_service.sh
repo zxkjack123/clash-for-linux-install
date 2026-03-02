@@ -133,7 +133,7 @@ else
 fi
 
 # Check if API is accessible
-if curl -fsS --noproxy '*' --connect-timeout 2 --max-time 3 "${AUTH_HDR[@]}" "$API/version" >/dev/null 2>&1; then
+if curl -fsS --noproxy '*' --connect-timeout 2 --max-time 3 ${AUTH_HDR[@]+"${AUTH_HDR[@]}"} "$API/version" >/dev/null 2>&1; then
     echo -e "${GREEN}✅ Clash API is accessible${NC}"
     API_STATUS="accessible"
 else
@@ -202,7 +202,7 @@ retries=0
 max_retries=10
 
 while [ $retries -lt $max_retries ]; do
-    if curl -fsS --noproxy '*' --connect-timeout 2 --max-time 3 "${AUTH_HDR[@]}" "$API/version" >/dev/null 2>&1; then
+    if curl -fsS --noproxy '*' --connect-timeout 2 --max-time 3 ${AUTH_HDR[@]+"${AUTH_HDR[@]}"} "$API/version" >/dev/null 2>&1; then
         echo -e "${GREEN}✅ Clash API is accessible${NC}"
         break
     else
@@ -235,8 +235,8 @@ echo "================================="
 
 # Test current proxy groups
 echo "📊 Current proxy groups:"
-AI_NODE=$(curl -fsS --noproxy '*' --connect-timeout 2 --max-time 4 "${AUTH_HDR[@]}" "$API/proxies/AI" 2>/dev/null | jq -r '.now' 2>/dev/null || echo "Unknown")
-STREAMING_NODE=$(curl -fsS --noproxy '*' --connect-timeout 2 --max-time 4 "${AUTH_HDR[@]}" "$API/proxies/Streaming" 2>/dev/null | jq -r '.now' 2>/dev/null || echo "Unknown")
+AI_NODE=$(curl -fsS --noproxy '*' --connect-timeout 2 --max-time 4 ${AUTH_HDR[@]+"${AUTH_HDR[@]}"} "$API/proxies/AI" 2>/dev/null | jq -r '.now' 2>/dev/null || echo "Unknown")
+STREAMING_NODE=$(curl -fsS --noproxy '*' --connect-timeout 2 --max-time 4 ${AUTH_HDR[@]+"${AUTH_HDR[@]}"} "$API/proxies/Streaming" 2>/dev/null | jq -r '.now' 2>/dev/null || echo "Unknown")
 echo "🤖 AI Group: $AI_NODE"
 echo "🎬 Streaming Group: $STREAMING_NODE"
 
@@ -289,6 +289,7 @@ for domain in "${ai_domains[@]}"; do
     if response=$(timeout 8 curl -s -o /dev/null -w "%{http_code}" \
         --connect-timeout 5 --max-time 8 \
         "https://$domain/" 2>/dev/null); then
+        response=${response:-0}
         if [ "$response" -ge 200 ] && [ "$response" -lt 400 ]; then
             echo -e "${GREEN}✅ OK${NC} (HTTP $response)"
         else

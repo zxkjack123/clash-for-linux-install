@@ -49,19 +49,33 @@ fi
 if [[ -z $group_json ]]; then err "Group $GROUP not found"; exit 2; fi
 
 nodes=()
-if have jq; then mapfile -t nodes < <(echo "$group_json" | jq -r '.all[]'); else nodes=($(echo "$group_json" | sed -n 's/.*"all":\[\(.*\)\].*/\1/p' | tr '"' '\n' | sed '/^$/d')); fi
+if have jq; then
+	mapfile -t nodes < <(echo "$group_json" | jq -r '.all[]')
+else
+	mapfile -t nodes < <(echo "$group_json" | sed -n 's/.*"all":\[\(.*\)\].*/\1/p' | tr '"' '\n' | sed '/^$/d')
+fi
 
 current=""
 if declare -F clash_group_now >/dev/null 2>&1; then
 	current="$(clash_group_now "$GROUP" 2>/dev/null || true)"
 fi
 if [[ -z "${current:-}" ]]; then
-	current=$(echo "$group_json" | (have jq && jq -r '.now' || sed -n 's/.*"now":"\([^"]*\)".*/\1/p'))
+	if have jq; then
+		current=$(echo "$group_json" | jq -r '.now // ""' 2>/dev/null || true)
+	else
+		current=$(echo "$group_json" | sed -n 's/.*"now":"\([^"]*\)".*/\1/p')
+	fi
 fi
 
 switch() {
 	local payload
-	payload=$(printf '{"name":"%s"}' "$1")
+	if have jq; then
+		payload=$(jq -cn --arg n "$1" '{name:$n}')
+	else
+		local esc
+		esc=$(printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e ':a;N;$!ba;s/\n/\\n/g')
+		payload=$(printf '{"name":"%s"}' "$esc")
+	fi
 	if declare -F clash_api_put_json >/dev/null 2>&1; then
 		clash_api_put_json "/proxies/$group_enc" "$payload" >/dev/null 2>&1 || return 1
 	else

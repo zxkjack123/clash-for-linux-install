@@ -1,4 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
+set -euo pipefail
 
 # 🚀 VPN Tools Access Script
 # 
@@ -31,38 +33,39 @@ echo ""
 echo "  0. Exit"
 echo ""
 
-read -p "Select option (0-8): " choice
+read -r -p "Select option (0-8): " choice
+choice="${choice:-}"
 
-case $choice in
+case "$choice" in
     1)
         echo "🎮 Launching Interactive Menu..."
-        cd vpn-tools && ./launcher.sh
+        (cd vpn-tools && ./launcher.sh)
         ;;
     2)
         echo "⚡ Running Quick VPN Status Check..."
-        cd vpn-tools && ./quick_vpn_check.sh
+        (cd vpn-tools && ./quick_vpn_check.sh)
         ;;
     3)
         echo "🤖 Running AI Service Optimization..."
-        cd vpn-tools && ./optimize_ai.sh
+        (cd vpn-tools && ./optimize_ai.sh)
         ;;
     4)
         echo "🎬 Running YouTube Optimization..."
-        cd vpn-tools && ./select_youtube_node.sh
+        (cd vpn-tools && ./select_youtube_node.sh)
         ;;
     5)
         echo "🌐 Running Network Connectivity Test..."
-        cd vpn-tools && ./network_connectivity_test.sh
+        (cd vpn-tools && ./network_connectivity_test.sh)
         ;;
     6)
         echo "📚 Showing Help System..."
-        cd vpn-tools && ./show_help.sh list
+        (cd vpn-tools && ./show_help.sh list)
         ;;
     7)
         echo "📁 Entering VPN Tools Folder..."
         echo "Use 'cd vpn-tools' to access the tools directory"
         echo "Available tools:"
-        cd vpn-tools && ls -1 *.sh | head -10
+        (cd vpn-tools && ls -1 *.sh | head -10)
         echo "... and more. Run './show_help.sh list' for complete list."
         ;;
     8)

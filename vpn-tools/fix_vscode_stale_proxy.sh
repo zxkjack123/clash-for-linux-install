@@ -11,6 +11,7 @@ ROOT_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 # Load common env for paths (BIN_YQ, CLASH_CONFIG_RUNTIME, etc.)
 # common.sh may reference positional parameters; shield from -u during sourcing.
 # shellcheck source=/dev/null
+export CLASH_LIB_MODE=1
 set +u
 . "$ROOT_DIR/script/common.sh"
 set -u

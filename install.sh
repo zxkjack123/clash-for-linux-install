@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC1091
-. script/common.sh >&/dev/null
-. script/clashctl.sh >&/dev/null
+. script/common.sh
+. script/clashctl.sh
+
+type _valid_env >/dev/null 2>&1 || { echo "ERROR: must run from repository root (missing script/common.sh or failed to source)" >&2; exit 2; }
 
 _valid_env
 
@@ -55,7 +57,9 @@ _merge_config_restart
 mkdir -p "${USER_HOME}/.local/bin"
 # Ensure scripts are executable in the install dir
 chmod +x "${CLASH_SCRIPT_DIR}/clashctl.sh" 2>/dev/null || true
-[ -f "${CLASH_SCRIPT_DIR}/emergency_off.sh" ] && chmod +x "${CLASH_SCRIPT_DIR}/emergency_off.sh" 2>/dev/null || true
+if [ -f "${CLASH_SCRIPT_DIR}/emergency_off.sh" ]; then
+    chmod +x "${CLASH_SCRIPT_DIR}/emergency_off.sh" 2>/dev/null || true
+fi
 
 _install_cli_link() {
     local name="$1"
@@ -82,7 +86,7 @@ After=network.target
 [Service]
 Type=simple
 Restart=always
-ExecStart=${BIN_KERNEL} -d ${CLASH_BASE_DIR} -f ${CLASH_CONFIG_RUNTIME}
+ExecStart="${BIN_KERNEL}" -d "${CLASH_BASE_DIR}" -f "${CLASH_CONFIG_RUNTIME}"
 RestartSec=5
 TimeoutStartSec=30
 
@@ -108,10 +112,43 @@ TimeoutStartSec=10
 WantedBy=default.target
 EOF
 
+# Install optional subscription refresh units with resolved install paths.
+cat <<EOF >"${USER_HOME}/.config/systemd/user/clash-subscription-refresh.service"
+[Unit]
+Description=Refresh Clash subscription (proxy-clean)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=${CLASH_BASE_DIR}
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/snap/bin
+Environment=RUN_OPTIMIZE_AFTER_REFRESH=1
+Environment=OPTIMIZE_DELAY=900
+Environment=OPTIMIZE_SCRIPT=${CLASH_BASE_DIR}/vpn-tools/optimize_all_network.sh
+ExecStart=${CLASH_BASE_DIR}/script/refresh_subscription_direct.sh
+TimeoutStartSec=45min
+EOF
+
+cat <<EOF >"${USER_HOME}/.config/systemd/user/clash-subscription-refresh.timer"
+[Unit]
+Description=Daily Clash subscription refresh
+
+[Timer]
+OnCalendar=*-*-* 04:30
+Persistent=true
+Unit=clash-subscription-refresh.service
+RandomizedDelaySec=15m
+
+[Install]
+WantedBy=timers.target
+EOF
+
 # Enable systemd user services
 systemctl --user daemon-reload
 systemctl --user enable "$BIN_KERNEL_NAME" >&/dev/null && _okcat '✅' "已设置开机自启" || _failcat '❌' "设置自启失败"
 systemctl --user enable clash-proxy-env.service >&/dev/null || _okcat '⚠️' "代理环境服务设置失败，将依赖shell启动"
+_okcat '⏱️' "已安装可选订阅自动刷新单元：clash-subscription-refresh.{service,timer}（默认未启用）"
 
 # Enable lingering to allow user services to start at boot
 loginctl enable-linger "$USER" 2>/dev/null || _okcat '⚠️' "无法设置开机自启，可手动执行: loginctl enable-linger $USER（可能需要管理员权限）"

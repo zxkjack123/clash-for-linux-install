@@ -54,13 +54,13 @@ if [[ -f "$RUNTIME_FILE" ]] && command -v clash_yq_bin >/dev/null 2>&1; then
 		mp=$("$YQ_BIN" -r '."mixed-port" // ""' "$RUNTIME_FILE" 2>/dev/null || true)
 		hp=$("$YQ_BIN" -r '.port // ""' "$RUNTIME_FILE" 2>/dev/null || true)
 		sp=$("$YQ_BIN" -r '."socks-port" // ""' "$RUNTIME_FILE" 2>/dev/null || true)
-		if [[ "$mp" =~ ^[0-9]{2,5}$ ]]; then
+		if [[ "$mp" =~ ^[1-9][0-9]*$ ]]; then
 			HTTP_PORT="$mp"
 			SOCKS_PORT="$mp"
 			SOCKS_CONFIGURED=0
 		else
-			[[ "$hp" =~ ^[0-9]{2,5}$ ]] && HTTP_PORT="$hp"
-			if [[ "$sp" =~ ^[0-9]{2,5}$ ]]; then
+			[[ "$hp" =~ ^[1-9][0-9]*$ ]] && HTTP_PORT="$hp"
+			if [[ "$sp" =~ ^[1-9][0-9]*$ ]]; then
 				SOCKS_PORT="$sp"
 				SOCKS_CONFIGURED=1
 			else

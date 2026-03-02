@@ -14,6 +14,10 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "${SCRIPT_DIR}/lib/net_helpers.sh" 2>/dev/null || true
+
 ALERT_LEVEL="${1:-INFO}"
 ALERT_MESSAGE="${2:-No message provided}"
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
@@ -135,17 +139,36 @@ send_webhook() {
         return 0
     fi
     
-    # 构造JSON payload
-    local payload=$(cat <<EOF
+    # 构造 JSON payload（严格转义，避免消息中的引号/换行破坏 JSON）
+    local payload host_name msg_escaped
+    host_name="$(hostname 2>/dev/null || echo unknown-host)"
+    if have jq; then
+        payload=$(jq -cn \
+            --arg ts "$TIMESTAMP" \
+            --arg level "$ALERT_LEVEL" \
+            --arg msg "$ALERT_MESSAGE" \
+            --arg src "clash-monitor" \
+            --arg host "$host_name" \
+            '{timestamp:$ts, level:$level, message:$msg, source:$src, hostname:$host}')
+    else
+        if declare -F nh_json_escape_str >/dev/null 2>&1; then
+            msg_escaped="$(nh_json_escape_str "$ALERT_MESSAGE")"
+            host_name="$(nh_json_escape_str "$host_name")"
+        else
+            msg_escaped=$(printf '%s' "$ALERT_MESSAGE" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e ':a;N;$!ba;s/\n/\\n/g')
+            host_name=$(printf '%s' "$host_name" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')
+        fi
+        payload=$(cat <<EOF
 {
   "timestamp": "$TIMESTAMP",
   "level": "$ALERT_LEVEL",
-  "message": "$ALERT_MESSAGE",
+  "message": "$msg_escaped",
   "source": "clash-monitor",
-  "hostname": "$(hostname)"
+  "hostname": "$host_name"
 }
 EOF
 )
+    fi
     
     curl -s -X POST "$WEBHOOK_URL" \
         -H "Content-Type: application/json" \

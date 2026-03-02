@@ -343,6 +343,7 @@ fi
 if ! $MODIFIED; then
   vv "文本模式处理"
   TMP="${RUNTIME}.tmp.$$"
+  trap 'rm -f "${TMP:-}" 2>/dev/null || true' EXIT INT TERM
   # 删除劫持行 (兼容引号/无引号)
   grep -Ev "IP-CIDR,1.1.1.1/32,西瓜加速,no-resolve|IP-CIDR,8.8.8.8/32,西瓜加速,no-resolve" "$RUNTIME" > "$TMP" || true
   mv "$TMP" "$RUNTIME"
@@ -357,6 +358,7 @@ if ! $MODIFIED; then
     sed -i "/^rules:/a \  - IP-CIDR,8.8.8.8/32,DIRECT,no-resolve" "$RUNTIME"
     MODIFIED=true
   fi
+  trap - EXIT INT TERM
 fi
 
 # 优先保持 QDAI/SCNET 相关规则在列表上方, 避免被 DOMAIN-SUFFIX,cn 提前截断

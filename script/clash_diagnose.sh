@@ -222,8 +222,53 @@ dbg "direct=$DIRECT_CODE proxy=$HTTP_CODE"
 
 # 8. DNS / dig (可选)
 if [ $FAST -eq 0 ] && have dig; then
-  DIG_OUT=$(dig +timeout=3 +short www.google.com @127.0.0.1 2>/dev/null | head -n1 || true)
-  if echo "$DIG_OUT" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+'; then ok "Clash DNS 解析成功 www.google.com -> $DIG_OUT"; add_json dns_ok true; else warn "Clash DNS 解析失败(或未启用)"; add_json dns_ok false; fi
+  DNS_ENABLE=false
+  DNS_LISTEN=""
+  if [ -x "$YQ" ] && [ -f "$RUNTIME" ]; then
+    DNS_ENABLE=$($YQ -r '.dns.enable // false' "$RUNTIME" 2>/dev/null || echo false)
+    DNS_LISTEN=$($YQ -r '.dns.listen // ""' "$RUNTIME" 2>/dev/null || echo "")
+  fi
+  DNS_ENABLE=$(printf '%s' "$DNS_ENABLE" | tr -d "\"'" | tr '[:upper:]' '[:lower:]')
+  DNS_LISTEN=$(printf '%s' "$DNS_LISTEN" | tr -d "\"'" | tr -d ' \t\r\n')
+
+  if [ "$DNS_ENABLE" != true ]; then
+    # Most setups don't enable Clash DNS listener; avoid noisy warnings.
+    add_json dns_ok skipped
+  else
+    DNS_SERVER="127.0.0.1"
+    DNS_PORT=53
+    if [ -n "$DNS_LISTEN" ]; then
+      case "$DNS_LISTEN" in
+        :*)
+          DNS_PORT=${DNS_LISTEN#:}
+          ;;
+        \[*\]:*)
+          DNS_SERVER=${DNS_LISTEN%]*}
+          DNS_SERVER=${DNS_SERVER#[}
+          DNS_PORT=${DNS_LISTEN##*:}
+          ;;
+        *:*)
+          DNS_SERVER=${DNS_LISTEN%:*}
+          DNS_PORT=${DNS_LISTEN##*:}
+          ;;
+      esac
+    fi
+
+    case "$DNS_SERVER" in
+      0.0.0.0|::|\[::\]) DNS_SERVER="127.0.0.1" ;;
+    esac
+    [[ "$DNS_PORT" =~ ^[0-9]+$ ]] || DNS_PORT=53
+
+    DIG_OUT=$(dig +timeout=3 +short www.google.com "@${DNS_SERVER}" -p "$DNS_PORT" 2>/dev/null | head -n1 || true)
+    if echo "$DIG_OUT" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+'; then
+      ok "Clash DNS 解析成功 www.google.com -> $DIG_OUT"
+      add_json dns_ok true
+    else
+      warn "Clash DNS 解析失败 (listen=${DNS_LISTEN:-unset})"
+      add_json dns_ok false
+      STATUS=$(( STATUS==1?1:2 ))
+    fi
+  fi
 else
   add_json dns_ok skipped
 fi

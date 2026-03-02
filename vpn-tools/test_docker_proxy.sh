@@ -175,6 +175,12 @@ ALL_TEST_URLS=("${BASIC_TEST_URLS[@]}" "${AI_TEST_URLS[@]}" "${STREAMING_TEST_UR
 
 # Docker test image
 TEST_IMAGE="curlimages/curl:latest"
+TEMP_COMPOSE_FILE=""
+
+cleanup_tmp_files() {
+    [ -n "${TEMP_COMPOSE_FILE:-}" ] && rm -f "${TEMP_COMPOSE_FILE}" 2>/dev/null || true
+}
+trap cleanup_tmp_files EXIT
 
 echo -e "${BLUE}🐳 Docker Proxy Connection Test Suite${NC}"
 echo -e "${BLUE}====================================${NC}"
@@ -465,7 +471,9 @@ echo -e "\n${YELLOW}🧪 Test Suite 5: Docker Compose Simulation${NC}"
 echo -e "${YELLOW}=========================================${NC}"
 
 # Create temporary docker-compose.yml for testing
-TEMP_COMPOSE_FILE="/tmp/docker-proxy-test-compose.yml"
+TEMP_COMPOSE_FILE="$(mktemp -t docker-proxy-test-compose.XXXXXX.yml 2>/dev/null || true)"
+[ -n "$TEMP_COMPOSE_FILE" ] || TEMP_COMPOSE_FILE="${XDG_RUNTIME_DIR:-/tmp}/docker-proxy-test-compose.$$.yml"
+: > "$TEMP_COMPOSE_FILE"
 if [[ "${DOCKER_NET_MODE}" == "host" ]]; then
         cat > "${TEMP_COMPOSE_FILE}" << EOF
 version: '3.8'

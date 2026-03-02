@@ -6,6 +6,7 @@
 # Usage: ./script/repair_subscription_and_restore.sh [--generate-from-current]
 set -euo pipefail
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+export ROOT_DIR
 BACKUP_DIR="$ROOT_DIR/resources/backup"
 CUR_CFG="$ROOT_DIR/resources/config.yaml"
 GEN_FLAG=0
@@ -77,6 +78,6 @@ fi
 mv -f "$CUR_CFG.restored" "$CUR_CFG"
 
 # Merge & restart kernel
-CLASH_LIB_MODE=1 bash -lc '. script/common.sh 2>/dev/null || true; . script/clashctl.sh 2>/dev/null || true; _merge_sanitize_restart' || true
+CLASH_LIB_MODE=1 bash -lc 'cd "$ROOT_DIR" && . script/common.sh 2>/dev/null || true; . script/clashctl.sh 2>/dev/null || true; _merge_sanitize_restart' || true
 
 echo "[+] Repair complete."

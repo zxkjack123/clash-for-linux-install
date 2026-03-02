@@ -162,6 +162,7 @@ def blocks_from_lines(lines: List[str]) -> List[Block]:
         if strip_comments(line):
             m = RE_HEREDOC.search(line)
             if m:
+                blocks.append(Block(start=lineno, end=lineno, text=line.rstrip()))
                 heredoc_delim = m.group(2)
                 heredoc_strip_tabs = "<<-" in line
                 i += 1

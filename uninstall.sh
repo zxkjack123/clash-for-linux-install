@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC1091
-. script/common.sh >&/dev/null
-. script/clashctl.sh >&/dev/null
+. script/common.sh
+. script/clashctl.sh
+
+type _valid_env >/dev/null 2>&1 || { echo "ERROR: must run from repository root (missing script/common.sh or failed to source)" >&2; exit 2; }
 
 _valid_env
 

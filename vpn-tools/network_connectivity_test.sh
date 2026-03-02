@@ -35,7 +35,7 @@ section() { echo; printf '===== %s =====\n' "$1"; }
 section "ENVIRONMENT"
 echo "Timestamp : $(date '+%F %T')"
 echo "Proxy     : $PROXY"
-echo "Controller: $API (reachable=$([[ $(curl -fsS --noproxy '*' --connect-timeout 2 --max-time 4 "${AUTH_HDR[@]}" "$API/version" 2>/dev/null || echo fail) != fail ]] && echo yes || echo no))"
+echo "Controller: $API (reachable=$([[ $(curl -fsS --noproxy '*' --connect-timeout 2 --max-time 4 ${AUTH_HDR[@]+"${AUTH_HDR[@]}"} "$API/version" 2>/dev/null || echo fail) != fail ]] && echo yes || echo no))"
 
 section "DNS BASELINE"
 for host in api.openai.com claude.ai youtube.com netflix.com braintrust.dev upwork.com; do
@@ -59,7 +59,7 @@ for row in \
 	"https://siliconflow.cn/ siliconflow" \
 	"https://openrouter.ai/api/v1 openrouter" \
 	"https://www.upwork.com/ upwork"; do
-	test_pair ${row% *} ${row##* }
+	test_pair "${row% *}" "${row##* }"
 done
 
 section "LATENCY SAMPLE (PROXY)"

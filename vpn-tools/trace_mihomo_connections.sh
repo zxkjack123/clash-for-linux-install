@@ -13,7 +13,7 @@
 
 set -euo pipefail
 
-SECONDS=30
+DURATION=30
 INTERVAL=0.5
 FILTER="${FILTER:-github\\.com|githubusercontent\\.com|githubassets\\.com|codeload\\.github\\.com|raw\\.githubusercontent\\.com|api\\.github\\.com}"
 PROCESS_RE="${PROCESS_RE:-code|Code|electron|node|git}"
@@ -36,13 +36,13 @@ EOF
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -h|--help) usage; exit 0;;
-    --seconds) SECONDS="$2"; shift 2;;
+    --seconds) DURATION="$2"; shift 2;;
     --interval) INTERVAL="$2"; shift 2;;
     *) echo "Unknown arg: $1" >&2; usage; exit 2;;
   esac
 done
 
-case "$SECONDS" in ''|*[!0-9]*) echo "--seconds must be integer" >&2; exit 2;; esac
+case "$DURATION" in ''|*[!0-9]*) echo "--seconds must be integer" >&2; exit 2;; esac
 
 RUNTIME="${CLASH_CONFIG_RUNTIME:-$HOME/.local/share/clash/runtime.yaml}"
 YQ_BIN="${BIN_YQ:-$HOME/.local/share/clash/bin/yq}"
@@ -73,9 +73,9 @@ api="http://${ui_host}:${ui_port}"
 hdr=()
 [ -n "$secret" ] && hdr=(-H "Authorization: Bearer $secret")
 
-end=$(( $(date +%s) + SECONDS ))
+end=$(( $(date +%s) + DURATION ))
 
-echo "Tracing controller ${api} for ${SECONDS}s (interval=${INTERVAL}s)"
+echo "Tracing controller ${api} for ${DURATION}s (interval=${INTERVAL}s)"
 echo "Filter host =~ /$FILTER/  process =~ /$PROCESS_RE/"
 echo
 

@@ -33,6 +33,8 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+BROWSER_LAUNCHER="$HOME/.local/share/clash/openxlab_browser.sh"
+
 # Optional env bootstrap (controller URL + secret)
 SCRIPT_DIR="$(cd "${BASH_SOURCE[0]%/*}" && pwd)"
 if [[ -f "$SCRIPT_DIR/load_env.sh" ]]; then
@@ -187,7 +189,7 @@ echo "================================="
 
 if [[ $APPLY -ne 1 ]]; then
     echo "ℹ️ Preview mode: not creating any files on disk." 
-    echo "   Re-run with --apply to create a Desktop shortcut and /tmp browser launcher." 
+    echo "   Re-run with --apply to create a Desktop shortcut and browser launcher." 
     echo ""
 else
 
@@ -210,7 +212,8 @@ if [ -f "$HOME/Desktop/OpenXLab-Direct.desktop" ]; then
 fi
 
 # Create browser launch script
-cat > "/tmp/openxlab_browser.sh" << 'EOF'
+mkdir -p "$(dirname "$BROWSER_LAUNCHER")"
+cat > "$BROWSER_LAUNCHER" << 'EOF'
 #!/bin/bash
 echo "🌐 Launching OpenXLab with optimized settings..."
 export no_proxy="*"
@@ -226,8 +229,8 @@ else
 fi
 EOF
 
-chmod +x "/tmp/openxlab_browser.sh"
-echo -e "✅ Created browser launcher: ${CYAN}/tmp/openxlab_browser.sh${NC}"
+chmod +x "$BROWSER_LAUNCHER"
+echo -e "✅ Created browser launcher: ${CYAN}${BROWSER_LAUNCHER}${NC}"
 
 fi
 
@@ -271,7 +274,7 @@ echo "curl --noproxy '*' https://openxlab.org.cn/"
 echo ""
 
 echo -e "${CYAN}# Launch browser without proxy${NC}"
-echo "/tmp/openxlab_browser.sh"
+echo "$BROWSER_LAUNCHER"
 echo ""
 
 echo -e "${CYAN}# Check if sites work without proxy${NC}"
@@ -304,9 +307,9 @@ fi
 echo ""
 echo "💡 IMMEDIATE ACTIONS:"
 if [[ $APPLY -eq 1 ]]; then
-    echo "1. Run: /tmp/openxlab_browser.sh"
+    echo "1. Run: ${BROWSER_LAUNCHER}"
 else
-    echo "1. (Optional) Re-run with --apply to create /tmp/openxlab_browser.sh"
+    echo "1. (Optional) Re-run with --apply to create ${BROWSER_LAUNCHER}"
 fi
 echo "2. Or manually visit: https://openxlab.org.cn/ (bypass proxy)"
 echo "3. If still not working, try: https://github.com/OpenXLab"

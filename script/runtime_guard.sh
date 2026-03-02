@@ -54,6 +54,8 @@ JSON_OUT=false
 
 [ -z "${CLASH_METRICS_FILE:-}" ] && CLASH_METRICS_FILE="$HOME/.local/share/clash/metrics.prom"
 CLASH_GUARD_METRICS_FILE="${CLASH_GUARD_METRICS_FILE:-$HOME/.local/share/clash/metrics_guard.prom}"
+GUARD_STATE_DIR="${CLASH_STATE_DIR:-${XDG_RUNTIME_DIR:-${CLASH_BASE_DIR:-$HOME/.local/share/clash}}}"
+mkdir -p "$GUARD_STATE_DIR" 2>/dev/null || true
 
 _guard_metrics_write() {
   # $1 key, $2 value
@@ -69,7 +71,7 @@ _guard_metrics_write() {
   echo "${key} ${val}" >> "$CLASH_GUARD_METRICS_FILE" 2>/dev/null || true
 }
 
-LOCK_FILE="${CLASH_LOCK_FILE:-/tmp/.clash_update.lock}"
+LOCK_FILE="${CLASH_LOCK_FILE:-${GUARD_STATE_DIR}/.clash_update.lock}"
 LOCK_FD=0
 
 # Output helpers.
@@ -158,6 +160,7 @@ _acquire_lock() {
 
 _upgrade_to_exclusive() {
   $AUTO_FIX || return 0
+  [ "${LOCK_MODE:-}" = "exclusive" ] && return 0
   flock -u "$LOCK_FD" 2>/dev/null || true
   if ! flock -w 10 -x "$LOCK_FD"; then
     if $JSON_OUT; then
@@ -325,7 +328,7 @@ fi
 
 REPORT_FILE=""
 if $REPORT; then
-  REPORT_FILE="/tmp/runtime_guard_report_${TS}.log"
+  REPORT_FILE="${GUARD_STATE_DIR}/runtime_guard_report_${TS}.log"
   {
     echo "# runtime guard report @ $TS"
     echo "file: $RUNTIME"
@@ -378,8 +381,20 @@ else
   warn "缺失 sanitizer 脚本: $SANITIZER"
 fi
 
-grep -q 'IP-CIDR,1.1.1.1/32,DIRECT' "$TMP_FIX" || echo "  - IP-CIDR,1.1.1.1/32,DIRECT,no-resolve" >> "$TMP_FIX"
-grep -q 'IP-CIDR,8.8.8.8/32,DIRECT' "$TMP_FIX" || echo "  - IP-CIDR,8.8.8.8/32,DIRECT,no-resolve" >> "$TMP_FIX"
+if ! grep -q 'IP-CIDR,1.1.1.1/32,DIRECT' "$TMP_FIX"; then
+  if [ -x "$YQ" ]; then
+    "$YQ" -i '.rules = ((.rules // []) + ["IP-CIDR,1.1.1.1/32,DIRECT,no-resolve"])' "$TMP_FIX" 2>/dev/null || true
+  else
+    sed -i "/^rules:/a \  - IP-CIDR,1.1.1.1/32,DIRECT,no-resolve" "$TMP_FIX" 2>/dev/null || true
+  fi
+fi
+if ! grep -q 'IP-CIDR,8.8.8.8/32,DIRECT' "$TMP_FIX"; then
+  if [ -x "$YQ" ]; then
+    "$YQ" -i '.rules = ((.rules // []) + ["IP-CIDR,8.8.8.8/32,DIRECT,no-resolve"])' "$TMP_FIX" 2>/dev/null || true
+  else
+    sed -i "/^rules:/a \  - IP-CIDR,8.8.8.8/32,DIRECT,no-resolve" "$TMP_FIX" 2>/dev/null || true
+  fi
+fi
 
 if [ -x "$YQ" ]; then
   "$YQ" '.' "$TMP_FIX" >/dev/null 2>&1 || fail "修复后 YAML 校验失败"

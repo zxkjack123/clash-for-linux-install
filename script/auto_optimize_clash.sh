@@ -23,7 +23,10 @@ MAX_TEST=60
 THRESH_TCP_FAIL=999999
 THRESH_TLS_FAIL=500000
 FILTER_REGEX='^(剩余流量|套餐到期|★|🈴)'
-TMP_RESULT="/tmp/.clash_latency.$$"
+TMP_RESULT="$(mktemp -t clash_latency.XXXXXX 2>/dev/null || true)"
+[ -n "$TMP_RESULT" ] || TMP_RESULT="${XDG_RUNTIME_DIR:-/tmp}/.clash_latency.$$.$RANDOM"
+: > "$TMP_RESULT"
+trap 'rm -f "$TMP_RESULT" "${TMP_RESULT}.top" 2>/dev/null || true' EXIT INT TERM
 
 APPLY=true
 DRY=false
@@ -120,8 +123,8 @@ if $APPLY; then
   "$YQ_BIN" '."proxy-groups"[]?.name' "$MIXIN" 2>/dev/null | grep -q '^西瓜加速$' || \
     "$YQ_BIN" -i '."proxy-groups" += [{"name":"西瓜加速","type":"select","proxies":["AUTO-SMART","DIRECT"]}]' "$MIXIN"
 
-  ARRAY_JSON=$(printf '"%s",' "${TOPN[@]}" | sed 's/,$//')
-  "$YQ_BIN" -i '(."proxy-groups"[] | select(.name=="AUTO-SMART")).proxies = ['"${ARRAY_JSON}"']' "$MIXIN"
+  TOPN_LIST=$(printf '%s\n' "${TOPN[@]}")
+  TOPN_LIST="$TOPN_LIST" "$YQ_BIN" -i '(."proxy-groups"[] | select(.name=="AUTO-SMART")).proxies = (strenv(TOPN_LIST) | split("\n") | map(select(length > 0)))' "$MIXIN"
   # 西瓜加速: 去重 + AUTO-SMART 置顶
   "$YQ_BIN" -i '(."proxy-groups"[] | select(.name=="西瓜加速")).proxies |= (["AUTO-SMART"] + ( .[] | select(. != "AUTO-SMART") )) | (."proxy-groups"[] | select(.name=="西瓜加速")).proxies |= (unique)' "$MIXIN" || true
   info "已写入 mixin (未自动重启)。后续手动: clashon 或 clashrestart"

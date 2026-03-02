@@ -46,7 +46,7 @@ if [ -f "$rt" ]; then
   # Extract port digits from external-controller: ':PORT'
   port=$(awk -F: '/^ *external-controller:/ {print $NF; exit}' "$rt" | tr -cd '0-9')
   [ -z "$port" ] && port=9090
-  ver=$(curl -sS --noproxy '*' --connect-timeout 2 --max-time 4 "${auth_hdr[@]}" "http://127.0.0.1:${port}/version" || true)
+  ver=$(curl -sS --noproxy '*' --connect-timeout 2 --max-time 4 ${auth_hdr[@]+"${auth_hdr[@]}"} "http://127.0.0.1:${port}/version" || true)
   echo "[start_vpn] Controller: http://127.0.0.1:${port} ${ver:+OK} ${ver:-UNREACHABLE}"
 fi
 
