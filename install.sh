@@ -16,10 +16,11 @@ mkdir -p "$CLASH_BASE_DIR/bin"
 
 # Install binaries in user space
 install -D <(gzip -dc "$ZIP_KERNEL") "${CLASH_BASE_DIR}/bin/$BIN_KERNEL_NAME"
-tar -xf "$ZIP_SUBCONVERTER" -C "${CLASH_BASE_DIR}/bin"
-tar -xf "$ZIP_YQ" -C "${CLASH_BASE_DIR}/bin"
-# shellcheck disable=SC2086
-/bin/mv -f ${CLASH_BASE_DIR}/bin/yq_* "${CLASH_BASE_DIR}/bin/yq"
+tar -xf "$ZIP_SUBCONVERTER" -C "${CLASH_BASE_DIR}/bin" || _error_quit "Failed to extract subconverter archive"
+tar -xf "$ZIP_YQ" -C "${CLASH_BASE_DIR}/bin" || _error_quit "Failed to extract yq archive"
+yq_found=("${CLASH_BASE_DIR}"/bin/yq_*)
+[[ -e "${yq_found[0]}" ]] || _error_quit "yq binary not found after extraction"
+/bin/mv -f "${yq_found[0]}" "${CLASH_BASE_DIR}/bin/yq"
 
 _set_bin "${CLASH_BASE_DIR}/bin"
 
@@ -47,7 +48,7 @@ find "$RESOURCES_BASE_DIR" -mindepth 1 -maxdepth 1 \
     ! -name 'zip' \
     ! -name '*.png' \
     -print0 | xargs -0 -I {} /bin/cp -rf "{}" "$CLASH_BASE_DIR"
-tar -xf "$ZIP_UI" -C "$CLASH_BASE_DIR"
+tar -xf "$ZIP_UI" -C "$CLASH_BASE_DIR" || _error_quit "Failed to extract UI archive"
 
 _set_rc
 _set_bin
@@ -116,8 +117,7 @@ EOF
 cat <<EOF >"${USER_HOME}/.config/systemd/user/clash-subscription-refresh.service"
 [Unit]
 Description=Refresh Clash subscription (proxy-clean)
-After=network-online.target
-Wants=network-online.target
+After=default.target
 
 [Service]
 Type=oneshot
@@ -127,6 +127,10 @@ Environment=RUN_OPTIMIZE_AFTER_REFRESH=1
 Environment=OPTIMIZE_DELAY=900
 Environment=OPTIMIZE_SCRIPT=${CLASH_BASE_DIR}/vpn-tools/optimize_all_network.sh
 ExecStart=${CLASH_BASE_DIR}/script/refresh_subscription_direct.sh
+Restart=on-failure
+RestartSec=300
+StartLimitIntervalSec=3600
+StartLimitBurst=3
 TimeoutStartSec=45min
 EOF
 
@@ -151,7 +155,7 @@ systemctl --user enable clash-proxy-env.service >&/dev/null || _okcat '⚠️' "
 _okcat '⏱️' "已安装可选订阅自动刷新单元：clash-subscription-refresh.{service,timer}（默认未启用）"
 
 # Enable lingering to allow user services to start at boot
-loginctl enable-linger "$USER" 2>/dev/null || _okcat '⚠️' "无法设置开机自启，可手动执行: loginctl enable-linger $USER（可能需要管理员权限）"
+loginctl enable-linger "${SUDO_USER:-$USER}" 2>/dev/null || _okcat '⚠️' "无法设置开机自启，可手动执行: loginctl enable-linger ${SUDO_USER:-$USER}（可能需要管理员权限）"
 
 clashui
 _okcat '🎉' 'enjoy 🎉'

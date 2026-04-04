@@ -75,7 +75,7 @@ RE_ECHO_PRINTF = re.compile(r"^\s*(echo|printf)\b")
 # IMPORTANT: avoid matching scripts that merely *call* other tools with --json
 # (e.g. `tailscale status --json`) or mention JSON in comments.
 RE_HAS_CASE_FLAG_JSON = re.compile(r"^\s*--json\)\b", re.MULTILINE)
-RE_MODE_ASSIGN = re.compile(r"^\s*MODE\s*=\s*\$\{1:-text\}\b", re.MULTILINE)
+RE_MODE_ASSIGN = re.compile(r'^\s*MODE\s*=\s*"?\$\{1:-text\}"?\b', re.MULTILINE)
 RE_MODE_TEST_TEXT = re.compile(r"\b\$?MODE\b\s*==\s*text\b")
 RE_MODE_TEST_JSON = re.compile(r"\b\$?MODE\b\s*==\s*json\b")
 RE_CASE_JSON_LABEL = re.compile(r"^\s*(json)\)\s*$")

@@ -21,3 +21,13 @@ rules:
   - DOMAIN-SUFFIX,wikinews.org,PROXY
   - DOMAIN-SUFFIX,wikiversity.org,PROXY
   - DOMAIN-SUFFIX,w.wiki,PROXY
+
+  # Amazon family (direct from China triggers anti-bot 503 or SSL timeout)
+  - DOMAIN-SUFFIX,amazon.com,PROXY
+  - DOMAIN-SUFFIX,amazon.co.jp,PROXY
+  - DOMAIN-SUFFIX,amazon.co.uk,PROXY
+  - DOMAIN-SUFFIX,amazon.de,PROXY
+  - DOMAIN-SUFFIX,ssl-images-amazon.com,PROXY
+  - DOMAIN-SUFFIX,media-amazon.com,PROXY
+  - DOMAIN-SUFFIX,images-amazon.com,PROXY
+  - DOMAIN-SUFFIX,amazonaw.com,PROXY

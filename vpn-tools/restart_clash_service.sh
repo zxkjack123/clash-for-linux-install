@@ -223,7 +223,8 @@ echo ""
 if command -v gsettings >/dev/null 2>&1; then
     echo "🧰 Applying GNOME proxy ignore-hosts best practices..."
     if [ -x "$ROOT_DIR/script/ensure_system_proxy_best_practices.sh" ]; then
-        bash "$ROOT_DIR/script/ensure_system_proxy_best_practices.sh" --set-manual 7890 || true
+        # Keep GNOME ports in sync with the actual running config (mixed-port or port+socks-port).
+        bash "$ROOT_DIR/script/ensure_system_proxy_best_practices.sh" --set-manual-from-runtime || true
     else
         echo -e "${YELLOW}⚠️ ensure_system_proxy_best_practices.sh not found at $ROOT_DIR/script, skipping${NC}"
     fi

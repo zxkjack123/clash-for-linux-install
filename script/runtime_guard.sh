@@ -52,6 +52,16 @@ BLACKLIST_FILE="${CLASH_BASE_DIR:-$HOME/.local/share/clash}/guard_rules_blacklis
 BASELINE_REPORT=false
 JSON_OUT=false
 
+# Optional: enforce reserved ports belong to Clash/mihomo only.
+# Enable via: CLASH_GUARD_CHECK_PORTS=1 or CLI --check-ports.
+CHECK_PORTS=false
+# Defaults are conservative and match this repo's typical ports.
+RESERVED_HTTP_PORT="${CLASH_RESERVED_HTTP_PORT:-7890}"
+RESERVED_SOCKS_PORT="${CLASH_RESERVED_SOCKS_PORT:-7891}"
+RESERVED_UI_PORT="${CLASH_RESERVED_UI_PORT:-9090}"
+# Allowed process name regex for ss output. Override if your kernel binary/unit differs.
+ALLOWED_PORT_PROCS_REGEX="${CLASH_ALLOWED_PORT_PROCS_REGEX:-}"
+
 [ -z "${CLASH_METRICS_FILE:-}" ] && CLASH_METRICS_FILE="$HOME/.local/share/clash/metrics.prom"
 CLASH_GUARD_METRICS_FILE="${CLASH_GUARD_METRICS_FILE:-$HOME/.local/share/clash/metrics_guard.prom}"
 GUARD_STATE_DIR="${CLASH_STATE_DIR:-${XDG_RUNTIME_DIR:-${CLASH_BASE_DIR:-$HOME/.local/share/clash}}}"
@@ -161,7 +171,6 @@ _acquire_lock() {
 _upgrade_to_exclusive() {
   $AUTO_FIX || return 0
   [ "${LOCK_MODE:-}" = "exclusive" ] && return 0
-  flock -u "$LOCK_FD" 2>/dev/null || true
   if ! flock -w 10 -x "$LOCK_FD"; then
     if $JSON_OUT; then
       printf '{"timestamp":"%s","status":"ERROR","message":"lock-upgrade-failed","lockFile":"%s"}\n' "$(date +%Y%m%d_%H%M%S)" "$LOCK_FILE"
@@ -213,10 +222,15 @@ while [[ $# -gt 0 ]]; do
     --quiet) QUIET=true; shift ;;
     --baseline) BASELINE_REPORT=true; shift ;;
     --json) JSON_OUT=true; shift ;;
+    --check-ports) CHECK_PORTS=true; shift ;;
     -h|--help) sed -n '1,80p' "$0"; exit 0 ;;
     *) echo "[guard] 未知参数: $1" >&2; exit 1 ;;
   esac
 done
+
+if [[ "${CLASH_GUARD_CHECK_PORTS:-0}" = "1" ]]; then
+  CHECK_PORTS=true
+fi
 
 # If a script is provided via env, assume script mode unless explicitly disabled.
 if [[ -n "${ALERT_SCRIPT:-}" && ( -z "${ALERT_MODE:-}" || "${ALERT_MODE}" == "none" ) ]]; then
@@ -224,6 +238,54 @@ if [[ -n "${ALERT_SCRIPT:-}" && ( -z "${ALERT_MODE:-}" || "${ALERT_MODE}" == "no
 fi
 
 _acquire_lock
+
+_ss_listen_lines() {
+  # $1 proto: tcp|udp, $2 port
+  local proto="${1:-tcp}" port="${2:-}"
+  [ -n "$port" ] || return 0
+  case "$proto" in
+    tcp) ss -ltnp 2>/dev/null | grep -E ":${port}\\b" || true ;;
+    udp) ss -lunp 2>/dev/null | grep -E ":${port}\\b" || true ;;
+    *) return 0 ;;
+  esac
+}
+
+_reserved_port_issue_if_any() {
+  # $1 proto tcp|udp, $2 port, $3 label
+  local proto="${1:-tcp}" port="${2:-}" label="${3:-port}"
+  [ -n "$port" ] || return 0
+  [[ "$port" =~ ^[0-9]+$ ]] || return 0
+
+  local lines
+  lines=$(_ss_listen_lines "$proto" "$port")
+  [ -z "$lines" ] && return 0
+
+  # ss may hide process names in some environments; treat unknown owner as an issue
+  # only when strict ownership is requested.
+  local strict_owner="${CLASH_GUARD_STRICT_PORT_OWNERSHIP:-1}"
+  if ! echo "$lines" | grep -q 'users:(' 2>/dev/null; then
+    if [ "$strict_owner" = "1" ]; then
+      ISSUES+=("保留端口被占用(未知进程): ${label}:${port}/${proto}")
+    fi
+    return 0
+  fi
+
+  # Decide allowed process names.
+  local allow_rx
+  if [ -n "${ALLOWED_PORT_PROCS_REGEX:-}" ]; then
+    allow_rx="$ALLOWED_PORT_PROCS_REGEX"
+  else
+    # SERVICE is typically "mihomo" or "clash"; accept both by default.
+    allow_rx="(${SERVICE:-mihomo}|mihomo|clash)"
+  fi
+
+  # If any listener line does NOT contain an allowed process name, flag it.
+  if echo "$lines" | grep -Evi "\\(\\\"${allow_rx}\\\"" >/dev/null 2>&1; then
+    local sample
+    sample=$(echo "$lines" | head -n 2 | tr '\n' ';' | sed 's/[[:space:]]\+/ /g')
+    ISSUES+=("保留端口被其他进程占用: ${label}:${port}/${proto} ss=${sample}")
+  fi
+}
 
 _build_alert_message() {
   # Keep message short and safe (no secrets).
@@ -310,6 +372,64 @@ fi
 [ -z "$HAS_DIRECT_1" ] && ISSUES+=("缺失 DIRECT 1.1.1.1")
 [ -z "$HAS_DIRECT_8" ] && ISSUES+=("缺失 DIRECT 8.8.8.8")
 [ -n "$HIJACK" ] && ISSUES+=("检测到劫持规则")
+
+# Optional: Reserved ports must be free or owned by Clash/mihomo only.
+if $CHECK_PORTS; then
+  # 1) If other process is listening on reserved ports -> ISSUE.
+  _reserved_port_issue_if_any tcp "$RESERVED_HTTP_PORT" "http"
+  _reserved_port_issue_if_any tcp "$RESERVED_SOCKS_PORT" "socks"
+  _reserved_port_issue_if_any udp "$RESERVED_SOCKS_PORT" "socks"
+  _reserved_port_issue_if_any tcp "$RESERVED_UI_PORT" "controller"
+
+  # 2) Detect port drift in runtime.yaml (helpful when GNOME system proxy depends on stability).
+  if [ -x "$YQ" ]; then
+    mixed_port=$("$YQ" -r '."mixed-port" // ""' "$RUNTIME" 2>/dev/null || true)
+    mixed_port=${mixed_port//$'\n'/}
+    mixed_port=${mixed_port//\"/}
+    mixed_port=${mixed_port//\'/}
+    http_port=$("$YQ" -r '.port // ""' "$RUNTIME" 2>/dev/null || true)
+    http_port=${http_port//$'\n'/}
+    http_port=${http_port//\"/}
+    http_port=${http_port//\'/}
+    socks_port=$("$YQ" -r '."socks-port" // ""' "$RUNTIME" 2>/dev/null || true)
+    socks_port=${socks_port//$'\n'/}
+    socks_port=${socks_port//\"/}
+    socks_port=${socks_port//\'/}
+    ui_addr=$("$YQ" -r '."external-controller" // "127.0.0.1:9090"' "$RUNTIME" 2>/dev/null || echo '127.0.0.1:9090')
+    ui_addr=${ui_addr//$'\n'/}
+    ui_addr=${ui_addr//\"/}
+    ui_addr=${ui_addr//\'/}
+    ui_port=${ui_addr##*:}
+    sp=$("$YQ" -r '."system-proxy".enable // false' "$RUNTIME" 2>/dev/null || echo false)
+    sp=${sp//$'\n'/}
+    sp=$(printf '%s' "$sp" | tr -d "\"'" | tr '[:upper:]' '[:lower:]')
+
+    # If mixed-port is used, it must match both reserved http/socks ports.
+    if [[ "$mixed_port" =~ ^[0-9]+$ ]]; then
+      if [ "$mixed_port" != "$RESERVED_HTTP_PORT" ] || [ "$mixed_port" != "$RESERVED_SOCKS_PORT" ]; then
+        ISSUES+=("runtime 端口漂移: mixed-port=$mixed_port (期望 http=$RESERVED_HTTP_PORT socks=$RESERVED_SOCKS_PORT; 建议改为 port+socks-port)")
+      fi
+    else
+      if [[ "$http_port" =~ ^[0-9]+$ ]] && [ "$http_port" != "$RESERVED_HTTP_PORT" ]; then
+        ISSUES+=("runtime 端口漂移: port=$http_port (期望 $RESERVED_HTTP_PORT)")
+      fi
+      if [[ "$socks_port" =~ ^[0-9]+$ ]] && [ "$socks_port" != "$RESERVED_SOCKS_PORT" ]; then
+        ISSUES+=("runtime 端口漂移: socks-port=$socks_port (期望 $RESERVED_SOCKS_PORT)")
+      fi
+    fi
+    if [[ "$ui_port" =~ ^[0-9]+$ ]] && [ "$ui_port" != "$RESERVED_UI_PORT" ]; then
+      ISSUES+=("runtime 端口漂移: external-controller=$ui_addr (期望 127.0.0.1:$RESERVED_UI_PORT)")
+    fi
+
+    # If system-proxy is enabled, lack of listeners is effectively a broken network.
+    if [ "$sp" = true ]; then
+      [ -z "$(_ss_listen_lines tcp "$RESERVED_HTTP_PORT")" ] && ISSUES+=("system-proxy 已启用但 http 端口未监听: $RESERVED_HTTP_PORT")
+      [ -z "$(_ss_listen_lines tcp "$RESERVED_SOCKS_PORT")" ] && ISSUES+=("system-proxy 已启用但 socks TCP 端口未监听: $RESERVED_SOCKS_PORT")
+      [ -z "$(_ss_listen_lines udp "$RESERVED_SOCKS_PORT")" ] && ISSUES+=("system-proxy 已启用但 socks UDP 端口未监听: $RESERVED_SOCKS_PORT")
+      [ -z "$(_ss_listen_lines tcp "$RESERVED_UI_PORT")" ] && ISSUES+=("system-proxy 已启用但 controller 端口未监听: $RESERVED_UI_PORT")
+    fi
+  fi
+fi
 
 if [ -f "$BLACKLIST_FILE" ]; then
   while IFS= read -r rx; do

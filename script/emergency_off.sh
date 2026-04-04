@@ -302,7 +302,7 @@ rollback() {
         [ -n "${_RB_GNOME_HTTP_PORT:-}" ] && gsettings set org.gnome.system.proxy.http port "${_RB_GNOME_HTTP_PORT}" 2>/dev/null || true
       else
         # 'none' or 'auto'
-        gsettings set org.gnome.system.proxy mode ${_RB_GNOME_MODE} 2>/dev/null || true
+        gsettings set org.gnome.system.proxy mode "${_RB_GNOME_MODE//\'/}" 2>/dev/null || true
       fi
     fi
   fi

@@ -1,4 +1,39 @@
 # Changelog
+## [2.5.11] - 2026-04-04
+
+### ✨ New
+- Added `vpn-tools/enable_vscode_fallback_direct.sh`: one-click toggle for VS Code direct-connect fallback when proxy is unavailable.
+- Port-conflict management framework: new `CLASH_PORT_POLICY` (strict / random / auto), `CLASH_RESERVED_PORTS`, and per-port env vars (`CLASH_RESERVED_HTTP_PORT`, etc.) for flexible port allocation and collision avoidance.
+- `runtime_guard.sh`: port-occupancy and port-drift checks (`CLASH_GUARD_CHECK_PORTS=1`) with customizable process allow-list (`CLASH_ALLOWED_PORT_PROCS_REGEX`).
+- `clashctl.sh`: live proxy-port detection from controller API (`_get_proxy_port_live_from_controller`).
+- Amazon domain family added to `resources/mixin.yaml` proxy rules (avoids anti-bot 503 / SSL timeouts on direct connections from China).
+
+### 🛠 Fixes
+- `install.sh`: fail-fast on `tar` extraction errors; robust `yq` binary rename using array glob instead of bare wildcard.
+- `repair_subscription_and_restore.sh`: gracefully handle missing `pyyaml` (exit 2 + warning instead of crash); harden SS-URI parsing against malformed URLs; fix `skip-cert-verify` default to `false`.
+- `emergency_off.sh`: fix gsettings rollback quoting (strip stray single-quote chars from saved mode value).
+- `vpn-tools/optimize_vscode_copilot.sh`: switch service-check data format from pipe-delimited to tab-delimited, fixing fragile `IFS='|'` parsing and ensuring correct proxy-mode fallback.
+- `vpn-tools/network_health_monitor.sh`: fix countdown loop direction (`seq 0 9` not `9 -1 0`); initialize associative array before first use.
+- `vpn-tools/network_dashboard.sh`: fix bracket-glob escaping in regex substitution.
+
+### 🔧 Improvements
+- `systemd/clash-subscription-refresh.service`: replace `network-online.target` dependency with `default.target`; add `Restart=on-failure` with rate limiting (3 retries / 1 hour, 5 min delay).
+- `script/ensure_system_proxy_best_practices.sh`: new `_reserved_port_issue_if_any` for system-proxy port-safety validation.
+- `script/common.sh`: port-reservation helpers (`_clash_reserved_ports_list`, `_clash_is_reserved_port`, `_clash_port_policy`, `_port_conflict_report`).
+- `docs/installation/ENV_CONFIG_GUIDE.md`: document all new port-policy and guard env vars.
+
+### 📋 Reviews & plans (not shipped as code)
+- `.github/reviews/network-jp-tailscale-2026-04-03.md`: JP-node connectivity assessment pre-migration.
+- `.github/reviews/network-stability-30min-2026-04-04.md`: 35-minute continuous monitoring report (post Shadowsocks migration; verdict: STABLE 9.35/10).
+- `.github/plans/bug-audit-remediation-2026-03-26.md`: tracked bug-audit remediation plan.
+- `.github/reviews/bug-hunt-2026-03-26.md`: code-quality bug-hunt review.
+
+### ✅ Verification
+- `bash -n $(git ls-files '*.sh')` — 0 errors
+- `bash script/run_static_gates.sh` — all gates passed (0 high / 0 medium / 0 low)
+- `script/clash_diagnose.sh --fast --json` — exit_status 2 (all core checks OK)
+- `script/runtime_guard.sh --check --json` — grade A, 0 issues
+
 ## [2.5.10] - 2026-03-02
 
 ### 🔒 Security & hardening

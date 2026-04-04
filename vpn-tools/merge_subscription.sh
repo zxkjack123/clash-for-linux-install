@@ -111,7 +111,7 @@ if [[ $AUTO_APPEND -eq 1 && ${#ADD[@]} -gt 0 ]]; then
 		for g in "${GS[@]}"; do
 			if [[ $line =~ name:[[:space:]]*$g[^,]*,.*proxies:.*\[.*\] ]]; then
 				inner=${line#*\[}; inner=${inner%]*}
-				declare -A CUR
+				declare -A CUR=()
 				IFS=',' read -r -a arr <<< "$inner"
 				for r in "${arr[@]}"; do
 					r=$(echo "$r" | sed "s/^['\"[:space:]]*//;s/['\"[:space:]]*$//")
@@ -121,7 +121,7 @@ if [[ $AUTO_APPEND -eq 1 && ${#ADD[@]} -gt 0 ]]; then
 					[[ ${CUR[$n]:-} ]] || inner="$inner, $n"
 				done
 				inner=$(echo "$inner" | sed 's/, */, /g')
-				line="${line%%[*]*}[$inner] }"
+				line="${line%%\[*}[$inner] }"
 				break
 			fi
 		done

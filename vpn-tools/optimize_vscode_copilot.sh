@@ -156,8 +156,8 @@ test_endpoint "OpenAI API (proxy)" "https://api.openai.com/v1/models" '^(200|401
 # If Copilot endpoints fail via proxy, check direct path and recommend VS Code relaunch with NO_PROXY bypass
 echo ""
 echo "🔍 Copilot endpoint bypass check (direct vs proxy) ..."
-direct_copilot=$(curl -sS -o /dev/null -w "%{http_code}" --connect-timeout 4 --max-time 6 --noproxy '*' https://api.githubcopilot.com/healthz 2>/dev/null); rc=$?; [[ $rc -eq 0 ]] || direct_copilot=000
-proxy_copilot=$(curl -sS -o /dev/null -w "%{http_code}" --connect-timeout 6 --max-time 10 --proxy "$PROXY_URL" https://api.githubcopilot.com/healthz 2>/dev/null); rc=$?; [[ $rc -eq 0 ]] || proxy_copilot=000
+direct_copilot=$(curl -sS -o /dev/null -w "%{http_code}" --connect-timeout 4 --max-time 6 --noproxy '*' https://api.githubcopilot.com/healthz 2>/dev/null) || direct_copilot=000
+proxy_copilot=$(curl -sS -o /dev/null -w "%{http_code}" --connect-timeout 6 --max-time 10 --proxy "$PROXY_URL" https://api.githubcopilot.com/healthz 2>/dev/null) || proxy_copilot=000
 echo "  Direct: $direct_copilot  |  Proxy: $proxy_copilot"
 if [[ "$proxy_copilot" == "000" || "$proxy_copilot" == "408" ]] && [[ "$direct_copilot" =~ ^(200|204|301|302|404)$ ]]; then
     echo ""

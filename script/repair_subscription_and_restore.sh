@@ -25,8 +25,13 @@ if [[ $GEN_FLAG -eq 1 ]]; then
   echo "[+] Attempting to parse raw subscription URIs from current (broken) config.yaml for new proxies list..."
   RAW="$CUR_CFG" # existing broken file
   OUT_SNIPPET="$ROOT_DIR/resources/generated_proxies.yaml"
-  python3 - <<'PY'
-import os,sys,urllib.parse,re,yaml
+  if python3 - <<'PY'
+import os,sys,urllib.parse,re
+try:
+  import yaml
+except ImportError:
+  print('pyyaml not installed; skip generated_proxies.yaml creation', file=sys.stderr)
+  sys.exit(2)
 root=os.environ.get('ROOT_DIR','.')
 cur_cfg=os.path.join(root,'resources','config.yaml')
 out_snippet=os.path.join(root,'resources','generated_proxies.yaml')
@@ -48,10 +53,13 @@ with open(cur_cfg,'r',encoding='utf-8',errors='ignore') as f:
       scheme, rest = uri.split('://',1)
       if scheme=='trojan':
         # password@host:port?query
-        cred_host = rest
-        pwd, hostport_q = cred_host.split('@',1)
-        hostport, *q = hostport_q.split('?',1)
-        host, port = hostport.split(':',1)
+        try:
+          cred_host = rest
+          pwd, hostport_q = cred_host.split('@',1)
+          hostport, *q = hostport_q.split('?',1)
+          host, port = hostport.split(':',1)
+        except (ValueError, IndexError):
+          continue
         sni=None
         if q:
           qs=urllib.parse.parse_qs(q[0])
@@ -63,7 +71,7 @@ with open(cur_cfg,'r',encoding='utf-8',errors='ignore') as f:
             'port': int(re.sub(r'[^0-9]','',port) or '443'),
           'password': pwd,
           'sni': sni,
-          'skip-cert-verify': True
+          'skip-cert-verify': False
         }
         proxies.append(proxy)
 # Output snippet
@@ -71,7 +79,16 @@ with open(out_snippet,'w',encoding='utf-8') as f:
   yaml.safe_dump({'proxies':proxies},f,allow_unicode=True,sort_keys=False)
 print(f"Generated {len(proxies)} proxies -> {out_snippet}")
 PY
-  echo "[+] Generated proxies snippet at resources/generated_proxies.yaml"
+  then
+    echo "[+] Generated proxies snippet at resources/generated_proxies.yaml"
+  else
+    py_rc=$?
+    if [[ $py_rc -eq 2 ]]; then
+      echo "[!] WARN: pyyaml not installed, skip proxy snippet generation" >&2
+    else
+      echo "[!] WARN: proxy snippet generation failed (rc=$py_rc), continue with restore" >&2
+    fi
+  fi
 fi
 
 # Move restored YAML into place

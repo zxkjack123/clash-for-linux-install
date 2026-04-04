@@ -186,13 +186,91 @@ function _get_kernel() {
 }
 
 _get_random_port() {
+    _clash_reserved_ports_list() {
+        # Space-separated list of reserved ports to avoid when allocating random ports.
+        # Users can provide either:
+        #   - CLASH_RESERVED_PORTS="7890,7891,9090" (comma/space separated)
+        #   - CLASH_RESERVED_HTTP_PORT / CLASH_RESERVED_SOCKS_PORT / CLASH_RESERVED_UI_PORT
+        local s="${CLASH_RESERVED_PORTS:-}"
+        s=${s//,/ }
+        # Append explicit vars (if set) to the list.
+        [ -n "${CLASH_RESERVED_HTTP_PORT:-}" ] && s+=" ${CLASH_RESERVED_HTTP_PORT}"
+        [ -n "${CLASH_RESERVED_SOCKS_PORT:-}" ] && s+=" ${CLASH_RESERVED_SOCKS_PORT}"
+        [ -n "${CLASH_RESERVED_UI_PORT:-}" ] && s+=" ${CLASH_RESERVED_UI_PORT}"
+        # Trim and normalize.
+        echo "$s" | tr -s ' ' | sed 's/^ *//; s/ *$//'
+    }
+
+    _clash_is_reserved_port() {
+        local p="${1:-}" rp
+        [ -n "$p" ] || return 1
+        for rp in $(_clash_reserved_ports_list); do
+            [ -n "$rp" ] || continue
+            [ "$p" = "$rp" ] && return 0
+        done
+        return 1
+    }
+
     local attempts=0 randomPort
     while [ "$attempts" -lt 50 ]; do
         randomPort=$(shuf -i 1024-65535 -n 1)
+        _clash_is_reserved_port "$randomPort" && { attempts=$((attempts + 1)); continue; }
         ! _is_bind "$randomPort" && { echo "$randomPort"; return 0; }
         attempts=$((attempts + 1))
     done
     _error_quit "无法分配空闲端口 (尝试 50 次失败)"
+}
+
+# Port assignment policy (stability vs auto-healing)
+#
+# Problem this solves:
+# - Some code paths (e.g. systemd oneshot that applies GNOME proxy settings)
+#   call _get_proxy_port while mihomo is already running.
+# - If we silently rewrite runtime.yaml to a random port due to a transient
+#   detection or occupancy issue, GNOME may be pointed at a non-listening port,
+#   causing "network broken" symptoms.
+#
+# Policy:
+# - CLASH_PORT_POLICY=strict : never mutate runtime.yaml ports; fail fast on conflict.
+# - CLASH_PORT_POLICY=random : keep legacy behavior (mutate runtime.yaml to a free port).
+# - CLASH_PORT_POLICY=auto (default): if runtime has system-proxy.enable=true -> strict,
+#   otherwise random.
+_clash_port_policy() {
+    local policy="${CLASH_PORT_POLICY:-auto}"
+    case "$policy" in
+        strict|random) printf '%s' "$policy"; return 0 ;;
+        auto|"") : ;;
+        *) printf '%s' "auto"; return 0 ;;
+    esac
+
+    # If the user explicitly reserved ports, prefer strict to avoid silent drift.
+    if [ -n "${CLASH_RESERVED_PORTS:-}" ] || [ -n "${CLASH_RESERVED_HTTP_PORT:-}" ] || [ -n "${CLASH_RESERVED_SOCKS_PORT:-}" ] || [ -n "${CLASH_RESERVED_UI_PORT:-}" ]; then
+        printf '%s' strict
+        return 0
+    fi
+
+    # Auto: if the user enabled system-proxy, prefer strict (stable ports).
+    local sp="false"
+    if [ -x "${BIN_YQ:-}" ] && [ -f "${CLASH_CONFIG_RUNTIME:-}" ]; then
+        sp=$("$BIN_YQ" -r '."system-proxy".enable // false' "$CLASH_CONFIG_RUNTIME" 2>/dev/null || echo false)
+    fi
+    # Strip quotes from yq output and normalize case.
+    sp=$(printf '%s' "$sp" | tr -d "\"'" | tr '[:upper:]' '[:lower:]')
+    if [ "$sp" = true ]; then
+        printf '%s' strict
+    else
+        printf '%s' random
+    fi
+}
+
+_port_conflict_report() {
+    # Best-effort diagnostics for port conflicts.
+    local port="${1:-}"
+    [ -n "$port" ] || return 0
+    {
+        echo "[port] 冲突端口: $port"
+        ss -ltnp 2>/dev/null | grep -E ":${port}\\b" || true
+    } >&2
 }
 
 function _get_proxy_port() {
@@ -211,12 +289,20 @@ function _get_proxy_port() {
         SOCKS_PORT="$mixed_port"
 
         _is_already_in_use "$MIXED_PORT" "$BIN_KERNEL_NAME" && {
+            local policy
+            policy=$(_clash_port_policy)
+            if [ "$policy" = strict ]; then
+                _failcat '🎯' "端口占用：${MIXED_PORT} (策略=strict，禁止随机改端口；请释放端口或修改配置)" || true
+                _port_conflict_report "$MIXED_PORT"
+                return 1
+            fi
+
             local newPort=$(_get_random_port)
             local msg="端口占用：${MIXED_PORT} 🎲 随机分配：$newPort"
             "$BIN_YQ" -i '."mixed-port" = '"$newPort" "$CLASH_CONFIG_RUNTIME"
             MIXED_PORT=$newPort
             SOCKS_PORT=$newPort
-            _failcat '🎯' "$msg"
+            _failcat '🎯' "$msg" || true
         }
         return 0
     fi
@@ -237,19 +323,35 @@ function _get_proxy_port() {
 
     # If ports are already in use by other process, reassign to a random available one.
     _is_already_in_use "$MIXED_PORT" "$BIN_KERNEL_NAME" && {
+        local policy
+        policy=$(_clash_port_policy)
+        if [ "$policy" = strict ]; then
+            _failcat '🎯' "端口占用：${MIXED_PORT} (策略=strict，禁止随机改端口；请释放端口或修改配置)" || true
+            _port_conflict_report "$MIXED_PORT"
+            return 1
+        fi
+
         local newPort=$(_get_random_port)
         local msg="端口占用：${MIXED_PORT} 🎲 随机分配：$newPort"
         "$BIN_YQ" -i '.port = '"$newPort" "$CLASH_CONFIG_RUNTIME"
         MIXED_PORT=$newPort
-        _failcat '🎯' "$msg"
+        _failcat '🎯' "$msg" || true
     }
     if [[ -n "${SOCKS_PORT:-}" ]]; then
         _is_already_in_use "$SOCKS_PORT" "$BIN_KERNEL_NAME" && {
+            local policy
+            policy=$(_clash_port_policy)
+            if [ "$policy" = strict ]; then
+                _failcat '🎯' "端口占用：${SOCKS_PORT} (策略=strict，禁止随机改端口；请释放端口或修改配置)" || true
+                _port_conflict_report "$SOCKS_PORT"
+                return 1
+            fi
+
             local newPort=$(_get_random_port)
             local msg="端口占用：${SOCKS_PORT} 🎲 随机分配：$newPort"
             "$BIN_YQ" -i '."socks-port" = '"$newPort" "$CLASH_CONFIG_RUNTIME"
             SOCKS_PORT=$newPort
-            _failcat '🎯' "$msg"
+            _failcat '🎯' "$msg" || true
         }
     fi
 }
@@ -272,11 +374,19 @@ function _get_ui_port() {
     UI_PORT=${ext_port:-9090}
 
     _is_already_in_use "$UI_PORT" "$BIN_KERNEL_NAME" && {
+        local policy
+        policy=$(_clash_port_policy)
+        if [ "$policy" = strict ]; then
+            _failcat '🎯' "端口占用：${UI_PORT} (策略=strict，禁止随机改端口；请释放端口或修改 external-controller)" || true
+            _port_conflict_report "$UI_PORT"
+            return 1
+        fi
+
         local newPort=$(_get_random_port)
         local msg="端口占用：${UI_PORT} 🎲 随机分配：$newPort"
         "$BIN_YQ" -i ".external-controller = \"${ext_host}:${newPort}\"" "$CLASH_CONFIG_RUNTIME"
         UI_PORT=$newPort
-        _failcat '🎯' "$msg"
+        _failcat '🎯' "$msg" || true
     }
 }
 
@@ -484,7 +594,7 @@ function _download_config() {
 }
 
 _start_convert() {
-    _is_already_in_use $BIN_SUBCONVERTER_PORT 'subconverter' && {
+    _is_already_in_use "$BIN_SUBCONVERTER_PORT" 'subconverter' && {
         local newPort=$(_get_random_port)
         _failcat '🎯' "端口占用：$BIN_SUBCONVERTER_PORT 🎲 随机分配：$newPort"
         [ ! -e "$BIN_SUBCONVERTER_CONFIG" ] && {

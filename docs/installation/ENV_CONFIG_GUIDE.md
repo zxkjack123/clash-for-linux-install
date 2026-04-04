@@ -49,11 +49,18 @@ echo "API Key: ${SILICONFLOW_API_KEY:0:20}..."
 
 ### Clash 配置
 
-| 配置项         | 默认值                  | 说明                                                                                                                       |
-| -------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `CLASH_API`    | `http://127.0.0.1:9090` | Controller API 地址（多数脚本会从 `~/.local/share/clash/runtime.yaml` 自动探测 `external-controller`；仅在需要覆盖时设置） |
-| `CLASH_SECRET` | (空)                    | Controller Secret / API 认证密钥（多数脚本会从 `runtime.yaml` 自动读取；仅在需要覆盖时设置）                               |
-| `PROXY`        | `http://127.0.0.1:7890` | HTTP 代理地址                                                                                                              |
+| 配置项                           | 默认值                  | 说明                                                                                                                       |
+| -------------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `CLASH_API`                      | `http://127.0.0.1:9090` | Controller API 地址（多数脚本会从 `~/.local/share/clash/runtime.yaml` 自动探测 `external-controller`；仅在需要覆盖时设置） |
+| `CLASH_SECRET`                   | (空)                    | Controller Secret / API 认证密钥（多数脚本会从 `runtime.yaml` 自动读取；仅在需要覆盖时设置）                               |
+| `PROXY`                          | `http://127.0.0.1:7890` | HTTP 代理地址                                                                                                              |
+| `CLASH_PORT_POLICY`              | `auto`                  | 端口分配策略：`strict`(禁止随机改端口，冲突就失败)、`random`(冲突自动随机改端口)、`auto`(系统代理启用时自动 strict)        |
+| `CLASH_RESERVED_PORTS`           | (空)                    | 保留端口列表（逗号或空格分隔），用于避免随机端口落到这些端口，如：`7890,7891,9090`                                         |
+| `CLASH_RESERVED_HTTP_PORT`       | `7890`                  | （可选）HTTP 保留端口（更细粒度覆盖；与 `CLASH_RESERVED_PORTS` 可并用）                                                    |
+| `CLASH_RESERVED_SOCKS_PORT`      | `7891`                  | （可选）SOCKS 保留端口                                                                                                     |
+| `CLASH_RESERVED_UI_PORT`         | `9090`                  | （可选）Controller/UI 保留端口                                                                                             |
+| `CLASH_GUARD_CHECK_PORTS`        | `0`                     | 启用 `runtime_guard.sh` 的端口占用/漂移检查：`1`=开启（可用于“7890/7891/9090 只允许 Clash 使用”的自检/告警）               |
+| `CLASH_ALLOWED_PORT_PROCS_REGEX` | (空)                    | 端口归属判定允许的进程名正则（用于 `ss -p` 输出匹配），默认接受 `mihomo                                                    | clash` |
 
 > 兼容说明：旧版本文档/脚本可能使用 `API_SECRET` 或 `CLASH_API_SECRET`，当前推荐统一使用 `CLASH_SECRET`。
 

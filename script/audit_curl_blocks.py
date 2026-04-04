@@ -234,7 +234,8 @@ def file_sets_e(lines: List[str]) -> bool:
 
 
 def file_sets_pipefail(lines: List[str]) -> bool:
-    for line in lines[:120]:
+    for blk in blocks_from_lines(lines[:120]):
+        line = blk.text
         if not strip_comments(line):
             continue
         if "set" in line and RE_SET_PIPEFAIL.search(line):

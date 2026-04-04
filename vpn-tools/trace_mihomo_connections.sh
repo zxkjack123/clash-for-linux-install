@@ -43,6 +43,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 case "$DURATION" in ''|*[!0-9]*) echo "--seconds must be integer" >&2; exit 2;; esac
+case "$INTERVAL" in ''|*[!0-9.]*) echo "--interval must be a positive number" >&2; exit 2;; esac
 
 RUNTIME="${CLASH_CONFIG_RUNTIME:-$HOME/.local/share/clash/runtime.yaml}"
 YQ_BIN="${BIN_YQ:-$HOME/.local/share/clash/bin/yq}"

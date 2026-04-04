@@ -1,7 +1,6 @@
 [Unit]
 Description=Refresh Clash subscription (proxy-clean)
-After=network-online.target
-Wants=network-online.target
+After=default.target
 
 [Service]
 Type=oneshot
@@ -11,5 +10,9 @@ Environment=RUN_OPTIMIZE_AFTER_REFRESH=1
 Environment=OPTIMIZE_DELAY=900
 Environment=OPTIMIZE_SCRIPT=%h/.local/share/clash/vpn-tools/optimize_all_network.sh
 ExecStart=%h/.local/share/clash/script/refresh_subscription_direct.sh
+Restart=on-failure
+RestartSec=300
+StartLimitIntervalSec=3600
+StartLimitBurst=3
 # Optional: adjust timeout if provider is slow
 TimeoutStartSec=45min

@@ -140,24 +140,19 @@ check_ai_services() {
     local total=0 success=0 total_latency=0
     
     local services=(
-        "https://chat.openai.com/|ChatGPT"
-        "https://api.scnet.cn/api/llm/v1/chat/completions|SCNET|^(20[0-9]|401|403|405)$"
-        "https://sg.uiuiapi.com/|UIUI-API|^(20[0-9]|30[12378])$"
-        "${SILICONFLOW_URL}|硅基流动|^(20[0-9]|30[0-9])$||direct"
-        "https://openrouter.ai/api/v1|OpenRouter|^(20[0-9]|401|403)$"
-        "https://kimi.moonshot.cn/|Kimi"
+        $'https://chat.openai.com/\tChatGPT\t^[23]\tyes'
+        $'https://api.scnet.cn/api/llm/v1/chat/completions\tSCNET\t^(20[0-9]|401|403|405)$\tyes'
+        $'https://sg.uiuiapi.com/\tUIUI-API\t^(20[0-9]|30[12378])$\tyes'
+        "${SILICONFLOW_URL}"$'\t硅基流动\t^(20[0-9]|30[0-9])$\tdirect'
+        $'https://openrouter.ai/api/v1\tOpenRouter\t^(20[0-9]|401|403)$\tyes'
+        $'https://kimi.moonshot.cn/\tKimi\t^[23]\tyes'
     )
     
     for service in "${services[@]}"; do
-        local proxy_pref="yes"
-        local data="$service"
-        if [[ "$data" == *'||'* ]]; then
-            proxy_pref="${data##*||}"
-            data="${data%||*}"
-        fi
-        IFS='|' read -r url label pattern <<< "$data"
+        local url label pattern proxy_pref
+        IFS=$'\t' read -r url label pattern proxy_pref <<< "$service"
         local regex="${pattern:-^[23]}"
-        local proxy_mode="$proxy_pref"
+        local proxy_mode="${proxy_pref:-yes}"
         case "${proxy_mode,,}" in
             direct|no|off)
                 proxy_mode="no"
@@ -188,14 +183,15 @@ check_dev_services() {
     local total=0 success=0 total_latency=0
     
     local services=(
-        "https://api.github.com|GitHub|^[23]"
-        "https://registry.npmjs.org|NPM|^[23]"
-        "https://pypi.org|PyPI|^[23]"
-        "https://crates.io|Crates|^(20[0-9]|30[0-9]|403)$"
+        $'https://api.github.com\tGitHub\t^[23]'
+        $'https://registry.npmjs.org\tNPM\t^[23]'
+        $'https://pypi.org\tPyPI\t^[23]'
+        $'https://crates.io\tCrates\t^(20[0-9]|30[0-9]|403)$'
     )
     
     for service in "${services[@]}"; do
-        IFS='|' read -r url label pattern <<< "$service"
+        local url label pattern
+        IFS=$'\t' read -r url label pattern <<< "$service"
         result=$(test_url "$url" "$label" "yes" "${pattern:-^[23]}")
         IFS='|' read -r lbl code latency succ <<< "$result"
 

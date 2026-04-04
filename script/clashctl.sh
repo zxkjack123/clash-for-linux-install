@@ -71,9 +71,88 @@ _ensure_gnome_ignore_hosts() {
     fi
 }
 
+# Prefer reading the *running* mihomo config via controller, so system proxy
+# settings always match the actual listening ports even if runtime.yaml was
+# updated/replaced or the controller was reloaded with a different config.
+#
+# Outputs (by setting globals): MIXED_PORT, SOCKS_PORT
+_get_proxy_port_live_from_controller() {
+    command -v curl >/dev/null 2>&1 || return 1
+    command -v python3 >/dev/null 2>&1 || return 1
+    [ -x "${BIN_YQ:-}" ] || return 1
+    [ -f "${CLASH_CONFIG_RUNTIME:-}" ] || return 1
+
+    local ui_addr ui_port secret
+    ui_addr=$("$BIN_YQ" -r '."external-controller" // "127.0.0.1:9090"' "$CLASH_CONFIG_RUNTIME" 2>/dev/null || echo '127.0.0.1:9090')
+    ui_addr=${ui_addr//$'\n'/}
+    ui_addr=${ui_addr//\"/}
+    ui_addr=${ui_addr//\'/}
+    ui_port=${ui_addr##*:}
+    [[ "$ui_port" =~ ^[0-9]+$ ]] || ui_port=9090
+
+    secret=$("$BIN_YQ" -r '.secret // ""' "$CLASH_CONFIG_RUNTIME" 2>/dev/null || echo '')
+    secret=${secret//$'\n'/}
+    secret=${secret//\"/}
+    secret=${secret//\'/}
+
+    local -a auth_hdr
+    auth_hdr=()
+    [ -n "$secret" ] && auth_hdr=(-H "Authorization: Bearer $secret")
+
+    local cfg_json
+    cfg_json=$(curl -fsS --noproxy '*' --connect-timeout 1 --max-time 2 \
+        "${auth_hdr[@]}" \
+        "http://127.0.0.1:${ui_port}/configs" \
+        2>/dev/null) || return 1
+
+    # Parse minimal fields via python (avoid jq dependency)
+    local parsed
+    parsed=$(python3 -c 'import json,sys
+d=json.load(sys.stdin)
+def as_int(v, default=0):
+    try:
+        return int(v)
+    except Exception:
+        return default
+print(f"{as_int(d.get('port',0))} {as_int(d.get('mixed-port',0))} {as_int(d.get('socks-port',0))}")
+' <<<"$cfg_json" 2>/dev/null) || return 1
+
+    local port mixed socks
+    port=$(awk '{print $1}' <<<"$parsed")
+    mixed=$(awk '{print $2}' <<<"$parsed")
+    socks=$(awk '{print $3}' <<<"$parsed")
+    [[ "$port" =~ ^[0-9]+$ ]] || port=0
+    [[ "$mixed" =~ ^[0-9]+$ ]] || mixed=0
+    [[ "$socks" =~ ^[0-9]+$ ]] || socks=0
+
+    if [ "$mixed" -gt 0 ]; then
+        MIXED_PORT="$mixed"
+        SOCKS_PORT="$mixed"
+        return 0
+    fi
+    if [ "$port" -gt 0 ]; then
+        MIXED_PORT="$port"
+        if [ "$socks" -gt 0 ]; then
+            SOCKS_PORT="$socks"
+        else
+            SOCKS_PORT=""
+        fi
+        return 0
+    fi
+    return 1
+}
+
 _set_system_proxy() {
     # Detect proxy ports (supports both mixed-port and split port/socks-port modes)
-    _get_proxy_port
+    # 1) Prefer controller (running config)
+    _get_proxy_port_live_from_controller >/dev/null 2>&1 || true
+    # 2) Fallback to runtime.yaml (and optional port healing / policy)
+    if ! [[ "+${MIXED_PORT:-}" =~ ^\+[0-9]+$ ]]; then
+        _get_proxy_port || {
+        _failcat '系统代理未应用：端口冲突或端口策略禁止自动改端口' || true
+        return 1
+        }
+    fi
     if ! [[ "+${MIXED_PORT:-}" =~ ^\+[0-9]+$ ]] || [ "${MIXED_PORT:-0}" -lt 1 ] || [ "${MIXED_PORT:-0}" -gt 65535 ]; then
         # Fallback to default port to avoid producing an invalid url like 127.0.0.1:
         MIXED_PORT=7890
@@ -240,7 +319,8 @@ Acquire::https::Proxy "$http_proxy_addr";
 EOF
     [ -f "$apt_proxy_file" ] && _okcat '📦' "APT代理配置已生成：$apt_proxy_file (需要sudo权限应用: sudo cp $apt_proxy_file /etc/apt/apt.conf.d/)"
 
-    echo "$current_state" >"$state_file" 2>/dev/null || true
+    ( umask 077; echo "$current_state" >"$state_file" ) 2>/dev/null || true
+    chmod 600 "$state_file" 2>/dev/null || true
 }
 
 _unset_system_proxy() {
@@ -281,7 +361,7 @@ _unset_system_proxy() {
 }
 
 function clashon() {
-    _get_proxy_port
+    _get_proxy_port || return 1
     systemctl --user is-active "$BIN_KERNEL_NAME" >&/dev/null || {
         systemctl --user start "$BIN_KERNEL_NAME" >/dev/null || {
             _failcat '启动失败: 执行 clashstatus 查看日志'
@@ -297,7 +377,7 @@ watch_proxy() {
     # points to a stale port (e.g., old 6209), refresh to current MIXED_PORT.
     [[ $- == *i* ]] || return 0
     # Ensure kernel is up (optional best-effort) and get current expected port
-    _get_proxy_port
+    _get_proxy_port || return 0
     local auth=$("$BIN_YQ" '.authentication[0] // ""' "$CLASH_CONFIG_RUNTIME")
     [ -n "$auth" ] && auth=$auth@
     local expect_http="http://${auth}127.0.0.1:${MIXED_PORT}"
@@ -345,7 +425,7 @@ function clashproxy() {
         }
 
         # Compute proxy URLs from runtime (works even when called as an executable, where $http_proxy may be empty)
-        _get_proxy_port
+        _get_proxy_port || return 1
         local auth http_proxy_addr socks_proxy_addr
         auth=$("$BIN_YQ" '.authentication[0] // ""' "$CLASH_CONFIG_RUNTIME" 2>/dev/null)
         [ -n "$auth" ] && auth="$auth@"
@@ -436,6 +516,7 @@ _merge_build_runtime() {
     local merge_err
     merge_err=$(mktemp -t clash_merge_err.XXXXXX 2>/dev/null || true)
     [ -n "$merge_err" ] || merge_err="${CLASH_STATE_DIR}/.clash_merge_err.$$.$RANDOM"
+    trap 'rm -f "$merge_err" 2>/dev/null || true' RETURN
     : > "$merge_err"
     if ! "$BIN_YQ" eval-all '
         (select(fileIndex==0)."proxy-groups" // []) as $m1 |
@@ -496,6 +577,7 @@ _merge_sanitize_restart() {
     exec 9>"$lock_file" || _error_quit '无法创建锁文件'
     flock -n 9 || _error_quit '有并发更新在进行 (锁获取失败)'
     local tmp_out="${CLASH_CONFIG_RUNTIME}.merge.$$"
+    trap 'rm -f "$tmp_out" "$tmp_out.tmp" "$tmp_out.tmp.m" "$tmp_out.annot" 2>/dev/null || true' RETURN
     _merge_build_runtime "$tmp_out"
     # 预结构校验
     "$BIN_YQ" '.rules | type == "!!seq"' "$tmp_out" >/dev/null 2>&1 || _failcat 'rules 缺失或非数组'
@@ -559,7 +641,7 @@ _merge_sanitize_restart() {
                 fi
         fi
 
-    _valid_config "$tmp_out" || _error_quit '合并后验证失败(含清洗)'
+    _valid_config "$tmp_out" || { rm -f "$tmp_out" 2>/dev/null || true; _error_quit '合并后验证失败(含清洗)'; return 1; }
     _annotate_runtime "$tmp_out"
     mv "$tmp_out" "$CLASH_CONFIG_RUNTIME" 2>/dev/null || _error_quit '替换 runtime 失败'
     clashrestart

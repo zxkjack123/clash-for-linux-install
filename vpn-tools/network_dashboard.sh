@@ -294,7 +294,7 @@ show_performance_trend() {
     local max_score=100
     local bar_height=10
     
-    for i in $(seq 9 -1 0); do
+    for i in $(seq 0 9); do
         local threshold=$((max_score - i * 10))
         printf "  %3d |" "$threshold"
         
