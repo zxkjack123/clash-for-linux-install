@@ -89,7 +89,7 @@
 
 ### Phase 3: Dashboard Robustness
 
-#### Task 3.1: Fix B4 + B5 — grep under set -e + arithmetic guard in network_dashboard.sh
+#### ✅ Task 3.1: Fix B4 + B5 — grep under set -e + arithmetic guard in network_dashboard.sh
 - **目标**：让 dashboard 在无历史数据或 jq 返回非数值时优雅降级而非崩溃
 - **修改内容**：
   - 文件 `vpn-tools/network_dashboard.sh`：

@@ -186,6 +186,7 @@ show_health_status() {
     fi
     
     local score=$(jq -r '.health_score' "$METRICS_FILE" 2>/dev/null || echo "0")
+    [[ "$score" =~ ^[0-9]+$ ]] || score=0
     local grade=$(jq -r '.health_grade' "$METRICS_FILE" 2>/dev/null || echo "未知")
     local check_time=$(jq -r '.check_time' "$METRICS_FILE" 2>/dev/null || echo "未知")
     
@@ -282,7 +283,7 @@ show_performance_trend() {
     fi
     
     # 提取最近10次的健康分数
-    local scores=($(grep "健康分数" "$HISTORY_LOG" | tail -n 10 | grep -oP '\d+/100' | cut -d'/' -f1))
+    local scores=($(grep "健康分数" "$HISTORY_LOG" | tail -n 10 | grep -oP '\d+/100' | cut -d'/' -f1 || true))
     
     if [ ${#scores[@]} -eq 0 ]; then
         echo -e "  ${YELLOW}⚠${RESET} 暂无历史数据"
