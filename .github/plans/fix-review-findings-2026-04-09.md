@@ -61,7 +61,7 @@
 
 ### Phase 2: Array Quoting Fixes
 
-#### Task 2.1: Fix B2 — Unquoted array slice in test_ai_connectivity.sh
+#### ✅ Task 2.1: Fix B2 — Unquoted array slice in test_ai_connectivity.sh
 - **目标**：防止节点名包含空格/glob 字符时破坏数组
 - **修改内容**：
   - 文件 `vpn-tools/test_ai_connectivity.sh`：

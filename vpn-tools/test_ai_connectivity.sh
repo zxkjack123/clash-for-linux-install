@@ -75,7 +75,7 @@ else
   NODES=($(echo "$nodes_json" | sed -n 's/.*"all":\[\([^]]*\)\].*/\1/p' | tr '"' '\n' | sed '/^$/d' | sed 's/ /%20/g'))
 fi
 [[ ${#NODES[@]} -eq 0 ]] && { echo "No nodes in group $GROUP" >&2; exit 1; }
-if [[ $LIMIT -gt 0 && ${#NODES[@]} -gt $LIMIT ]]; then NODES=(${NODES[@]:0:$LIMIT}); fi
+if [[ $LIMIT -gt 0 && ${#NODES[@]} -gt $LIMIT ]]; then NODES=("${NODES[@]:0:$LIMIT}"); fi
 
 ENDPOINTS=(
   "chatgpt:https://chat.openai.com/"
