@@ -134,7 +134,7 @@ for n in "${candidates[@]}"; do
 	printf '%s\n' "${available[@]}" | grep -Fxq "$n" && filtered+=("$n") || true
 done
 if (( ${#filtered[@]} == 0 )); then
-	filtered=(${available[@]:0:$LIMIT})
+	filtered=("${available[@]:0:$LIMIT}")
 fi
 
 original=""

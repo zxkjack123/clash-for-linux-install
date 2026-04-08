@@ -74,7 +74,7 @@
   - ✅ L79 数组切片有双引号包裹
 - **潜在风险**：无 — 双引号保留数组元素的原始边界，行为严格兼容
 
-#### Task 2.2: Fix B3 — Unquoted array slice in optimize_ai.sh
+#### ✅ Task 2.2: Fix B3 — Unquoted array slice in optimize_ai.sh
 - **目标**：同 Task 2.1，防止候选节点名切割错误
 - **修改内容**：
   - 文件 `vpn-tools/optimize_ai.sh`：
