@@ -107,14 +107,12 @@ for domain in "${domains[@]}"; do
     echo -n "📍 Testing $domain: "
     
     # Test with longer timeout since it's direct connection
-    response=$(timeout 10 curl -s -o /dev/null -w "%{http_code},%{time_total}" \
+    if response=$(timeout 10 curl -s -o /dev/null -w "%{http_code},%{time_total}" \
         --connect-timeout 5 --max-time 10 \
         --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
-        "https://$domain/" 2>/dev/null)
-    
-    if [ $? -eq 0 ]; then
-        http_code=$(echo $response | cut -d',' -f1)
-        time_total=$(echo $response | cut -d',' -f2)
+        "https://$domain/" 2>/dev/null); then
+        http_code=$(echo "$response" | cut -d',' -f1)
+        time_total=$(echo "$response" | cut -d',' -f2)
         
         if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 400 ]; then
             echo -e "${GREEN}✅ OK${NC} (HTTP $http_code, ${time_total}s)"
