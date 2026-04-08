@@ -897,7 +897,7 @@ function clashupdate() {
             if [ "$lines" -gt "$keep" ]; then
                 # 取要删除的过期行对应文件
                 local remove_count=$((lines-keep))
-                head -n "$remove_count" "$CLASH_DIFF_INDEX_FILE" | awk -F '\t' '{print $3}' | xargs -r rm -f --
+                head -n "$remove_count" "$CLASH_DIFF_INDEX_FILE" | awk -F '\t' '{print $3}' | xargs -d '\n' -r rm -f --
                 # 保留尾部 keep 行
                 tail -n "$keep" "$CLASH_DIFF_INDEX_FILE" >"${CLASH_DIFF_INDEX_FILE}.tmp" && mv "${CLASH_DIFF_INDEX_FILE}.tmp" "$CLASH_DIFF_INDEX_FILE"
             fi

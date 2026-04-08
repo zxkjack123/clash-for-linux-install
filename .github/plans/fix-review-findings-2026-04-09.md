@@ -107,7 +107,7 @@
 
 ### Phase 4: Safe xargs
 
-#### Task 4.1: Fix Q3 — Unsafe xargs in clashctl.sh
+#### ✅ Task 4.1: Fix Q3 — Unsafe xargs in clashctl.sh
 - **目标**：防止 diff 索引文件路径含空格时 xargs 错误切割
 - **修改内容**：
   - 文件 `script/clashctl.sh`：
