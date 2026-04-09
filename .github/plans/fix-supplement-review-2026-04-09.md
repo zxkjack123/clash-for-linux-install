@@ -171,7 +171,7 @@
 
 ### Phase 5: Regression Verification
 
-#### Task 5.1: Full static gate + syntax check
+#### ✅ Task 5.1: Full static gate + syntax check
 - **目标**：确认所有修改未引入新问题
 - **修改内容**：无代码修改
 - **测试要求**：
