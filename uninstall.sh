@@ -16,6 +16,11 @@ systemctl --user stop clash-proxy-env.service >&/dev/null
 systemctl --user disable clash-proxy-env.service >&/dev/null
 rm -f "${USER_HOME}/.config/systemd/user/${BIN_KERNEL_NAME}.service"
 rm -f "${USER_HOME}/.config/systemd/user/clash-proxy-env.service"
+systemctl --user stop clash-subscription-refresh.timer >&/dev/null
+systemctl --user disable clash-subscription-refresh.timer >&/dev/null
+systemctl --user stop clash-subscription-refresh.service >&/dev/null
+rm -f "${USER_HOME}/.config/systemd/user/clash-subscription-refresh.service"
+rm -f "${USER_HOME}/.config/systemd/user/clash-subscription-refresh.timer"
 systemctl --user daemon-reload
 
 # Disable lingering if it was enabled

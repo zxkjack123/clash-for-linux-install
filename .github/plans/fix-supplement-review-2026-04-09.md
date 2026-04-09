@@ -134,7 +134,7 @@
 
 ### Phase 4: Uninstall Cleanup + systemd Fix
 
-#### Task 4.1: Fix Q11 — Add subscription refresh unit cleanup to uninstall.sh
+#### ✅ Task 4.1: Fix Q11 — Add subscription refresh unit cleanup to uninstall.sh
 - **目标**：卸载时同时清理 subscription refresh 的 systemd units
 - **修改内容**：
   - 文件 `uninstall.sh`：
