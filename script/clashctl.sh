@@ -554,6 +554,11 @@ _merge_build_runtime() {
             fi
         fi
     fi
+    # 结构完整性校验：确认合并产出包含有效 proxy-groups
+    if [ -s "$out_file.tmp" ] && ! "$BIN_YQ" -e '.["proxy-groups"] | type == "!!seq"' "$out_file.tmp" >/dev/null 2>&1; then
+        warn "合并产出缺少有效 proxy-groups，回退到原始订阅"
+        cp "$CLASH_CONFIG_RAW" "$out_file.tmp" 2>>"$merge_err" || true
+    fi
     mv "$out_file.tmp" "$out_file" 2>/dev/null || true
     "$BIN_YQ" -i '.proxy-groups |= ( . // [] | group_by(.name) | map(.[-1]) )' "$out_file" 2>/dev/null || true
     # 再次清理 select 探测字段

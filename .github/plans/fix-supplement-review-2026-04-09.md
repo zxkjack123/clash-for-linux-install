@@ -76,7 +76,7 @@
 
 ### Phase 2: Mixin Merge Integrity Check
 
-#### Task 2.1: Fix Q6 — Add post-merge structural validation in clashctl.sh
+#### ✅ Task 2.1: Fix Q6 — Add post-merge structural validation in clashctl.sh
 - **目标**：在 mixin 合并回退路径 2 完成后、`mv` 到目标文件前，验证合并产出具有必需的结构
 - **修改内容**：
   - 文件 `script/clashctl.sh`：
