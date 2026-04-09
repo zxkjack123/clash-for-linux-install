@@ -128,7 +128,7 @@ delay_probe(){
   [[ -n ${d:-} ]] || return 1
   printf '%s' "$d"
 }
-percentile(){ local p=$1; shift; local arr=($(printf '%s\n' "$@" | sort -n)); local n=${#arr[@]}; [[ $n -eq 0 ]] && { echo 0; return; }; [[ $n -eq 1 ]] && { echo ${arr[0]}; return; }; local rank=$(awk -v p=$p -v n=$n 'BEGIN{print (p/100)*(n-1)}'); local lo=${rank%.*}; local hi=$((lo+1)); (( hi>=n )) && hi=$lo; local frac=$(awk -v r=$rank -v l=$lo 'BEGIN{print r-l}'); awk -v a=${arr[$lo]} -v b=${arr[$hi]} -v f=$frac 'BEGIN{print a+(b-a)*f}'; }
+percentile(){ local p=$1; shift; local arr=(); mapfile -t arr < <(printf '%s\n' "$@" | sort -n); local n=${#arr[@]}; [[ $n -eq 0 ]] && { echo 0; return; }; [[ $n -eq 1 ]] && { echo ${arr[0]}; return; }; local rank=$(awk -v p=$p -v n=$n 'BEGIN{print (p/100)*(n-1)}'); local lo=${rank%.*}; local hi=$((lo+1)); (( hi>=n )) && hi=$lo; local frac=$(awk -v r=$rank -v l=$lo 'BEGIN{print r-l}'); awk -v a=${arr[$lo]} -v b=${arr[$hi]} -v f=$frac 'BEGIN{print a+(b-a)*f}'; }
 score_node(){ local sr=$1 med=$2 p95=$3; awk -v sr=$sr -v m=$med -v p=$p95 'BEGIN{s=sr*60; L=(m*0.6+p*0.4); l=(L>4?0:(4-L)/4*30); printf "%.2f", s+l}'; }
 apply_group(){ curl -fsS "${CTRL_CURL_OPTS[@]}" -X PUT "${AUTH_HEADER[@]}" "$API/proxies/$GROUP" -H 'Content-Type: application/json' -d '{"name":"'"$1"'"}' >/dev/null 2>&1; }
 
@@ -154,7 +154,7 @@ for node in "${NODES[@]}"; do
         svc=${ep%%:*}; url=${ep#*:}; res=$(curl_probe "$url"); code=${res%%,*}; t=${res##*,}; attempts=$((attempts+1))
         if code_ok "$svc" "$code"; then successes=$((successes+1)); lat+=($t); fi
       done
-      if [[ $r -eq 2 ]]; then sr_tmp=$(awk -v s=$successes -v a=$attempts 'BEGIN{if(a==0)print 0; else print s/a}'); awk -v v=$sr_tmp 'BEGIN{exit !(v<0.3)}'; [[ $? -eq 0 ]] && break; fi
+      if [[ $r -eq 2 ]]; then sr_tmp=$(awk -v s=$successes -v a=$attempts 'BEGIN{if(a==0)print 0; else print s/a}'); if awk -v v="$sr_tmp" 'BEGIN{exit !(v<0.3)}'; then break; fi; fi
     done
   else
     # Safe-by-default mode: do NOT switch; use controller delay API to estimate per-node latency.
@@ -178,7 +178,7 @@ for node in "${NODES[@]}"; do
 done
 
 best=""; best_score=0
-for n in "${NODES[@]}"; do s=${MET[$n.score]:-0}; awk -v s=$s -v b=$best_score 'BEGIN{exit !(s>b)}'; [[ $? -eq 0 ]] && { best=$n; best_score=$s; }; done
+for n in "${NODES[@]}"; do s=${MET[$n.score]:-0}; if awk -v s="$s" -v b="$best_score" 'BEGIN{exit !(s>b)}'; then best=$n; best_score=$s; fi; done
 decoded_best=${best//%20/ }
 elapsed=$(( $(date +%s)-start ))
 
