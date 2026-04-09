@@ -90,6 +90,12 @@ fi
 # Validate YAML minimally
 if command -v yq >/dev/null 2>&1; then
   yq e '.' "$TMP_DECODE" >/dev/null || { echo "YAML parse failed" >&2; exit 3; }
+else
+  # Minimal structure check without yq: at least one Clash config key must be present
+  if ! grep -qE '^(proxies|proxy-groups|rules):' "$TMP_DECODE"; then
+    echo "Downloaded file does not look like a valid Clash config (missing proxies/proxy-groups/rules)" >&2
+    exit 3
+  fi
 fi
 TS=$(date +%Y%m%d_%H%M%S)
 
@@ -104,6 +110,11 @@ if [ "$APPLY" -ne 1 ]; then
   fi
   exit 0
 fi
+
+# Acquire exclusive lock to prevent concurrent subscription updates
+LOCK_FILE="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/.clash_sub_update.lock"
+exec 8>"$LOCK_FILE" || { echo "Cannot create lock file" >&2; exit 1; }
+flock -n 8 || { echo "Another subscription update is running (lock held)" >&2; exit 1; }
 
 if [ -f "$BASE_CFG" ]; then
   cp -f "$BASE_CFG" "$BACKUP_DIR/config_${TS}.yaml"

@@ -102,7 +102,7 @@
 
 ### Phase 3: Subscription Update Hardening
 
-#### Task 3.1: Fix Q7 + Q8 — YAML fallback validation + flock in update_clash_subscription.sh
+#### ✅ Task 3.1: Fix Q7 + Q8 — YAML fallback validation + flock in update_clash_subscription.sh
 - **目标**：无 yq 时添加基本结构验证；用 flock 防止并发运行冲突
 - **修改内容**：
   - 文件 `script/update_clash_subscription.sh`：
