@@ -1,6 +1,7 @@
 [Unit]
 Description=Refresh Clash subscription (proxy-clean)
-After=default.target
+After=default.target network-online.target
+Wants=network-online.target
 
 [Service]
 Type=oneshot

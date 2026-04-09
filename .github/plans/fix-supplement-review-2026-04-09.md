@@ -155,7 +155,7 @@
   - ✅ `uninstall.sh` 包含 `clash-subscription-refresh.service` 的 stop + rm
 - **潜在风险**：若这些 units 不存在，`systemctl stop/disable` 和 `rm -f` 会静默成功——这是预期行为。timer 必须在 service 之前 stop 以避免 timer 在 service 删除后触发启动失败。
 
-#### Task 4.2: Fix S1 — Add network-online dependency to subscription refresh service
+#### ✅ Task 4.2: Fix S1 — Add network-online dependency to subscription refresh service
 - **目标**：确保订阅刷新在网络就绪后才执行
 - **修改内容**：
   - 文件 `systemd/clash-subscription-refresh.service`：
