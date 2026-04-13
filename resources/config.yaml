@@ -15,17 +15,27 @@ external-controller: 127.0.0.1:9090
 
 proxies:
   - name: "JP-Tailscale"
-    type: http
-    # Replace with your JP exit (e.g. a Tailscale peer running Tinyproxy).
-    # Tailscale uses 100.64.0.0/10 by default.
-    server: 100.64.0.1
-    port: 8888
+    type: ss
+    server: 100.82.241.21
+    port: 8388
+    cipher: aes-256-gcm
+    password: "9V0Cl2UXeLBdMZWlFt4kdCAfLla+YOUDcproLkmbp/8="
+    udp: true
+
+  - name: "US-Tailscale"
+    type: ss
+    server: 100.92.101.61
+    port: 8388
+    cipher: aes-256-gcm
+    password: "NzrE+ZhoKDa6K+DHCGrMG4KgxCiB7WpKd2XaXtLaMc8="
+    udp: true
 
 proxy-groups:
-  # Main upstream: JP-only (Tailscale + Tinyproxy)
+  # Main upstream: dual-node select
   - name: "PROXY"
     type: select
     proxies:
+      - "US-Tailscale"
       - "JP-Tailscale"
       - "DIRECT"
 
@@ -36,22 +46,41 @@ proxy-groups:
       - "PROXY"
       - "DIRECT"
 
-  # Dev / academic workflow groups (all JP-only, just more observable/switchable)
+  # Dev: US-first fallback
   - name: "DEV"
-    type: select
+    type: fallback
     proxies:
-      - "PROXY"
+      - "US-Tailscale"
+      - "JP-Tailscale"
       - "DIRECT"
+    url: "https://www.gstatic.com/generate_204"
+    interval: 120
 
+  # Copilot: US-first fallback (AI traffic needs low latency)
   - name: "COPILOT"
-    type: select
+    type: fallback
     proxies:
-      - "PROXY"
+      - "US-Tailscale"
+      - "JP-Tailscale"
       - "DIRECT"
+    url: "https://copilot-proxy.githubusercontent.com/_ping"
+    interval: 120
+
+  # VS Code update/marketplace
+  - name: "VSCODE"
+    type: fallback
+    proxies:
+      - "US-Tailscale"
+      - "JP-Tailscale"
+      - "DIRECT"
+    url: "https://update.code.visualstudio.com/api/update/linux-x64/stable/latest"
+    interval: 300
 
   - name: "DOCKER"
     type: select
     proxies:
+      - "US-Tailscale"
+      - "JP-Tailscale"
       - "PROXY"
       - "DIRECT"
 
@@ -102,6 +131,12 @@ rules:
   - DOMAIN-SUFFIX,frontiersin.org,ACADEMIC
   - DOMAIN-SUFFIX,ncbi.nlm.nih.gov,ACADEMIC
   - DOMAIN-SUFFIX,nih.gov,ACADEMIC
+
+  # VS Code update/marketplace
+  - DOMAIN-SUFFIX,visualstudio.com,VSCODE
+  - DOMAIN-SUFFIX,vscode-cdn.net,VSCODE
+  - DOMAIN-SUFFIX,vscode-unpkg.net,VSCODE
+  - DOMAIN,update.code.visualstudio.com,VSCODE
 
   # GitHub (dev)
   - DOMAIN-SUFFIX,githubusercontent.com,DEV

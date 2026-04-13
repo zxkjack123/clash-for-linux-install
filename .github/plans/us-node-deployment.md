@@ -155,7 +155,7 @@
 
 ### Phase 2: 本地 mihomo 配置改造
 
-#### Task 2.1: 修改 config.yaml 添加 US 节点
+#### ✅ Task 2.1: 修改 config.yaml 添加 US 节点
 - **目标**：在本地 mihomo 配置中添加 US-Tailscale proxy 条目，修改 proxy-groups 为双节点 fallback
 - **修改内容**：
   - 文件 `resources/config.yaml`：
