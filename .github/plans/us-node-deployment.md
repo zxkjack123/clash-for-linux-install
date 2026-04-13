@@ -73,7 +73,7 @@
   - ✅ `/etc/fstab` 包含 swap 持久化条目
 - **潜在风险**：磁盘空间不足（当前 26GB 可用，不构成问题）
 
-#### Task 1.2: 安装 Tailscale
+#### ✅ Task 1.2: 安装 Tailscale
 - **目标**：在 US 节点安装 Tailscale 并加入 Tailnet，配置为 exit node
 - **修改内容**：
   - 通过官方脚本安装 Tailscale：`curl -fsSL https://tailscale.com/install.sh | sh`
