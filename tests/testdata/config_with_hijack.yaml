@@ -1,0 +1,36 @@
+# Test config with various non-DIRECT hijack rules on 1.1.1.1/8.8.8.8
+# Used by tests/test_sanitize_hijack.sh
+
+proxies:
+  - name: "TestProxy"
+    type: ss
+    server: 127.0.0.1
+    port: 8388
+    cipher: aes-256-gcm
+    password: test
+
+proxy-groups:
+  - name: "AUTO"
+    type: url-test
+    proxies:
+      - "TestProxy"
+    url: "http://www.gstatic.com/generate_204"
+    interval: 300
+  - name: "PROXY"
+    type: select
+    proxies:
+      - "AUTO"
+      - "DIRECT"
+
+rules:
+  - "DOMAIN,example.com,PROXY"
+  - "IP-CIDR,1.1.1.1/32,SomeProxy,no-resolve"
+  - "IP-CIDR,8.8.8.8/32,西瓜加速,no-resolve"
+  - "IP-CIDR,1.1.1.1/32,DIRECT,no-resolve"
+  - "GEOIP,CN,DIRECT"
+  - "MATCH,DIRECT"
+
+dns:
+  fallback:
+    - 1.1.1.1
+    - tls://dns.google
