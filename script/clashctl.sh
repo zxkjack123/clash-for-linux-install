@@ -1081,7 +1081,7 @@ _clash_health() {
     fi
     direct1=$(grep -q 'IP-CIDR,1.1.1.1/32,DIRECT' "$CLASH_CONFIG_RUNTIME" && echo ok || echo miss)
     direct8=$(grep -q 'IP-CIDR,8.8.8.8/32,DIRECT' "$CLASH_CONFIG_RUNTIME" && echo ok || echo miss)
-    hijack=$(grep -E 'IP-CIDR,(1.1.1.1|8.8.8.8)/32,.*(PROXY|西瓜加速)' "$CLASH_CONFIG_RUNTIME" >/dev/null && echo risk || echo clean)
+    hijack=$(grep -E 'IP-CIDR,(1.1.1.1|8.8.8.8)/32,[^,]+,no-resolve' "$CLASH_CONFIG_RUNTIME" | grep -v ',DIRECT,' >/dev/null && echo risk || echo clean)
     # 最近 5 分钟失败节点总数
     fails=$(journalctl --user -u "$BIN_KERNEL_NAME" --since "5 min ago" --no-pager 2>/dev/null | grep -c 'connect error' 2>/dev/null || true)
     fails=$(echo "${fails:-0}" | tail -n 1)
@@ -1117,7 +1117,7 @@ _clash_metrics() {
     now_epoch=$(date +%s)
     direct1=$(grep -q 'IP-CIDR,1.1.1.1/32,DIRECT' "$CLASH_CONFIG_RUNTIME" && echo 1 || echo 0)
     direct8=$(grep -q 'IP-CIDR,8.8.8.8/32,DIRECT' "$CLASH_CONFIG_RUNTIME" && echo 1 || echo 0)
-    hijack=$(grep -E 'IP-CIDR,(1.1.1.1|8.8.8.8)/32,.*(PROXY|西瓜加速)' "$CLASH_CONFIG_RUNTIME" >/dev/null && echo 1 || echo 0)
+    hijack=$(grep -E 'IP-CIDR,(1.1.1.1|8.8.8.8)/32,[^,]+,no-resolve' "$CLASH_CONFIG_RUNTIME" | grep -v ',DIRECT,' >/dev/null && echo 1 || echo 0)
     fails=$(journalctl --user -u "$BIN_KERNEL_NAME" --since "5 min ago" --no-pager 2>/dev/null | grep -c 'connect error' 2>/dev/null || true)
     fails=$(echo "${fails:-0}" | tail -n 1)
     score=100
