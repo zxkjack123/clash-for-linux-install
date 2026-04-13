@@ -134,6 +134,14 @@ if (( ${#filtered[@]} == 0 )); then
 	filtered=("${available[@]:0:$LIMIT}")
 fi
 
+# Restore original node selection on exit/interrupt
+_restore_original() {
+  if [[ -n "${original:-}" ]]; then
+    switch_node "$original" >/dev/null 2>&1 || true
+  fi
+}
+trap _restore_original EXIT
+
 original=""
 if declare -F clash_group_now >/dev/null 2>&1; then
 	original="$(clash_group_now "$GROUP" 2>/dev/null || true)"
@@ -170,7 +178,7 @@ best_node=""; best_score=-1
 
 for node in "${filtered[@]}"; do
 	[[ -z "$node" ]] && continue
-	echo "\n🧪 Testing node: $node"
+	printf '\n🧪 Testing node: %s\n' "$node"
 	switch_node "$node"; sleep 2
 	mapfile -t results < <(
 		test_platform https://api.openai.com/v1/models openai 
@@ -182,13 +190,14 @@ for node in "${filtered[@]}"; do
 	if (( total > best_score )); then best_score=$total; best_node=$node; fi
 done
 
-echo "\n🏆 Best node: $best_node (score $best_score)"
+printf '\n🏆 Best node: %s (score %s)\n' "$best_node" "$best_score"
 if [[ -z "$best_node" ]]; then
 	echo "No suitable node found." >&2
 	exit 1
 fi
 
 if (( APPLY == 1 )); then
+	trap - EXIT
 	switch_node "$best_node"; sleep 1
 	now=""
 	if declare -F clash_group_now >/dev/null 2>&1; then
