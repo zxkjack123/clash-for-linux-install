@@ -1,0 +1,27 @@
+name: Lint & Static Gates
+
+on: [push, pull_request]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: bash -n syntax check
+        run: |
+          fail=0
+          for f in script/*.sh vpn-tools/*.sh vpn-tools/lib/*.sh; do
+            if ! bash -n "$f" 2>&1; then
+              echo "FAIL: $f"
+              fail=1
+            fi
+          done
+          exit $fail
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Static gates
+        run: bash script/run_static_gates.sh

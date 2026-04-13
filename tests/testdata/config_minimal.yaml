@@ -1,0 +1,39 @@
+# Minimal test config with ACADEMIC, PROXY, AUTO, COPILOT groups
+# Used by tests/test_sanitize_runtime.sh
+
+proxies:
+  - name: "TestProxy"
+    type: ss
+    server: 127.0.0.1
+    port: 8388
+    cipher: aes-256-gcm
+    password: test
+
+proxy-groups:
+  - name: "AUTO"
+    type: url-test
+    proxies:
+      - "TestProxy"
+    url: "http://www.gstatic.com/generate_204"
+    interval: 300
+  - name: "PROXY"
+    type: select
+    proxies:
+      - "AUTO"
+      - "DIRECT"
+  - name: "ACADEMIC"
+    type: select
+    proxies:
+      - "PROXY"
+      - "DIRECT"
+  - name: "COPILOT"
+    type: fallback
+    proxies:
+      - "AUTO"
+      - "DIRECT"
+    url: "https://copilot-proxy.githubusercontent.com/_ping"
+    interval: 120
+
+rules:
+  - "GEOIP,CN,DIRECT"
+  - "MATCH,DIRECT"

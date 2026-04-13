@@ -1,0 +1,7 @@
+# Config with NO proxy-groups — tests fallback behavior
+# Used by tests/test_sanitize_runtime.sh
+
+proxies: []
+
+rules:
+  - "MATCH,DIRECT"
