@@ -10,7 +10,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 API="${CLASH_API:-http://127.0.0.1:9090}"
 PROXY=${PROXY:-http://127.0.0.1:7890}
-GROUP=AI
+GROUP=COPILOT
 ROUNDS=5
 LIMIT=0
 APPLY=0

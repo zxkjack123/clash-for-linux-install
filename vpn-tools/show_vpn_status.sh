@@ -37,15 +37,13 @@ curl_api() {
 
 STATUS_GROUPS=()
 PREFERRED_GROUPS=(
-    "GLOBAL"
-    "🇯🇵 JP-自动选择"
-    "🇭🇰 HK-自动选择"
-    "🇸🇬 SG-自动选择"
-    "🇹🇼 TW-自动选择"
-    "自动选择"
-    "故障转移"
-    "速云梯"
-    "西瓜加速"
+    "AUTO"
+    "PROXY"
+    "COPILOT"
+    "DEV"
+    "VSCODE"
+    "DOCKER"
+    "ACADEMIC"
 )
 
 for g in "${PREFERRED_GROUPS[@]}"; do
@@ -70,13 +68,13 @@ if declare -F clash_pick_selector_group >/dev/null 2>&1; then
     fi
 fi
 declare -A GROUP_DESCRIPTIONS=(
-    ["GLOBAL"]="AI/开发/流媒体统一调度"
-    ["速云梯"]="主控分组，可手动挑选任意节点"
-    ["🇭🇰 HK-自动选择"]="香港自动测速"
-    ["🇯🇵 JP-自动选择"]="日本自动测速"
-    ["🇸🇬 SG-自动选择"]="新加坡自动测速"
-    ["🇹🇼 TW-自动选择"]="台湾自动测速"
-    ["故障转移"]="超时自动切换 (Fallback)"
+    ["AUTO"]="url-test 自动选择最快节点 (tolerance 200ms)"
+    ["PROXY"]="手动选择，默认走 AUTO"
+    ["COPILOT"]="Copilot/AI 流量 fallback(AUTO → DIRECT)"
+    ["DEV"]="GitHub/开发 fallback(AUTO → DIRECT)"
+    ["VSCODE"]="VS Code 更新/市场 fallback(AUTO → DIRECT)"
+    ["DOCKER"]="Docker 镜像 fallback(AUTO → DIRECT)"
+    ["ACADEMIC"]="学术站点 手动选择(PROXY/DIRECT)"
 )
 
 have() { command -v "$1" >/dev/null 2>&1; }

@@ -3,7 +3,7 @@
 # DESCRIPTION:
 #   Lightweight AI optimization: evaluates a shortlist of candidate nodes for an AI-like
 #   selector group using latency + success to OpenAI/Claude endpoints, selects best node.
-#   Auto-detects a valid selector group when 'AI' is missing (prefers: 西瓜加速, GLOBAL, 自动选择).
+#   Auto-detects a valid selector group (prefers: COPILOT, DEV, PROXY, AUTO).
 #   Faster (≈2-3 min) than full enhanced script.
 #
 # USAGE:
@@ -21,7 +21,7 @@ API="${CLASH_API:-http://127.0.0.1:9090}"
 PROXY="${PROXY:-http://127.0.0.1:7890}"
 APPLY=${APPLY:-0}
 LIMIT=${LIMIT:-8}
-PREF_GROUPS=("AI" "西瓜加速" "GLOBAL" "自动选择")
+PREF_GROUPS=("COPILOT" "DEV" "PROXY" "AUTO")
 have() { command -v "$1" >/dev/null 2>&1; }
 
 CURL_PROXY_OPTS=()
@@ -54,11 +54,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 default_nodes=(
-	"V1-美国01|流媒体|GPT"
-	"V1-美国05|流媒体|GPT"
-	"V1-美国10|流媒体|GPT"
-	"V1-新加坡01|流媒体|GPT"
-	"V1-日本01|流媒体|GPT"
+	"US-Tailscale"
+	"JP-Tailscale"
 )
 
 echo "=== Quick AI Optimization ($(date '+%F %T')) ==="

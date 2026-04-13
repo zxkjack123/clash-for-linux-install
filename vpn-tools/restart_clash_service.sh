@@ -97,26 +97,14 @@ echo ""
 # Step 2: Validate configuration
 echo "🔍 Validating configuration files..."
 
-# Check for OpenXLab rules in main config
-if grep -q "openxlab.org.cn,DIRECT" "$CONFIG_FILE"; then
-    echo -e "${GREEN}✅ OpenXLab rules found in main config${NC}"
-else
-    echo -e "${YELLOW}⚠️ OpenXLab rules not found in main config${NC}"
-fi
-
-# Check for OpenXLab rules in mixin
-if [ -f "$MIXIN_FILE" ] && grep -q "openxlab.org.cn,DIRECT" "$MIXIN_FILE"; then
-    echo -e "${GREEN}✅ OpenXLab rules found in mixin config${NC}"
-else
-    echo -e "${YELLOW}⚠️ OpenXLab rules not found in mixin config${NC}"
-fi
-
-# Check for Braintrust rules in mixin
-if [ -f "$MIXIN_FILE" ] && grep -q "braintrust.dev,AI-Manual" "$MIXIN_FILE"; then
-    echo -e "${GREEN}✅ Braintrust.dev rules found in mixin config${NC}"
-else
-    echo -e "${YELLOW}⚠️ Braintrust.dev rules not found in mixin config${NC}"
-fi
+# Check that key proxy groups exist in main config
+for _grp in AUTO PROXY COPILOT DEV; do
+    if grep -q "name:.*\"${_grp}\"" "$CONFIG_FILE" 2>/dev/null; then
+        echo -e "${GREEN}✅ Proxy group ${_grp} found in main config${NC}"
+    else
+        echo -e "${YELLOW}⚠️ Proxy group ${_grp} not found in main config${NC}"
+    fi
+done
 
 echo ""
 
@@ -234,12 +222,12 @@ fi
 echo "🧪 Testing configuration changes:"
 echo "================================="
 
-# Test current proxy groups
+# Show current proxy group status
 echo "📊 Current proxy groups:"
-AI_NODE=$(curl -fsS --noproxy '*' --connect-timeout 2 --max-time 4 ${AUTH_HDR[@]+"${AUTH_HDR[@]}"} "$API/proxies/AI" 2>/dev/null | jq -r '.now' 2>/dev/null || echo "Unknown")
-STREAMING_NODE=$(curl -fsS --noproxy '*' --connect-timeout 2 --max-time 4 ${AUTH_HDR[@]+"${AUTH_HDR[@]}"} "$API/proxies/Streaming" 2>/dev/null | jq -r '.now' 2>/dev/null || echo "Unknown")
-echo "🤖 AI Group: $AI_NODE"
-echo "🎬 Streaming Group: $STREAMING_NODE"
+for _grp in AUTO PROXY COPILOT DEV VSCODE DOCKER; do
+    _now=$(curl -fsS --noproxy '*' --connect-timeout 2 --max-time 4 ${AUTH_HDR[@]+"${AUTH_HDR[@]}"} "$API/proxies/$_grp" 2>/dev/null | jq -r '.now // "N/A"' 2>/dev/null || echo "Unknown")
+    printf "  %-10s → %s\n" "$_grp" "$_now"
+done
 
 echo ""
 
@@ -274,27 +262,31 @@ done
 
 echo ""
 
-# Step 7: Test AI services
-echo "🤖 Testing AI services connectivity:"
-echo "===================================="
+# Step 7: Test international services via proxy
+echo "🌍 Testing international services (via proxy):"
+echo "================================================"
 
-ai_domains=(
-    "api.openai.com"
-    "claude.ai"
-    "www.braintrust.dev"
+proxy_test_domains=(
+    "copilot-proxy.githubusercontent.com/_ping"
+    "www.google.com"
+    "github.com"
 )
 
-for domain in "${ai_domains[@]}"; do
-    echo -n "🧠 Testing $domain: "
-    
-    if response=$(timeout 8 curl -s -o /dev/null -w "%{http_code}" \
-        --connect-timeout 5 --max-time 8 \
-        "https://$domain/" 2>/dev/null); then
-        response=${response:-0}
-        if [ "$response" -ge 200 ] && [ "$response" -lt 400 ]; then
-            echo -e "${GREEN}✅ OK${NC} (HTTP $response)"
+for url in "${proxy_test_domains[@]}"; do
+    domain=$(echo "$url" | cut -d'/' -f1)
+    echo -n "🔗 Testing $domain: "
+
+    if response=$(timeout 10 curl -s -o /dev/null -w "%{http_code},%{time_total}" \
+        -x http://127.0.0.1:7890 \
+        --connect-timeout 5 --max-time 10 \
+        "https://$url" 2>/dev/null); then
+        http_code=$(echo "$response" | cut -d',' -f1)
+        time_total=$(echo "$response" | cut -d',' -f2)
+        http_code=${http_code:-0}
+        if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 400 ]; then
+            echo -e "${GREEN}✅ OK${NC} (HTTP $http_code, ${time_total}s)"
         else
-            echo -e "${YELLOW}⚠️ HTTP $response${NC}"
+            echo -e "${YELLOW}⚠️ HTTP $http_code${NC} (${time_total}s)"
         fi
     else
         echo -e "${YELLOW}⚠️ Connection timeout${NC}"
@@ -309,31 +301,24 @@ echo "==================="
 echo -e "${GREEN}✅ Mihomo service restarted successfully${NC}"
 echo -e "${GREEN}✅ Configuration loaded${NC}"
 echo -e "${GREEN}✅ API accessible${NC}"
-echo -e "${GREEN}✅ OpenXLab domains configured for direct connection${NC}"
-echo -e "${GREEN}✅ AI services routing through proxy${NC}"
 
 echo ""
-echo "🎯 CURRENT CONFIGURATION:"
-echo "========================="
-echo "🇨🇳 Chinese AI Platforms (DIRECT):"
-echo "  • OpenXLab: Direct ISP connection"
-echo "  • MinerU: Direct ISP connection"
-echo ""
-echo "🌍 International AI Platforms (PROXY):"
-echo "  • OpenAI/ChatGPT: Through $AI_NODE"
-echo "  • Claude/Anthropic: Through AI-Claude group"
-echo "  • Braintrust.dev: Through AI-Manual group"
-echo ""
-echo "🎬 Streaming Services: Through $STREAMING_NODE"
+echo "🎯 CURRENT ROUTING:"
+echo "=================="
+_auto_now=$(curl -fsS --noproxy '*' --connect-timeout 2 --max-time 3 ${AUTH_HDR[@]+"${AUTH_HDR[@]}"} "$API/proxies/AUTO" 2>/dev/null | jq -r '.now // "?"' 2>/dev/null || echo "?")
+echo "  AUTO (url-test):  → $_auto_now"
+echo "  COPILOT (fallback): → AUTO → $_auto_now"
+echo "  DEV (fallback):     → AUTO → $_auto_now"
+echo "  VSCODE (fallback):  → AUTO → $_auto_now"
+echo "  DOCKER (fallback):  → AUTO → $_auto_now"
+echo "  ACADEMIC (select):  → manual"
 echo ""
 
 echo "🔗 QUICK TESTS:"
 echo "==============="
-echo "🇨🇳 Test OpenXLab: ./quick_openxlab_access.sh"
 echo "🤖 Test AI services: ./optimize_ai.sh"
-echo "🎬 Test streaming: ./streaming_manager.sh"
 echo "📊 Full network test: ./network_connectivity_test.sh"
+echo "📊 Show VPN status: ./show_vpn_status.sh"
 echo ""
 
 echo -e "${CYAN}🎉 Service restart completed successfully!${NC}"
-echo -e "${CYAN}Your VPN is now optimized for both Chinese and international AI platforms.${NC}"
