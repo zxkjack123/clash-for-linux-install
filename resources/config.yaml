@@ -31,10 +31,21 @@ proxies:
     udp: true
 
 proxy-groups:
-  # Main upstream: dual-node select
+  # Auto-select lowest-latency node (tolerance 200ms to avoid flapping)
+  - name: "AUTO"
+    type: url-test
+    proxies:
+      - "US-Tailscale"
+      - "JP-Tailscale"
+    url: "https://www.gstatic.com/generate_204"
+    interval: 120
+    tolerance: 200
+
+  # Main upstream: manual override, defaults to AUTO
   - name: "PROXY"
     type: select
     proxies:
+      - "AUTO"
       - "US-Tailscale"
       - "JP-Tailscale"
       - "DIRECT"
@@ -46,43 +57,41 @@ proxy-groups:
       - "PROXY"
       - "DIRECT"
 
-  # Dev: US-first fallback
+  # Dev: auto-select with DIRECT fallback
   - name: "DEV"
     type: fallback
     proxies:
-      - "US-Tailscale"
-      - "JP-Tailscale"
+      - "AUTO"
       - "DIRECT"
     url: "https://www.gstatic.com/generate_204"
     interval: 120
 
-  # Copilot: US-first fallback (AI traffic needs low latency)
+  # Copilot: auto-select with DIRECT fallback
   - name: "COPILOT"
     type: fallback
     proxies:
-      - "US-Tailscale"
-      - "JP-Tailscale"
+      - "AUTO"
       - "DIRECT"
     url: "https://copilot-proxy.githubusercontent.com/_ping"
     interval: 120
 
-  # VS Code update/marketplace
+  # VS Code update/marketplace: auto-select with DIRECT fallback
   - name: "VSCODE"
     type: fallback
     proxies:
-      - "US-Tailscale"
-      - "JP-Tailscale"
+      - "AUTO"
       - "DIRECT"
     url: "https://update.code.visualstudio.com/api/update/linux-x64/stable/latest"
-    interval: 300
+    interval: 120
 
+  # Docker: auto-select with DIRECT fallback
   - name: "DOCKER"
-    type: select
+    type: fallback
     proxies:
-      - "US-Tailscale"
-      - "JP-Tailscale"
-      - "PROXY"
+      - "AUTO"
       - "DIRECT"
+    url: "https://www.gstatic.com/generate_204"
+    interval: 120
 
   - name: "ACADEMIC"
     type: select
