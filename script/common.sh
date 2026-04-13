@@ -355,6 +355,7 @@ function _get_proxy_port() {
             _failcat '🎯' "$msg" || true
         }
     fi
+    return 0
 }
 
 function _get_ui_port() {
@@ -389,6 +390,7 @@ function _get_ui_port() {
         UI_PORT=$newPort
         _failcat '🎯' "$msg" || true
     }
+    return 0
 }
 
 _get_color() {

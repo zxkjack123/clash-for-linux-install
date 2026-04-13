@@ -106,16 +106,16 @@ _get_proxy_port_live_from_controller() {
         2>/dev/null) || return 1
 
     # Parse minimal fields via python (avoid jq dependency)
+    # Note: use printf|python3 (pipe) — heredoc+herestring both compete for stdin.
     local parsed
-    parsed=$(python3 -c 'import json,sys
-d=json.load(sys.stdin)
+    parsed=$(printf '%s' "$cfg_json" | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
 def as_int(v, default=0):
-    try:
-        return int(v)
-    except Exception:
-        return default
-print(f"{as_int(d.get('port',0))} {as_int(d.get('mixed-port',0))} {as_int(d.get('socks-port',0))}")
-' <<<"$cfg_json" 2>/dev/null) || return 1
+    try: return int(v)
+    except Exception: return default
+print(as_int(d.get("port", 0)), as_int(d.get("mixed-port", 0)), as_int(d.get("socks-port", 0)))
+' 2>/dev/null) || return 1
 
     local port mixed socks
     port=$(awk '{print $1}' <<<"$parsed")
