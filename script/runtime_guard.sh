@@ -532,6 +532,7 @@ if diff -q "$RUNTIME" "$TMP_FIX" >/dev/null 2>&1; then
 fi
 
 mv "$TMP_FIX" "$RUNTIME" || fail "替换 runtime 失败"
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 systemctl --user restart "$SERVICE" >/dev/null 2>&1 && { $JSON_OUT || ok "已自愈并重启"; } || { $JSON_OUT || warn "重启失败, 请手动检查"; }
 
 # Alerts (safe-by-default): prefer --alert/--alert-script or env ALERT_MODE/ALERT_SCRIPT.

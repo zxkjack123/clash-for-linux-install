@@ -16,6 +16,13 @@
 
 set -euo pipefail
 
+# Ensure systemctl --user works in non-interactive environments (cron, SSH ForceCommand, etc.)
+# Without these, systemctl --user cannot find the user manager D-Bus socket.
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+if [[ -z "${DBUS_SESSION_BUS_ADDRESS:-}" && -S "$XDG_RUNTIME_DIR/bus" ]]; then
+    export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
+fi
+
 # 配置
 BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PARENT_DIR="$(dirname "$BASE_DIR")"
@@ -83,10 +90,13 @@ check_clash_service() {
     local msg=""
     
     if ! systemctl --user is-active "$SERVICE" &>/dev/null; then
-        status="CRITICAL"
-        msg="Clash服务未运行"
-        echo "$status|$msg"
-        return 1
+        # Fallback: cron 环境中 D-Bus 可能偶发不可达，用进程检测兜底
+        if ! pgrep -u "$(id -u)" -x "$SERVICE" &>/dev/null; then
+            status="CRITICAL"
+            msg="Clash服务未运行"
+            echo "$status|$msg"
+            return 1
+        fi
     fi
     
     if declare -F clash_api_get >/dev/null 2>&1; then
@@ -140,7 +150,7 @@ check_ai_services() {
     local total=0 success=0 total_latency=0
     
     local services=(
-        $'https://chat.openai.com/\tChatGPT\t^[23]\tyes'
+        $'https://api.githubcopilot.com/\tCopilot\t^(20[0-9]|40[0-9])$\tyes'
         $'https://api.scnet.cn/api/llm/v1/chat/completions\tSCNET\t^(20[0-9]|401|403|405)$\tyes'
         $'https://sg.uiuiapi.com/\tUIUI-API\t^(20[0-9]|30[12378])$\tyes'
         "${SILICONFLOW_URL}"$'\t硅基流动\t^(20[0-9]|30[0-9])$\tdirect'
@@ -186,7 +196,7 @@ check_dev_services() {
         $'https://api.github.com\tGitHub\t^[23]'
         $'https://registry.npmjs.org\tNPM\t^[23]'
         $'https://pypi.org\tPyPI\t^[23]'
-        $'https://crates.io\tCrates\t^(20[0-9]|30[0-9]|403)$'
+        $'https://api.semanticscholar.org/graph/v1/paper/search?query=test&limit=1\tSemantic-Scholar\t^([23]|429)'
     )
     
     for service in "${services[@]}"; do
@@ -214,7 +224,6 @@ check_streaming_services() {
     local total=0 success=0 total_latency=0
     
     local services=(
-        "https://www.youtube.com|YouTube"
         "https://zoom.us|Zoom"
         "https://meet.google.com|Google-Meet"
     )
@@ -336,6 +345,7 @@ trigger_auto_fix() {
             ;;
         "service_down")
             log "尝试重启服务..."
+            export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
             systemctl --user restart "$SERVICE" || true
             sleep 5
             ;;

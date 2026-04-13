@@ -68,6 +68,8 @@ install_monitoring() {
     
     # 生成新的 crontab 配置
     local temp_cron=$(mktemp)
+    local _uid
+    _uid=$(id -u)
     
     # 保留现有的 crontab（排除旧的监控任务）
     if crontab -l &>/dev/null; then
@@ -79,6 +81,7 @@ install_monitoring() {
 # ===== Clash 网络监控任务 =====
 # 由 setup_monitoring_cron.sh 自动生成
 # 生成时间: $(date '+%Y-%m-%d %H:%M:%S')
+XDG_RUNTIME_DIR=/run/user/$_uid
 EOF
 
     if [[ $WITH_AUTOFIX -eq 1 ]]; then
