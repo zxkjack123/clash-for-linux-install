@@ -8,7 +8,7 @@
    - 吞吐（B/s）
    - 并发稳定性（成功率 + p50/p95）
 3. 给出**mihomo / 系统参数建议**。
-4. 可选：把 `AUTO-SMART` 收敛为「JP‑Tailscale 优先 + 可控兜底」。
+4. 可选：把 `PROXY` 分组收敛为「JP‑Tailscale 优先 + 可控兜底」。
 
 > 安全：脚本不会打印 mihomo 的 `secret`，也会对 URL 中可能包含的 token 进行脱敏。
 
@@ -26,7 +26,7 @@ bash jp_tailscale_single_node_test.sh --full --concurrency 30
 
 ### 只测试、不切换分组
 
-默认会通过 Mihomo API 临时把 `AUTO-SMART` 切到 `JP-Tailscale`，结束后恢复。
+默认会通过 Mihomo API 临时把 `PROXY` 切到 `JP-Tailscale`，结束后恢复。
 
 如果你不希望它影响当前路由：
 
@@ -71,9 +71,9 @@ bash jp_tailscale_single_node_test.sh --ts-peer 100.82.241.21
 
 ---
 
-## 一键“收敛 AUTO-SMART”（可选）
+## 一键“收敛”分组（已弃用）
 
-如果你已经确认 JP‑Tailscale 很稳定，可以把 `AUTO-SMART` 收敛成：
+> **注意**: `--apply-tighten` 已弃用，因为旧的 `AUTO-SMART` 分组已不存在。当前配置使用 `AUTO` (url-test) + `PROXY` (select) 分组，无需手动收敛。
 
 - `minimal`：仅 `JP-Tailscale + 故障转移`
 - `balanced`：`JP-Tailscale` 优先 + 少量地域兜底
@@ -88,7 +88,7 @@ bash jp_tailscale_single_node_test.sh --apply-tighten --fallback minimal
 
 该操作会：
 1. 备份 `~/.local/share/clash/mixin.yaml`
-2. 修改 `AUTO-SMART` 和 `速云梯` 相关分组，避免循环引用
+2. 修改相关分组，避免循环引用
 3. 调用仓库内的合并+清洗逻辑重建 `runtime.yaml` 并重启 mihomo
 
 ---

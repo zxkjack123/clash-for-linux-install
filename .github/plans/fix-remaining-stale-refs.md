@@ -86,7 +86,7 @@
 - **潜在风险**：文本回退的正则需同时保留 DIRECT 规则——需确保 grep -Ev 不误删 DIRECT 行
 
 ### Phase 2: vpn-tools UPDATE 类脚本
-#### Task 2.1: 更新 clash_pick_selector_group 候选列表（5 文件）
+#### ✅ Task 2.1: 更新 clash_pick_selector_group 候选列表（5 文件）
 - **目标**：将 `clash_pick_selector_group "西瓜加速" "速云梯" "GLOBAL" "自动选择" "PROXY"` 等旧候选列表更新为当前分组名
 - **修改内容**：
   - `vpn-tools/intelligent_rule_optimizer.sh` L37：候选 → `"PROXY" "AUTO"`
@@ -103,7 +103,7 @@
   - ✅ 5 个文件零旧分组名引用
 - **潜在风险**：optimize_dev_nodes.sh 还有其他行引用旧名——需检查全文
 
-#### Task 2.2: 更新 jp_tailscale_single_node_test.sh
+#### ✅ Task 2.2: 更新 jp_tailscale_single_node_test.sh
 - **目标**：更新默认 GROUP 和移除已废弃的 `--apply-tighten` 段
 - **修改内容**：
   - `vpn-tools/jp_tailscale_single_node_test.sh`：
@@ -123,7 +123,7 @@
 
 ### Phase 3: vpn-tools OBSOLETE + DOCS
 
-#### Task 3.1: 弃用 use_jp_tailscale_only.sh
+#### ✅ Task 3.1: 弃用 use_jp_tailscale_only.sh
 - **目标**：添加 deprecation guard（与 auto_optimize_clash.sh 一致）
 - **修改内容**：
   - `vpn-tools/use_jp_tailscale_only.sh`：在 `set -euo pipefail` 后添加弃用检测段
@@ -136,7 +136,7 @@
   - ✅ `bash -n` 通过
 - **潜在风险**：无
 
-#### Task 3.2: 更新文档
+#### ✅ Task 3.2: 更新文档
 - **目标**：更新 vpn-tools 相关 md 文档中的旧分组名
 - **修改内容**：
   - `vpn-tools/JP_TAILSCALE_SINGLE_NODE_TESTING.md`：AUTO-SMART → PROXY/AUTO、速云梯 → 已移除、标注过时段落
@@ -150,7 +150,7 @@
 
 ### Phase 4: 验证与提交
 
-#### Task 4.1: 全量回归验证
+#### ✅ Task 4.1: 全量回归验证
 - **目标**：确认所有修改后无回归
 - **修改内容**：无
 - **修改边界**：不修改任何文件
@@ -166,7 +166,7 @@
   - ✅ 全部 7 项检查通过
 - **潜在风险**：无
 
-#### Task 4.2: 提交变更
+#### ✅ Task 4.2: 提交变更
 - **目标**：git commit
 - **修改内容**：
   - Commit 1（sanitize 通用化）：`script/sanitize_runtime.sh`

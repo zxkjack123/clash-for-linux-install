@@ -3,7 +3,7 @@
 # Usage:
 #   probe_domain_across_nodes.sh <url> [group-name]
 # Example:
-#   probe_domain_across_nodes.sh https://repo.protonvpn.com/ "西瓜加速"
+#   probe_domain_across_nodes.sh https://repo.protonvpn.com/ "PROXY"
 
 set -euo pipefail
 
@@ -27,9 +27,9 @@ fi
 API_BASE="${CLASH_API:-http://127.0.0.1:9090}"
 
 if [[ -z "${GROUP_LABEL:-}" ]] && declare -F clash_pick_selector_group >/dev/null 2>&1; then
-  GROUP_LABEL="$(clash_pick_selector_group "西瓜加速" "速云梯" "GLOBAL" "自动选择" "PROXY" 2>/dev/null || true)"
+  GROUP_LABEL="$(clash_pick_selector_group "PROXY" "AUTO" 2>/dev/null || true)"
 fi
-GROUP_LABEL=${GROUP_LABEL:-GLOBAL}
+GROUP_LABEL=${GROUP_LABEL:-PROXY}
 
 # Read proxy port from runtime if available (for local proxy probing)
 PROXY_PORT="7890"

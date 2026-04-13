@@ -34,7 +34,7 @@ API=${CLASH_API:-http://127.0.0.1:9090}
 # Node source selector group (auto-pick by default; override with NODE_GROUP=...)
 NODE_GROUP=${NODE_GROUP:-}
 if [[ -z "${NODE_GROUP:-}" ]] && declare -F clash_pick_selector_group >/dev/null 2>&1; then
-    NODE_GROUP="$(clash_pick_selector_group "西瓜加速" "速云梯" "GLOBAL" "自动选择" "PROXY" 2>/dev/null || true)"
+    NODE_GROUP="$(clash_pick_selector_group "PROXY" "AUTO" 2>/dev/null || true)"
 fi
 
 # Controller delay probe timeout (ms)
@@ -272,7 +272,7 @@ EOF
     type: select
     proxies:
       - $best_node
-      - AUTO-SMART
+      - AUTO
       - DIRECT
     # 性能: 得分=$score, 平均延迟=${latency}ms
 EOF

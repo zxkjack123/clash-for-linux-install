@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # optimize_mineru.sh
 # 专用于 MinerU / OpenXLab 相关域名 (sso.openxlab.org.cn, mineru.net) 的节点可用性测试与优化脚本。
-# 目的：在一个 Selector 分组(默认: 西瓜加速) 内，找出能成功完成 TLS+HTTP 访问目标域的最优节点，并可选自动切换。
+# 目的：在一个 Selector 分组(默认: PROXY) 内，找出能成功完成 TLS+HTTP 访问目标域的最优节点，并可选自动切换。
 #
 # 特性:
 #  * 枚举分组候选节点 (排除 DIRECT)
@@ -31,7 +31,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 clash_env_bootstrap 2>/dev/null || true
 
-GROUP_DEFAULT="西瓜加速"
+GROUP_DEFAULT="PROXY"
 TARGET_DOMAINS=("sso.openxlab.org.cn" "mineru.net")
 CONTROLLER="127.0.0.1:9090"
 GROUP="$GROUP_DEFAULT"
@@ -168,7 +168,7 @@ group_json=$(ctrl_get "$API/proxies/$ENC_GROUP")
 # If default legacy group missing, try to auto-pick a Selector group.
 if { [[ -z "$group_json" ]] || printf '%s' "$group_json" | grep -qiE 'unauthorized|not found'; } && [[ "$GROUP" == "$GROUP_DEFAULT" ]]; then
   if declare -F clash_pick_selector_group >/dev/null 2>&1; then
-    picked="$(clash_pick_selector_group "西瓜加速" "速云梯" "GLOBAL" "自动选择" "PROXY" 2>/dev/null || true)"
+    picked="$(clash_pick_selector_group "PROXY" "AUTO" 2>/dev/null || true)"
     if [[ -n "$picked" ]]; then
       GROUP="$picked"
       ENC_GROUP=$(urlencode "$GROUP")

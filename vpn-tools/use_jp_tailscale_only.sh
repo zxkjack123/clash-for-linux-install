@@ -26,6 +26,15 @@
 
 set -euo pipefail
 
+# DEPRECATED: 此脚本围绕旧订阅模式的 AUTO-SMART/速云梯 分组设计。
+# 当前配置使用 AUTO (url-test) + PROXY (select) 分组，已无需手动收敛 mixin。
+# 若确需运行，设置环境变量 FORCE_LEGACY=1 绕过此检查。
+if [[ "${FORCE_LEGACY:-}" != "1" ]]; then
+  echo "⚠️  此脚本已弃用。当前 AUTO/PROXY 分组已替代旧的 AUTO-SMART/速云梯。" >&2
+  echo "    若确需运行旧逻辑，请设置 FORCE_LEGACY=1。" >&2
+  exit 1
+fi
+
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 

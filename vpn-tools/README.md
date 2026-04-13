@@ -140,11 +140,13 @@ cd vpn-tools
 - Some scripts are **configuration tools** and may modify local Clash/Mihomo files (they will say so explicitly).
 - Always run a preview/--help first before applying changes.
 
-## 🧷 JP‑Tailscale-only 配置收敛工具（默认仅预览）
+## 🧷 JP‑Tailscale-only 配置收敛工具（已弃用）
+
+> **DEPRECATED**: 此工具围绕旧订阅模式的 `AUTO-SMART`/`速云梯` 分组设计。当前配置已改用 `AUTO` (url-test) + `PROXY` (select)，直接运行会输出弃用提示。
 
 脚本：`use_jp_tailscale_only.sh`
 
-用途：把本机 `~/.local/share/clash/mixin.yaml` 的 `proxy-groups` 收敛到 **JP‑Tailscale-only**（可选保留兼容分组名 `速云梯`，避免旧规则引用断裂）。
+用途：把本机 `~/.local/share/clash/mixin.yaml` 的 `proxy-groups` 收敛到 **JP‑Tailscale-only**。
 
 安全特性：
 - **默认仅预览（dry-run）**：不写入文件、不重启 mihomo
@@ -155,8 +157,8 @@ cd vpn-tools
 - `--apply`：应用修改（仍不重启）
 - `--rebuild`：应用后重建 runtime + 重启 mihomo（有风险，建议挑窗口期）
 - `--prune-all-selectors`：更激进地裁剪所有 `select` 组，仅保留安全条目（用于清理残留订阅节点名）
-- `--no-compat-suyunti`：不保留/创建 `速云梯` 兼容组
-- `--with-direct-fallback`：允许 `DIRECT` 作为 `AUTO-SMART/故障转移` 的兜底选项
+- `--no-compat-suyunti`：不保留/创建兼容组
+- `--with-direct-fallback`：允许 `DIRECT` 作为兜底选项
 - `--mixin PATH`：指定 mixin 路径
 
 依赖：需要 `mikefarah/yq v4`（优先使用本仓库安装的 `~/.local/share/clash/bin/yq`）。
@@ -190,7 +192,7 @@ cd vpn-tools
 	- `http.proxySupport`: `override`
 2. 运行一次：`./optimize_vscode_copilot.sh`（验证 Copilot/GitHub/OpenAI 端点经 7890 可达）
 3. 复现卡顿的同时运行：`./trace_mihomo_connections.sh --seconds 60`
-	- 输出会显示 `rule=...` / `chains=...`，可直接证明 VS Code/Copilot 流量是否进入 mihomo、最终走 DIRECT 还是 AUTO-SMART/具体链路。
+- 输出会显示 `rule=...` / `chains=...`，可直接证明 VS Code/Copilot 流量是否进入 mihomo、最终走 DIRECT 还是 PROXY/具体链路。
 
 ## 🆘 Getting Help
 

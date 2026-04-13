@@ -5,17 +5,17 @@
 #  - Tailscale 直连/DERP 判定
 #  - 通过 mihomo(Clash Meta) 代理的延迟/吞吐/并发稳定性
 #  - 给出 mihomo/系统参数建议
-#  - 可选：自动“收敛” AUTO-SMART 为「JP-Tailscale 优先 + 可控兜底」
+#  - 可选：自动“收敛” PROXY 分组为「JP-Tailscale 优先 + 可控兜底」
 #
 # 说明：
-#  - 默认仅临时切换 AUTO-SMART 到 JP-Tailscale（可关闭 --no-switch），结束后自动恢复。
+#  - 默认仅临时切换 PROXY 到 JP-Tailscale（可关闭 --no-switch），结束后 自动恢复。
 #  - 不会打印 mihomo secret/token。
 #
 # 用法：
 #   cd vpn-tools
 #   bash jp_tailscale_single_node_test.sh --quick
 #   bash jp_tailscale_single_node_test.sh --full --concurrency 30
-#   bash jp_tailscale_single_node_test.sh --apply-tighten --fallback balanced
+#   bash jp_tailscale_single_node_test.sh --apply-tighten --fallback balanced  # (DEPRECATED)
 #
 set -euo pipefail
 
@@ -32,7 +32,7 @@ APPLY_TIGHTEN=0
 PROXY=${PROXY:-http://127.0.0.1:7890}
 TS_PEER=${TS_PEER:-100.82.241.21}
 TS_IFACE=${TS_IFACE:-tailscale0}
-GROUP_TO_SWITCH=${GROUP_TO_SWITCH:-AUTO-SMART}
+GROUP_TO_SWITCH=${GROUP_TO_SWITCH:-PROXY}
 TARGET_PROXY_NAME=${TARGET_PROXY_NAME:-JP-Tailscale}
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -62,12 +62,12 @@ Options:
   --quick                 快速模式（~30-60s）
   --full                  完整模式（默认，~2-5min，取决于网络）
   --no-switch             不通过 API 切换分组到 JP-Tailscale（只测当前路由）
-  --group NAME            需要临时切换的 selector 分组名（默认：AUTO-SMART）
+  --group NAME            需要临时切换的 selector 分组名（默认：PROXY）
   --proxy-name NAME       要切换到的代理名（默认：JP-Tailscale）
   --ts-peer IP|NAME       需要 tailscale ping 的对端（默认：100.82.241.21）
   --concurrency N         并发请求数（默认：20）
   --dl-seconds N          吞吐测试最大时长（默认：20）
-  --apply-tighten         根据建议自动收敛 AUTO-SMART（修改 ~/.local/share/clash/mixin.yaml 并重建 runtime）
+  --apply-tighten         (DEPRECATED) 根据建议自动收敛分组（已弃用，无操作）
   --fallback minimal|balanced   收敛策略（默认：balanced）
 EOF
 }
@@ -427,7 +427,7 @@ Action ideas:
   - Ensure outbound UDP is allowed (especially UDP 41641) on current network.
   - Check local firewall (ufw/firewalld) and campus/ISP UDP restrictions.
   - Run: tailscale netcheck  (look for 'UDP: true' and DERP latencies)
-  - If consistently stuck on DERP, expect higher jitter; keep a limited fallback in AUTO-SMART.
+  - If consistently stuck on DERP, expect higher jitter; keep a limited fallback in PROXY/AUTO.
 EOF
   else
     echo "DERP detected  : ${NH_OK:-OK} (ping looks direct)"
@@ -438,10 +438,13 @@ cat <<EOF
 Mihomo config hints (JP-Tailscale):
   - You already have: interface-name: ${TS_IFACE} (good; reduces multi-NIC surprises)
   - If you see random stalls under load: consider raising process NOFILE limit for user systemd service.
-  - If DNS pollution hits again: keep FINAL MATCH -> AUTO-SMART and keep wikipedia/wikimedia/wikidata pinned (already handled).
+  - If DNS pollution hits again: keep FINAL MATCH -> PROXY and keep wikipedia/wikimedia/wikidata pinned (already handled).
 EOF
 
 if [ "$APPLY_TIGHTEN" = 1 ]; then
+  echo "WARNING: --apply-tighten is DEPRECATED (AUTO-SMART group no longer exists). Skipping." >&2
+  # Legacy code preserved below for reference; not executed.
+elif false; then  # BEGIN deprecated apply-tighten block
   section "APPLY: TIGHTEN AUTO-SMART"
   MIXIN="$HOME/.local/share/clash/mixin.yaml"
   if [ ! -f "$MIXIN" ]; then

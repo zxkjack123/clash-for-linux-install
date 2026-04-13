@@ -135,7 +135,7 @@ show_system_overview() {
     # 当前节点（自动选择一个可用的 Selector 分组展示，避免硬编码旧分组名）
     local status_group=""
     if declare -F clash_pick_selector_group >/dev/null 2>&1; then
-        status_group="$(clash_pick_selector_group "西瓜加速" "速云梯" "GLOBAL" "自动选择" "PROXY" 2>/dev/null || true)"
+        status_group="$(clash_pick_selector_group "PROXY" "AUTO" 2>/dev/null || true)"
     fi
     if [[ -n "$status_group" ]]; then
         local current_node=""

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # optimize_dev_nodes.sh
 # 选择对开发/科研站点最友好的节点 (GitHub / NPM / PyPI / Docker / Go Proxy 等)
-# 默认从“速云梯”分组获取候选节点，并将最佳节点同步到 GLOBAL / 速云梯 等常用分组。
+# 默认从“PROXY”分组获取候选节点，并将最佳节点同步到 PROXY 等常用分组。
 #
 # 用法：
 #   ./vpn-tools/optimize_dev_nodes.sh
-#   SOURCE_GROUP=GLOBAL APPLY_GROUPS="GLOBAL" ./vpn-tools/optimize_dev_nodes.sh
+#   SOURCE_GROUP=DEV APPLY_GROUPS="DEV" ./vpn-tools/optimize_dev_nodes.sh
 #   CANDIDATE_LIMIT=5 TIMEOUT=4 ./vpn-tools/optimize_dev_nodes.sh
 
 set -euo pipefail
@@ -47,17 +47,17 @@ API="${CLASH_API:-http://127.0.0.1:9090}"
 
 # Auto-pick a selector group when SOURCE_GROUP/APPLY_GROUPS are not provided.
 if [[ -z "${SOURCE_GROUP:-}" ]] && declare -F clash_pick_selector_group >/dev/null 2>&1; then
-	SOURCE_GROUP="$(clash_pick_selector_group "速云梯" "西瓜加速" "GLOBAL" "自动选择" "PROXY" 2>/dev/null || true)"
+	SOURCE_GROUP="$(clash_pick_selector_group "DEV" "PROXY" "AUTO" 2>/dev/null || true)"
 fi
 if [[ -z "${SOURCE_GROUP:-}" ]]; then
 	echo "ERROR: 无法自动选择可用的 Selector 分组 (请设置 SOURCE_GROUP)" >&2
 	exit 1
 fi
 if [[ -z "${APPLY_GROUPS:-}" ]]; then
-	if [[ "$SOURCE_GROUP" == "GLOBAL" ]]; then
-		APPLY_GROUPS="GLOBAL"
+	if [[ "$SOURCE_GROUP" == "PROXY" ]]; then
+		APPLY_GROUPS="PROXY"
 	else
-		APPLY_GROUPS="GLOBAL,$SOURCE_GROUP"
+		APPLY_GROUPS="PROXY,$SOURCE_GROUP"
 	fi
 fi
 
@@ -173,7 +173,7 @@ select_candidates() {
 	local nodes fallback_group
 	mapfile -t nodes < <(get_group_nodes "$SOURCE_GROUP" 2>/dev/null || true)
 	if (( ${#nodes[@]} == 0 )); then
-		fallback_group=GLOBAL
+		fallback_group=PROXY
 		mapfile -t nodes < <(get_group_nodes "$fallback_group" 2>/dev/null || true)
 	fi
 	if (( ${#nodes[@]} == 0 )); then
