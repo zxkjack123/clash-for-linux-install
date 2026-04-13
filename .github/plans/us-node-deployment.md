@@ -98,7 +98,7 @@
   - Tailscale 安装脚本需要外网访问（US 节点自身须能访问 pkgs.tailscale.com）——US 节点在美国，无需翻墙
   - 如果 authkey 方式认证失败，需要在终端打开 URL 手动确认——SSH 连接不稳定时比较麻烦
 
-#### Task 1.3: 安装 Shadowsocks-Rust (ssserver)
+#### ✅ Task 1.3: 安装 Shadowsocks-Rust (ssserver)
 - **目标**：在 US 节点以 gw 用户部署 shadowsocks-rust，监听 Tailscale IP
 - **修改内容**：
   - 下载 shadowsocks-rust v1.21.2 预编译二进制到 `/home/gw/.local/bin/ssserver`
