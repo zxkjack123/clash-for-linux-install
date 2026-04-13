@@ -364,7 +364,7 @@ ISSUES=()
 
 HAS_DIRECT_1=$(grep -E '^ *- IP-CIDR,1.1.1.1/32,DIRECT' "$RUNTIME" || true)
 HAS_DIRECT_8=$(grep -E '^ *- IP-CIDR,8.8.8.8/32,DIRECT' "$RUNTIME" || true)
-HIJACK=$(grep -E '^ *- IP-CIDR,(1.1.1.1|8.8.8.8)/32,.*(西瓜加速|PROXY|Proxy|proxy).*(no-resolve)?' "$RUNTIME" || true)
+HIJACK=$(grep -E '^ *- IP-CIDR,(1.1.1.1|8.8.8.8)/32,.*(AUTO|PROXY|Proxy|proxy|COPILOT|DEV).*(no-resolve)?' "$RUNTIME" || true)
 FALLBACK_IP=$(grep -E '^ *fallback:.*(1.1.1.1|8.8.8.8)' "$RUNTIME" || true)
 if [ -x "$YQ" ]; then
   "$YQ" '.' "$RUNTIME" >/dev/null 2>&1 || ISSUES+=("YAML 语法错误")

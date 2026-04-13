@@ -276,7 +276,7 @@ fi
 # 9. 关键 DIRECT 规则 / 劫持
 RULE_DIR1=$(grep -q 'IP-CIDR,1.1.1.1/32,DIRECT' "$RUNTIME" && echo 1 || echo 0)
 RULE_DIR8=$(grep -q 'IP-CIDR,8.8.8.8/32,DIRECT' "$RUNTIME" && echo 1 || echo 0)
-HIJACK=$(grep -E 'IP-CIDR,(1.1.1.1|8.8.8.8)/32,.*(PROXY|西瓜加速)' "$RUNTIME" >/dev/null && echo 1 || echo 0)
+HIJACK=$(grep -E 'IP-CIDR,(1.1.1.1|8.8.8.8)/32,.*(PROXY|AUTO|COPILOT|DEV)' "$RUNTIME" >/dev/null && echo 1 || echo 0)
 add_json direct_1_1_1_1 "$RULE_DIR1"; add_json direct_8_8_8_8 "$RULE_DIR8"; add_json hijack "$HIJACK"
 [ "$RULE_DIR1" = 1 ] && ok "DIRECT 规则存在 1.1.1.1" || warn "缺失 DIRECT 1.1.1.1"
 [ "$RULE_DIR8" = 1 ] && ok "DIRECT 规则存在 8.8.8.8" || warn "缺失 DIRECT 8.8.8.8"

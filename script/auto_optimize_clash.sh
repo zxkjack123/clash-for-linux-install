@@ -10,6 +10,15 @@
 # 依赖: yq, bash /dev/tcp, timeout, (可选) openssl
 set -euo pipefail
 
+# DEPRECATED: 此脚本围绕旧订阅模式的 AUTO-SMART/西瓜加速 分组设计。
+# 当前配置使用 AUTO (url-test) 分组自动选择最优节点，无需手动测速。
+# 若确需运行，设置环境变量 FORCE_LEGACY=1 绕过此检查。
+if [[ "${FORCE_LEGACY:-}" != "1" ]]; then
+  echo "⚠️  此脚本已弃用。当前 AUTO (url-test) 分组已自动完成节点选择。" >&2
+  echo "    若确需运行旧测速逻辑，请设置 FORCE_LEGACY=1。" >&2
+  exit 1
+fi
+
 BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MIXIN="$BASE_DIR/resources/mixin.yaml"
 RUNTIME="$HOME/.local/share/clash/runtime.yaml"

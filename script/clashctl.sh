@@ -598,24 +598,15 @@ _merge_sanitize_restart() {
     # 注意: yq 的 unique() 会对规则排序，破坏规则优先级（例如 Copilot 需要在宽泛 GitHub 规则之前）。
     # 因此这里不做全量 unique；重复规则通常不影响运行，且 sanitizer 会尽量避免重复注入。
 
-    # 防御性修复：ProxyGroup 循环 (AUTO-SMART <-> 速云梯)
-    # 该循环会导致 mihomo -t 直接失败，从而让 update 看起来“卡住/失败”。
-    # 优先保留兼容分组「速云梯 -> AUTO-SMART」，并从 AUTO-SMART 中移除「速云梯」以打破环。
-    if [ -x "$BIN_YQ" ]; then
-        if "$BIN_YQ" -e '.proxy-groups[] | select(.name=="AUTO-SMART") | ((.proxies // []) | contains(["速云梯"]))' "$tmp_out" >/dev/null 2>&1 && \
-           "$BIN_YQ" -e '.proxy-groups[] | select(.name=="速云梯") | ((.proxies // []) | contains(["AUTO-SMART"]))' "$tmp_out" >/dev/null 2>&1; then
-            "$BIN_YQ" -i '(.proxy-groups[] | select(.name=="AUTO-SMART") | .proxies) |= ((. // []) | map(select(. != "速云梯")))' "$tmp_out" 2>/dev/null || true
-        fi
-    fi
-
-        # 默认路由策略：若存在 AUTO-SMART 分组，则强制将最终 MATCH 指向该分组，避免订阅过期导致默认落回某个订阅分组。
+    # NOTE: 旧订阅时代 AUTO-SMART↔速云梯循环检测已移除 (2026-04, 不再需要)
+        # 默认路由策略：若存在目标分组，则强制将最终 MATCH 指向该分组，确保未匹配流量走代理。
         # 允许通过环境变量 CLASH_MATCH_GROUP 覆盖目标分组名。
         # 规则调整原则：
         #   - 移除所有现有 MATCH,*（避免“先匹配先返回”导致新 MATCH 不生效）
         #   - 将 wikipedia/wikimedia/wikidata 路由到目标分组（插入在 GEOIP 之前）
         #   - 追加 MATCH,<target> 作为最后一条规则
         if [ -x "$BIN_YQ" ]; then
-                local match_group="${CLASH_MATCH_GROUP:-AUTO-SMART}"
+                local match_group="${CLASH_MATCH_GROUP:-PROXY}"
                 if CLASH_MATCH_GROUP="$match_group" "$BIN_YQ" -e '((.["proxy-groups"] // []) | map(.name) | contains([strenv(CLASH_MATCH_GROUP)]))' "$tmp_out" >/dev/null 2>&1; then
                         CLASH_MATCH_GROUP="$match_group" "$BIN_YQ" -i '
                             .rules = (
@@ -630,7 +621,7 @@ _merge_sanitize_restart() {
                                 ) as $base |
                                 ($base + [
                                     # VS Code / Microsoft endpoints:
-                                    # 默认走 CLASH_MATCH_GROUP（通常为 AUTO-SMART）以避免在“直连受限”网络里出现大量超时。
+                                    # 默认走 CLASH_MATCH_GROUP（通常为 PROXY）以避免在“直连受限”网络里出现大量超时。
                                     "DOMAIN,update.code.visualstudio.com," + strenv(CLASH_MATCH_GROUP),
                                     "DOMAIN,marketplace.visualstudio.com," + strenv(CLASH_MATCH_GROUP),
                                     "DOMAIN-SUFFIX,gallery.vsassets.io," + strenv(CLASH_MATCH_GROUP),

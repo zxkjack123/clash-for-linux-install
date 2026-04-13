@@ -114,17 +114,14 @@ if [ -x "$YQ_BIN" ]; then
     fi
   fi
   if [ -z "$GOOGLE_SCHOLAR_TARGET" ]; then
-    # Best-effort auto pick (never guess a non-existent group)
-    GOOGLE_SCHOLAR_TARGET=$("$YQ_BIN" -r '
-      ((.["proxy-groups"] // []) | map(.name)) as $names |
-      if ($names | index("ACADEMIC")) != null then "ACADEMIC"
-      elif ($names | index("AUTO-SMART")) != null then "AUTO-SMART"
-      elif ($names | index("速云梯")) != null then "速云梯"
-      elif ($names | index("PROXY")) != null then "PROXY"
-      elif ($names | index("Proxy")) != null then "Proxy"
-      else ""
-      end
-    ' "$RUNTIME" 2>/dev/null || echo "")
+    # Best-effort auto pick (never guess a non-existent group).
+    # Uses yq -e + contains() per candidate — same pattern as Copilot detection.
+    for _cand in ACADEMIC AUTO PROXY Proxy; do
+      if "$YQ_BIN" -e "((.\"proxy-groups\" // []) | map(.name) | contains([\"$_cand\"]))" "$RUNTIME" >/dev/null 2>&1; then
+        GOOGLE_SCHOLAR_TARGET="$_cand"
+        break
+      fi
+    done
   fi
   if [ -n "$GOOGLE_SCHOLAR_TARGET" ]; then
     # Keep rules minimal/specific to avoid affecting other Google services.
@@ -161,11 +158,11 @@ fi
 # Fallback (no yq): try to detect a safe existing group by plain text.
 # IMPORTANT: Do not inject a rule referencing a non-existent group (mihomo will fail to start).
 if [ -z "$GOOGLE_SCHOLAR_TARGET" ]; then
-  if [ -n "$CLASH_GOOGLE_SCHOLAR_TARGET" ] && grep -qF "name: $CLASH_GOOGLE_SCHOLAR_TARGET" "$RUNTIME" 2>/dev/null; then
+  if [ -n "$CLASH_GOOGLE_SCHOLAR_TARGET" ] && grep -qE "name: \"?${CLASH_GOOGLE_SCHOLAR_TARGET}\"?" "$RUNTIME" 2>/dev/null; then
     GOOGLE_SCHOLAR_TARGET="$CLASH_GOOGLE_SCHOLAR_TARGET"
   else
-    for cand in AUTO-SMART 速云梯 PROXY; do
-      if grep -qF "name: $cand" "$RUNTIME" 2>/dev/null; then
+    for cand in ACADEMIC AUTO PROXY; do
+      if grep -qE "name: \"?${cand}\"?" "$RUNTIME" 2>/dev/null; then
         GOOGLE_SCHOLAR_TARGET="$cand"
         break
       fi
@@ -175,9 +172,9 @@ fi
 
 # Fallback (no yq): try to detect COPILOT group by plain text.
 if [ -z "$COPILOT_TARGET" ]; then
-  if [ -n "$CLASH_COPILOT_TARGET" ] && grep -qF "name: $CLASH_COPILOT_TARGET" "$RUNTIME" 2>/dev/null; then
+  if [ -n "$CLASH_COPILOT_TARGET" ] && grep -qE "name: \"?${CLASH_COPILOT_TARGET}\"?" "$RUNTIME" 2>/dev/null; then
     COPILOT_TARGET="$CLASH_COPILOT_TARGET"
-  elif grep -qF 'name: COPILOT' "$RUNTIME" 2>/dev/null; then
+  elif grep -qE 'name: "?COPILOT"?' "$RUNTIME" 2>/dev/null; then
     COPILOT_TARGET="COPILOT"
   else
     COPILOT_TARGET="DIRECT"
