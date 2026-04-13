@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 最小运行时清洗脚本 (独立版)
 # 目标:
-#   1. 移除订阅/合并后遗留的 1.1.1.1 / 8.8.8.8 经由“西瓜加速”或其它非 DIRECT 的 IP-CIDR 劫持规则
+#   1. 移除订阅/合并后遗留的 1.1.1.1 / 8.8.8.8 经由非 DIRECT 代理的 IP-CIDR 劫持规则
 #   2. 确保存在高优先级 DIRECT 规则: IP-CIDR,1.1.1.1/32,DIRECT,no-resolve & IP-CIDR,8.8.8.8/32,DIRECT,no-resolve
 #   3. 从 dns.fallback 中移除裸 IP 1.1.1.1 / 8.8.8.8 (避免不稳定时造成递归/EOF 震荡)
 #   4. 可选 --restart 重启服务 (只在成功修改后)
@@ -189,8 +189,8 @@ if [ -z "$GOOGLE_SCHOLAR_PRIORITY_RULES" ] && [ -n "$GOOGLE_SCHOLAR_TARGET" ]; t
 fi
 
 # 预扫描统计
-HIJACK_1=$(grep -E "IP-CIDR,1.1.1.1/32,.*(西瓜加速|PROXY|Proxy|proxy).*no-resolve" -n "$RUNTIME" || true)
-HIJACK_8=$(grep -E "IP-CIDR,8.8.8.8/32,.*(西瓜加速|PROXY|Proxy|proxy).*no-resolve" -n "$RUNTIME" || true)
+HIJACK_1=$(grep -E "IP-CIDR,1\.1\.1\.1/32," "$RUNTIME" | grep -v ",DIRECT," || true)
+HIJACK_8=$(grep -E "IP-CIDR,8\.8\.8\.8/32," "$RUNTIME" | grep -v ",DIRECT," || true)
 HAS_DIRECT_1=$(grep -E "IP-CIDR,1.1.1.1/32,DIRECT,no-resolve" -n "$RUNTIME" || true)
 HAS_DIRECT_8=$(grep -E "IP-CIDR,8.8.8.8/32,DIRECT,no-resolve" -n "$RUNTIME" || true)
 FALLBACK_HAS_IP=$(grep -E "^ *fallback:.*(1.1.1.1|8.8.8.8)" -n "$RUNTIME" || true)
@@ -237,7 +237,9 @@ if [ -x "$YQ_BIN" ]; then
   "$YQ_BIN" -i '
     .rules = (
       ( ["IP-CIDR,1.1.1.1/32,DIRECT,no-resolve","IP-CIDR,8.8.8.8/32,DIRECT,no-resolve"] +
-        ((.rules // []) | map(select(. != "IP-CIDR,1.1.1.1/32,西瓜加速,no-resolve" and . != "IP-CIDR,8.8.8.8/32,西瓜加速,no-resolve")))
+        ((.rules // []) | map(select(
+          (test("^IP-CIDR,(1\\.1\\.1\\.1|8\\.8\\.8\\.8)/32,") == false) or (test(",DIRECT,"))
+        )))
       )
     ) |
     .dns.fallback = ((.dns.fallback // []) | map(select(. != "1.1.1.1" and . != "8.8.8.8")))
@@ -341,8 +343,8 @@ if ! $MODIFIED; then
   vv "文本模式处理"
   TMP="${RUNTIME}.tmp.$$"
   trap 'rm -f "${TMP:-}" 2>/dev/null || true' EXIT INT TERM
-  # 删除劫持行 (兼容引号/无引号)
-  grep -Ev "IP-CIDR,1.1.1.1/32,西瓜加速,no-resolve|IP-CIDR,8.8.8.8/32,西瓜加速,no-resolve" "$RUNTIME" > "$TMP" || true
+  # 删除劫持行: 移除所有非 DIRECT 的 1.1.1.1/8.8.8.8 IP-CIDR 规则 (保留 DIRECT 和其他行)
+  awk '!/IP-CIDR,(1\.1\.1\.1|8\.8\.8\.8)\/32,/ || /,DIRECT,/' "$RUNTIME" > "$TMP" || true
   mv "$TMP" "$RUNTIME"
   # fallback 去除裸IP (简易: 不深入解析, 直接替换当前行)
   sed -i -E 's/(fallback:.*)1.1.1.1 */\1/g; s/(fallback:.*)8.8.8.8 */\1/g' "$RUNTIME" || true
@@ -479,7 +481,7 @@ if [ -x "$YQ_BIN" ]; then
 fi
 
 # 变更摘要
-NEW_HIJACK=$(grep -E "IP-CIDR,(1.1.1.1|8.8.8.8)/32,西瓜加速,no-resolve" "$RUNTIME" || true)
+NEW_HIJACK=$(grep -E "IP-CIDR,(1\.1\.1\.1|8\.8\.8\.8)/32," "$RUNTIME" | grep -v ",DIRECT," || true)
 if [ -n "$NEW_HIJACK" ]; then
   log "警告: 仍检测到残留劫持行 (请手动检查):"; echo "$NEW_HIJACK"
 else
