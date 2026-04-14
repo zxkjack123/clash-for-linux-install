@@ -1,4 +1,35 @@
 # Changelog
+## [2.5.12] - 2026-04-14
+
+### 🛠 Fixes
+- **Division-by-zero guards**: `check_streaming_services()` and `check_domestic_sites()` now handle zero-endpoint cases gracefully instead of crashing.
+- **Unstable-skip latency inflation**: unstable endpoints marked as SKIP no longer contribute their timeout penalty to average latency calculations in `check_ai_services()` and `check_dev_services()`.
+- **Cron overlap at :00**: removed duplicate `0 * * * * --check-only` cron entry that collided with the `*/10 --auto-fix` schedule every hour.
+- **Atomic JSON write**: `health_metrics.json` is now written via tmp+mv to prevent partial reads from concurrent consumers.
+- **SCNET routing**: changed from proxy to `direct` (domestic API, ~99 ms vs ~300–500 ms through proxy).
+
+### 🔧 Improvements
+- **Graduated latency scoring**: replaced binary pass/fail latency thresholds with a piecewise-linear `_grad_latency_score()` model (overseas 300–1500 ms, domestic 100–500 ms), yielding more representative health grades.
+- **Faster failover detection**: AUTO proxy group `interval` reduced from 120 s to 30 s across all url-test groups, cutting node-down detection from ~2 min to ~30 s.
+- **Notification auto-dismiss**: `notify-send` alerts now auto-close after 15 s (`-t 15000`).
+- **Kimi endpoint removed**: no longer probed (service discontinued).
+- **Semantic Scholar marked unstable**: excluded from availability scoring; failures no longer drag down health grade.
+
+### 🐛 Script quality
+- Generalized `sanitize_runtime.sh` hijack detection (no longer hardcodes vendor names).
+- Fixed unquoted array slices in `optimize_ai.sh`, `test_ai_connectivity.sh`, and `test_openxlab_direct_rules.sh`.
+- Fixed unsafe `xargs` in `clashctl.sh` (handles filenames with spaces).
+- Added post-merge structural YAML validation in `clashctl.sh`.
+- Added YAML fallback validation + `flock` in `update_clash_subscription.sh`.
+- Subscription refresh systemd service: added `network-online.target` dependency.
+- `uninstall.sh` now cleans up subscription refresh timer/service.
+
+### ✅ Verification
+- `bash -n $(git ls-files '*.sh')` — 0 syntax errors
+- `bash tests/run_tests.sh` — 69 passed, 0 failed
+- `bash script/run_static_gates.sh` — all gates passed (0 high / 0 medium / 0 low)
+- Live health check: 87/B (was ~69/D under old scoring model)
+
 ## [2.5.11] - 2026-04-04
 
 ### ✨ New

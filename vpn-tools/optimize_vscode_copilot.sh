@@ -151,7 +151,6 @@ test_endpoint() {
 test_endpoint "GitHub API (proxy)" "https://api.github.com/" '^(200|301|302|401|403)$'
 test_endpoint "Copilot API (proxy)" "https://api.githubcopilot.com/healthz" '^(200|204|301|302|404)$'
 test_endpoint "Copilot Proxy (proxy)" "https://copilot-proxy.githubusercontent.com/" '^(200|301|302|404)$'
-test_endpoint "OpenAI API (proxy)" "https://api.openai.com/v1/models" '^(200|401|403)$'
 
 # If Copilot endpoints fail via proxy, check direct path and recommend VS Code relaunch with NO_PROXY bypass
 echo ""

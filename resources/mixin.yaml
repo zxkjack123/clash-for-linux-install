@@ -31,3 +31,8 @@ rules:
   - DOMAIN-SUFFIX,media-amazon.com,PROXY
   - DOMAIN-SUFFIX,images-amazon.com,PROXY
   - DOMAIN-SUFFIX,amazonaw.com,PROXY
+
+  # HuggingFace (direct from China triggers connection reset / ERR_CONNECTION_CLOSED)
+  - DOMAIN-SUFFIX,huggingface.co,PROXY
+  - DOMAIN-SUFFIX,hf.co,PROXY
+  - DOMAIN-SUFFIX,huggingface.com,PROXY

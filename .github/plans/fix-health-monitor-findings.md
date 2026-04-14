@@ -214,7 +214,7 @@
   - ✅ `health_metrics.json` 是合法 JSON（`jq . ~/.local/share/clash/metrics/health_metrics.json`）
 - **潜在风险**：无
 
-#### Task 5.2: 提交
+#### ✅ Task 5.2: 提交
 - **目标**：提交所有改动
 - **修改内容**：
   - `git add vpn-tools/network_health_monitor.sh`
