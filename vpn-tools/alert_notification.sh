@@ -121,7 +121,7 @@ send_desktop_notification() {
     
     # 尝试多种桌面通知方式
     if have notify-send; then
-        notify-send -u "$urgency" -i "$icon" "Clash 网络监控" "$ALERT_MESSAGE" 2>/dev/null || true
+        notify-send -t 15000 -u "$urgency" -i "$icon" "Clash 网络监控" "$ALERT_MESSAGE" 2>/dev/null || true
     elif have zenity; then
         zenity --notification --text="[$ALERT_LEVEL] $ALERT_MESSAGE" 2>/dev/null || true
     elif have kdialog; then

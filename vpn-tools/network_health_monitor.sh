@@ -155,12 +155,11 @@ check_ai_services() {
         $'https://sg.uiuiapi.com/\tUIUI-API\t^(20[0-9]|30[12378])$\tyes'
         "${SILICONFLOW_URL}"$'\t硅基流动\t^(20[0-9]|30[0-9])$\tdirect'
         $'https://openrouter.ai/api/v1\tOpenRouter\t^(20[0-9]|401|403)$\tyes'
-        $'https://kimi.moonshot.cn/\tKimi\t^[23]\tyes'
     )
     
     for service in "${services[@]}"; do
-        local url label pattern proxy_pref
-        IFS=$'\t' read -r url label pattern proxy_pref <<< "$service"
+        local url label pattern proxy_pref stability
+        IFS=$'\t' read -r url label pattern proxy_pref stability <<< "$service"
         local regex="${pattern:-^[23]}"
         local proxy_mode="${proxy_pref:-yes}"
         case "${proxy_mode,,}" in
@@ -174,6 +173,13 @@ check_ai_services() {
         result=$(test_url "$url" "$label" "$proxy_mode" "$regex")
         IFS='|' read -r lbl code latency succ <<< "$result"
 
+        # Unstable sites: log result but exclude failures from success rate
+        if [[ "${stability:-}" == "unstable" && "$succ" -eq 0 ]]; then
+            total_latency=$((total_latency + latency))
+            log "  $lbl: ${code} (${latency}ms) [UNSTABLE-SKIP]" >&2
+            continue
+        fi
+
         total=$((total + 1))
         success=$((success + succ))
         total_latency=$((total_latency + latency))
@@ -181,8 +187,8 @@ check_ai_services() {
         log "  $lbl: ${code} (${latency}ms) [$([ $succ -eq 1 ] && echo 'OK' || echo 'FAIL')]" >&2
     done
     
-    local avg_latency=$((total_latency / total))
-    local success_rate=$((success * 100 / total))
+    local avg_latency=$(( total > 0 ? total_latency / total : 0 ))
+    local success_rate=$(( total > 0 ? success * 100 / total : 100 ))
     
     echo "$success_rate|$avg_latency|$success|$total"
 }
@@ -196,14 +202,21 @@ check_dev_services() {
         $'https://api.github.com\tGitHub\t^[23]'
         $'https://registry.npmjs.org\tNPM\t^[23]'
         $'https://pypi.org\tPyPI\t^[23]'
-        $'https://api.semanticscholar.org/graph/v1/paper/search?query=test&limit=1\tSemantic-Scholar\t^([23]|429)'
+        $'https://api.semanticscholar.org/graph/v1/paper/search?query=test&limit=1\tSemantic-Scholar\t^([23]|429)\tunstable'
     )
     
     for service in "${services[@]}"; do
-        local url label pattern
-        IFS=$'\t' read -r url label pattern <<< "$service"
+        local url label pattern stability
+        IFS=$'\t' read -r url label pattern stability <<< "$service"
         result=$(test_url "$url" "$label" "yes" "${pattern:-^[23]}")
         IFS='|' read -r lbl code latency succ <<< "$result"
+
+        # Unstable sites: log result but exclude failures from success rate
+        if [[ "${stability:-}" == "unstable" && "$succ" -eq 0 ]]; then
+            total_latency=$((total_latency + latency))
+            log "  $lbl: ${code} (${latency}ms) [UNSTABLE-SKIP]" >&2
+            continue
+        fi
 
         total=$((total + 1))
         success=$((success + succ))
@@ -212,8 +225,8 @@ check_dev_services() {
         log "  $lbl: ${code} (${latency}ms) [$([ $succ -eq 1 ] && echo 'OK' || echo 'FAIL')]" >&2
     done
     
-    local avg_latency=$((total_latency / total))
-    local success_rate=$((success * 100 / total))
+    local avg_latency=$(( total > 0 ? total_latency / total : 0 ))
+    local success_rate=$(( total > 0 ? success * 100 / total : 100 ))
     
     echo "$success_rate|$avg_latency|$success|$total"
 }

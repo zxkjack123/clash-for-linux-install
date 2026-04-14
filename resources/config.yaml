@@ -38,7 +38,7 @@ proxy-groups:
       - "US-Tailscale"
       - "JP-Tailscale"
     url: "https://www.gstatic.com/generate_204"
-    interval: 120
+    interval: 30
     tolerance: 200
 
   # Main upstream: manual override, defaults to AUTO
@@ -64,7 +64,7 @@ proxy-groups:
       - "AUTO"
       - "DIRECT"
     url: "https://www.gstatic.com/generate_204"
-    interval: 120
+    interval: 30
 
   # Copilot: auto-select with DIRECT fallback
   - name: "COPILOT"
@@ -73,7 +73,7 @@ proxy-groups:
       - "AUTO"
       - "DIRECT"
     url: "https://copilot-proxy.githubusercontent.com/_ping"
-    interval: 120
+    interval: 30
 
   # VS Code update/marketplace: auto-select with DIRECT fallback
   - name: "VSCODE"
@@ -82,7 +82,7 @@ proxy-groups:
       - "AUTO"
       - "DIRECT"
     url: "https://update.code.visualstudio.com/api/update/linux-x64/stable/latest"
-    interval: 120
+    interval: 30
 
   # Docker: auto-select with DIRECT fallback
   - name: "DOCKER"
@@ -91,7 +91,7 @@ proxy-groups:
       - "AUTO"
       - "DIRECT"
     url: "https://www.gstatic.com/generate_204"
-    interval: 120
+    interval: 30
 
   - name: "ACADEMIC"
     type: select
