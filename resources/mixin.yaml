@@ -9,6 +9,10 @@
 #   so these rules won’t be shadowed by a trailing MATCH,DIRECT.
 
 rules:
+  # Block link-local IMDS (169.254.169.254) — VS Code extensions probe cloud metadata
+  # on physical workstations; these always fail and pollute connection failure counts.
+  - IP-CIDR,169.254.0.0/16,REJECT,no-resolve
+
   # Wikipedia / Wikimedia family (force proxy; direct may be blocked or DNS-poisoned)
   - DOMAIN-SUFFIX,wikipedia.org,PROXY
   - DOMAIN-SUFFIX,wikimedia.org,PROXY

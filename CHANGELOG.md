@@ -1,4 +1,18 @@
 # Changelog
+## [2.5.13] - 2026-04-14
+
+### ✨ New
+- **`vpn-tools/network_health_check.sh`**: lightweight Nagios-style three-state health check (OK/WARN/CRIT) for GitHub, Copilot, and VS Code link probing via cron. Features configurable thresholds, streak-based debounce (consecutive failures before escalation), JSON state persistence, `--json` / `--verbose` / `--dry-run` / `--reset` flags, and integration with `alert_notification.sh` for desktop alerts.
+
+### 🛠 Fixes
+- **Block link-local IMDS probes**: added `IP-CIDR,169.254.0.0/16,REJECT,no-resolve` to `resources/mixin.yaml`. VS Code extensions continuously probe `169.254.169.254` (cloud instance metadata) on physical workstations; these requests were routed through the proxy, timing out and inflating `fails_5m` by ~976/hour.
+
+### ✅ Verification
+- `bash -n $(git ls-files '*.sh')` — 0 syntax errors
+- `bash tests/run_tests.sh` — 69 passed, 0 failed
+- `bash script/run_static_gates.sh` — all gates passed (0 high / 0 medium / 0 low)
+- Health check tested: OK (exit 0), WARN (exit 1), CRIT (exit 2), debounce escalation, recovery, cron auto-fire
+
 ## [2.5.12] - 2026-04-14
 
 ### 🛠 Fixes
