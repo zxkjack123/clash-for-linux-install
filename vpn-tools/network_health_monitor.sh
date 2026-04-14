@@ -151,7 +151,7 @@ check_ai_services() {
     
     local services=(
         $'https://api.githubcopilot.com/\tCopilot\t^(20[0-9]|40[0-9])$\tyes'
-        $'https://api.scnet.cn/api/llm/v1/chat/completions\tSCNET\t^(20[0-9]|401|403|405)$\tyes'
+        $'https://api.scnet.cn/api/llm/v1/chat/completions\tSCNET\t^(20[0-9]|401|403|405)$\tdirect'
         $'https://sg.uiuiapi.com/\tUIUI-API\t^(20[0-9]|30[12378])$\tyes'
         "${SILICONFLOW_URL}"$'\t硅基流动\t^(20[0-9]|30[0-9])$\tdirect'
         $'https://openrouter.ai/api/v1\tOpenRouter\t^(20[0-9]|401|403)$\tyes'
@@ -175,7 +175,6 @@ check_ai_services() {
 
         # Unstable sites: log result but exclude failures from success rate
         if [[ "${stability:-}" == "unstable" && "$succ" -eq 0 ]]; then
-            total_latency=$((total_latency + latency))
             log "  $lbl: ${code} (${latency}ms) [UNSTABLE-SKIP]" >&2
             continue
         fi
@@ -213,7 +212,6 @@ check_dev_services() {
 
         # Unstable sites: log result but exclude failures from success rate
         if [[ "${stability:-}" == "unstable" && "$succ" -eq 0 ]]; then
-            total_latency=$((total_latency + latency))
             log "  $lbl: ${code} (${latency}ms) [UNSTABLE-SKIP]" >&2
             continue
         fi
@@ -253,8 +251,8 @@ check_streaming_services() {
         log "  $lbl: ${code} (${latency}ms) [$([ $succ -eq 1 ] && echo 'OK' || echo 'FAIL')]" >&2
     done
     
-    local avg_latency=$((total_latency / total))
-    local success_rate=$((success * 100 / total))
+    local avg_latency=$(( total > 0 ? total_latency / total : 0 ))
+    local success_rate=$(( total > 0 ? success * 100 / total : 100 ))
     
     echo "$success_rate|$avg_latency|$success|$total"
 }
@@ -283,10 +281,18 @@ check_domestic_sites() {
         log "  $lbl: ${code} (${latency}ms) [$([ $succ -eq 1 ] && echo 'OK' || echo 'FAIL')]" >&2
     done
     
-    local avg_latency=$((total_latency / total))
-    local success_rate=$((success * 100 / total))
+    local avg_latency=$(( total > 0 ? total_latency / total : 0 ))
+    local success_rate=$(( total > 0 ? success * 100 / total : 100 ))
     
     echo "$success_rate|$avg_latency|$success|$total"
+}
+
+# 分段线性延迟评分: <=fast → 100, fast..slow → 线性衰减, >=slow → 0
+_grad_latency_score() {
+    local latency="$1" fast="$2" slow="$3"
+    if [ "$latency" -le "$fast" ]; then echo 100; return; fi
+    if [ "$latency" -ge "$slow" ]; then echo 0; return; fi
+    echo $(( (slow - latency) * 100 / (slow - fast) ))
 }
 
 # 计算健康分数
@@ -305,12 +311,14 @@ calculate_health_score() {
     score=$((score + stream_rate * 20 * 70 / 10000))
     score=$((score + domestic_rate * 25 * 70 / 10000))
     
-    # 延迟贡献 (30%)
+    # 延迟贡献 (30%) — 分段线性衰减
+    # 海外: <=300ms 满分, 300-1500ms 线性, >=1500ms 零分
+    # 国内: <=100ms 满分, 100-500ms 线性, >=500ms 零分
     local latency_score=0
-    [ "$ai_latency" -lt 500 ] && latency_score=$((latency_score + 30))
-    [ "$dev_latency" -lt 500 ] && latency_score=$((latency_score + 25))
-    [ "$stream_latency" -lt 500 ] && latency_score=$((latency_score + 20))
-    [ "$domestic_latency" -lt 300 ] && latency_score=$((latency_score + 25))
+    latency_score=$((latency_score + $(_grad_latency_score "$ai_latency" 300 1500) * 30 / 100))
+    latency_score=$((latency_score + $(_grad_latency_score "$dev_latency" 300 1500) * 25 / 100))
+    latency_score=$((latency_score + $(_grad_latency_score "$stream_latency" 300 1500) * 20 / 100))
+    latency_score=$((latency_score + $(_grad_latency_score "$domestic_latency" 100 500) * 25 / 100))
     
     score=$((score + latency_score * 30 / 100))
     
@@ -410,8 +418,8 @@ perform_health_check() {
     log "国内网站:   成功率 ${domestic_rate}% | 平均延迟 ${domestic_latency}ms"
     log "================================="
     
-    # 5. 保存指标
-    cat > "$HEALTH_METRICS" <<EOF
+    # 5. 保存指标（原子写入：先写临时文件再 mv）
+    cat > "${HEALTH_METRICS}.tmp" <<EOF
 {
   "timestamp": $timestamp,
   "check_time": "$check_time",
@@ -445,6 +453,7 @@ perform_health_check() {
   }
 }
 EOF
+    mv -f "${HEALTH_METRICS}.tmp" "$HEALTH_METRICS"
     
     # 6. 检测问题并告警
     if [ "$health_score" -lt "$MIN_HEALTH_SCORE" ]; then
