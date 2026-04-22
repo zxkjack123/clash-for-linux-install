@@ -4,14 +4,16 @@
 
 - **问题/需求描述**：Tailscale SSH 在 control plane / Magic DNS 不稳定时会挂起（已被 Task 3.2 阻塞复现）。Windows 客户端对 Tailscale SSH 支持差，多平台体验不一致。希望切换到"Tailscale 提供网络层 + OpenSSH 提供认证层"的更稳健方案。
 - **审阅来源**：用户决策（在比较两方案后采纳 OpenSSH over Tailscale）。
+- **关键发现（2026-04-22 Task 1.4 验证）**：Tailscale `--ssh` flag 在 tailnet IP 的 22 端口上做 userspace 拦截，sshd 即使监听 `0.0.0.0:22` 也收不到连接。**这意味着 OpenSSH 与 Tailscale SSH 在同一端口上无法共存**。采纳**方案 B**：sshd 增开 **2222 端口**，两者分端口共存。
 - **目标**：
-  - 在所有常用节点（jp-node、us-node、SynologyNAS923 等）启用原生 sshd，绑定到 Tailscale 接口或受防火墙限制
-  - 本机配置 `~/.ssh/config` 别名，能用 `ssh jp` / `ssh us` 直接登录
-  - 保留 Tailscale SSH 作为应急后备（不主动关闭 `--ssh` flag）
+  - 在所有常用节点（jp-node、us-node、SynologyNAS923 等）让 sshd 在 **Tailscale 接口的 2222 端口**额外监听
+  - 本机配置 `~/.ssh/config` 别名（含 `Port 2222`），能用 `ssh jp` / `ssh us` 走 OpenSSH 公钥认证
+  - 保留 Tailscale SSH 作为应急后备（22 端口仍由 tailscaled 拦截）
   - **零停机切换**：实施过程中绝不丢失对任何节点的访问能力
 - **非目标（不做什么）**：
   - 不卸载 Tailscale，也不关闭 `tailscaled` —— 网络层依赖
   - 不在本次范围内修改 Tailscale ACL policy
+  - 不修改 sshd 在 22 端口的监听（保持 `Port 22` 供本地/公网回退）
   - 不强制禁用密码登录的远端节点（仅在确认公钥可用后才禁用）
   - 不做 SSH 跳板机（jump host）配置
   - 不处理 offline 节点（DELL、PC20241202、neutronics-server 等）
@@ -26,34 +28,38 @@
 
 分三个阶段推进，每个阶段独立可回滚：
 
-1. **Phase 1 — 本地准备 + 单节点验证**：用 jp-node 作为试点，配公钥 + 测试 OpenSSH 通路 + 验证防火墙隔离 22 端口对公网
-2. **Phase 2 — 推广到其他在线节点**：us-node、SynologyNAS923，复用 jp-node 的配置模板
-3. **Phase 3 — 加固与文档化**：所有节点确认无误后，再考虑禁用密码认证、限制监听地址等收紧操作
+1. **Phase 1 — 本地准备 + jp-node 试点**：探测 → 公钥分发 → 本机 alias → **sshd 开 2222 端口** → 端到端验证 → 防火墙审计
+2. **Phase 2 — 推广到其他在线节点**：us-node、SynologyNAS923，复用 jp-node 流程
+3. **Phase 3 — 加固（可选）**：云厂商安全组核查、sshd 加固、防火墙收紧
 
 ### 关键设计决策
 
 | 决策 | 选择 | 理由 |
 |------|------|------|
-| sshd 监听范围 | **防火墙限制 + 默认监听** | `ListenAddress` 修改风险高（若 Tailscale 接口名/IP 变化会锁死），用防火墙更灵活；保留 `0.0.0.0:22` 但 `ufw deny 22` + `ufw allow in on tailscale0` |
-| 公钥分发方式 | **现有 Tailscale SSH 通道传输** | 已经能 `tailscale ssh` 登录的节点，用它当临时通道传公钥，避免引入第三方工具 |
+| **端口策略** | **sshd 在 22 和 2222 同时监听；2222 走 OpenSSH，22 仍被 Tailscale 拦截** | Tailscale `--ssh` 无法与 22 端口 sshd 共存（已实测验证）；分端口可两者并存且可独立回滚 |
+| **2222 端口选择** | 非标端口 2222 | 避开 Tailscale 拦截；云厂商防火墙通常不默认放行，降低公网暴露风险 |
+| sshd 监听范围 | **保持 0.0.0.0:22 + 新增 0.0.0.0:2222；云厂商安全组/本地防火墙控制公网暴露** | `ListenAddress` 绑 Tailscale IP 风险高（接口漂移会锁死）；防火墙层控制更灵活 |
+| 公钥分发方式 | **现有 Tailscale SSH 通道传输** | 已验证可用，无需第三方工具 |
 | 密码认证 | **Phase 3 才禁用，且每节点独立确认** | 公钥失效时密码是最后的救命稻草 |
 | 别名命名 | `jp` / `us` / `nas` | 简短，与现有 `~/.ssh/config` 中 `sugon-hf` 等命名风格一致 |
 | 测试顺序 | **新会话验证 + 保留旧会话** | 改 sshd 配置后必须开新窗口验证再断旧窗口 |
-| 回滚机制 | 每次改 sshd_config 前备份 + 改完不立即关旧 session | sshd reload 失败时旧 session 仍能 `mv` 备份回去 |
+| 回滚机制 | 每次改 sshd_config 前备份 + 改完不立即关旧 session + 用 reload 而非 restart | reload 不踢现有连接；失败时用备份恢复 |
+| sshd 变更粒度 | **仅追加 `Port 2222`，不改其他任何项** | 最小变更降低风险；Phase 3 才考虑 PasswordAuthentication 等 |
 
 ### 影响范围
 
 **本机文件**：
-- `~/.ssh/config` — 新增 jp/us/nas Host 段
+- `~/.ssh/config` — 新增 jp/us/nas Host 段（含 Port 2222）
 - `~/.ssh/known_hosts` — 自然写入（首次连接）
 
 **远端节点文件**（每节点）：
 - `~/.ssh/authorized_keys` — 追加本机公钥
-- `/etc/ssh/sshd_config` — Phase 3 才动（仅 us-node/jp-node，可选）
-- 防火墙规则（ufw / firewalld / iptables）— Phase 1/2 验证现状，Phase 3 才收紧
+- `/etc/ssh/sshd_config` — **Phase 1 起即修改**（追加 `Port 2222`；**不删除原 `Port 22`**）
+- 防火墙规则（ufw / firewalld / iptables）— Phase 1 审计现状并**放行 tailscale0 上的 2222**，Phase 3 才收紧公网
 
 **不会触碰**：
 - Tailscale 配置（`tailscaled` 仍以 `--ssh` 运行）
+- sshd 在 22 端口的监听（Tailscale SSH 回退路径）
 - `clash-for-linux-install` 项目代码
 - 其他已有 SSH alias（sugon-hf、asipp 等）
 
@@ -61,15 +67,15 @@
 
 | 代码路径/操作 | 可能的失败 | 错误类型 | 已处理？ | 处理方式 | 用户可见行为 |
 |-------------|-----------|---------|---------|---------|------------|
-| `ssh-copy-id` over Tailscale SSH | Tailscale SSH 此刻挂起 | 阻塞 | Y | Plan B：用 `tailscale file cp` 传文件，再 ssh 进去手动 cat 追加；或 web console 临时启用密码 | 手动 fallback 流程在 Task 1.2 中详述 |
-| 修改远端 `sshd_config` 后 `systemctl reload sshd` | 配置语法错 / sshd 启动失败 | 锁死 | Y | 改前 `sshd -t` 预检；reload 失败时旧 session 用备份恢复 | Task 3.x 标记为 CRITICAL，必须保留旧 session |
-| 远端启用 ufw 但忘记放行 tailscale0 | 自身 SSH 被防火墙踢掉 | 锁死 | Y | 必须按"先 allow 再 enable"顺序；先用 `ufw --dry-run` | Task 1.4 详述顺序 |
-| 远端 sshd 没装/未启用 | OpenSSH 路径不可用 | 阻塞 | Y | Task 1.1 先检测 `systemctl status sshd`，缺失则 `apt install openssh-server` | 检测步骤前置 |
-| 公网 IP 节点（jp-node 47.245.32.3）22 端口被云厂商安全组开放 | OpenSSH 暴露公网，遭暴力破解 | 安全 | Y | Phase 3 的安全检查清单包含云厂商安全组核查 | Task 3.1 明确要求 |
-| 本机 `~/.ssh/config` 已有同名 Host | 别名冲突覆盖 | 配置错 | Y | Task 1.5 grep 检查后再追加 | 已确认当前无 jp/us/nas |
-| Tailscale IP 变化（peer 重装） | 别名指向失效 | 阻塞 | N（已知局限）| 文档记录：IP 变化时手动更新 `~/.ssh/config` HostName 字段 | 可见局限 |
-| 远端节点 root 用户禁用 | `User root` 别名无法登录 | 配置错 | Y | Task 1.1 先 `tailscale ssh root@host whoami` 验证 root 身份可用 | 检测前置 |
-| 网络中断 / Tailscale 离线 | 100.x 地址不可达 | 阻塞 | N（设计预期）| 这种情况下任何 100.x 方案都不可用；保留每节点的公网 SSH 应急通道（如有） | 可见局限 |
+| `ssh-copy-id` over Tailscale SSH | Tailscale SSH 此刻挂起 | 阻塞 | Y | 用 `tailscale file cp` 传文件，或云控制台 VNC | Task 1.1-fallback |
+| 修改远端 `sshd_config` 追加 Port 2222 后 `systemctl reload sshd` | 配置语法错 / sshd 启动失败 | 锁死 | Y | 改前 `sshd -t` 预检；保留活 Tailscale SSH session；reload 失败则备份恢复后再 reload | Task 1.4 CRITICAL 流程 |
+| 远端云厂商安全组默认放行 2222 端口 | OpenSSH 暴露公网遭暴破 | 安全 | Y | Task 1.4 后立即用 `nc` 从本机公网侧探测；若开放则立刻在云控制台关闭；Task 3.1 二次核查 | Task 1.4/3.1 |
+| 远端 ufw 已启用但未放行 2222 | OpenSSH 即使 sshd 监听也连不上 | 配置错 | Y | Task 1.4 先 `ufw status` 检查；若 active 则 `ufw allow in on tailscale0 to any port 2222` 再 reload sshd | Task 1.4 详述 |
+| 远端 sshd 没装/未启用 | OpenSSH 路径不可用 | 阻塞 | Y | Task 1.1 已前置检测 | 已验证 jp-node sshd active |
+| 本机 `~/.ssh/config` 已有同名 Host | 别名冲突覆盖 | 配置错 | Y | Task 1.3 grep 检查后再追加 | 已确认当前无 jp/us/nas |
+| Tailscale IP 变化（peer 重装） | 别名指向失效 | 阻塞 | N（已知局限）| 文档记录：IP 变化时手动更新 `~/.ssh/config` HostName | 可见局限 |
+| 网络中断 / Tailscale 离线 | 100.x 地址不可达 | 阻塞 | N（设计预期）| 保留每节点的公网 SSH 应急通道（如有） | 可见局限 |
+| 修改 sshd 后 Tailscale SSH 也挂了 | 双通道全断 | 锁死 | Y | **必须在修改前保持一个活 Tailscale SSH session** + 云控制台 VNC 作最后退路 | Task 1.4 CRITICAL |
 
 ## 执行计划
 
@@ -161,90 +167,175 @@
 - 备份 `~/.ssh/config.bak.20260422_142426` 已创建
 - 对 sugon-hf / github.com 等现有别名进行了回归验证，输出未变
 
-- **目标**：本机能用 `ssh jp` 走 OpenSSH 登录 jp-node
+**⚠️ Task 1.4 验证发现 Tailscale 拦截 22 端口**：Task 1.4-B 完成后将补为 `Port 2222`。
+
+最终追加的 `Host jp` 段（Task 1.4-C 后完整形态）：
+
+```
+# === Tailscale OpenSSH aliases (added 2026-04-22) ===
+Host jp
+    HostName 100.82.241.21
+    Port 2222
+    User root
+    IdentityFile ~/.ssh/id_ed25519
+    IdentitiesOnly yes
+    ServerAliveInterval 30
+    ServerAliveCountMax 3
+```
+
+#### ✅ Task 1.4-A: 验证 Tailscale SSH 拦截 22 端口
+
+**执行结果 (2026-04-22)**：
+- `ssh jp` 虽然连通，但 `ssh -vvv jp` banner 为 `remote software version Tailscale`
+- `Authenticated to 100.82.241.21 using "none"` — 表明走的是 Tailscale SSH，非 OpenSSH 公钥
+- 远端 `ss -tlnp` 确认 sshd 监听 `0.0.0.0:22`，但 tailscaled `--ssh` 在 tailnet 层拦截
+- **结论**：必须在 sshd 上增开非 22 端口方能旁路 Tailscale 拦截
+
+#### Task 1.4-B: jp-node sshd 追加 `Port 2222` 监听（**CRITICAL — 最高风险任务**）
+
+- **目标**：在 jp-node 上让 sshd 额外监听 2222 端口，保留 22 端口不动
 - **修改内容**：
-  - 文件 `~/.ssh/config`：追加 `Host jp` 段
+  - 远端 `/etc/ssh/sshd_config`：**仅追加**一行 `Port 2222`（若已存在则跳过）
+  - 远端 ufw（仅在 active 时）：`allow in on tailscale0 to any port 2222 proto tcp`
 - **修改边界**：
-  - 不修改现有任何 Host 段（sugon-hf、asipp、github.com 等）
-  - 不全局改 `Host *` 默认值
-- **追加内容**：
-  ```
-  # === Tailscale OpenSSH aliases (added 2026-04-22) ===
-  Host jp
-      HostName 100.82.241.21
-      User root
-      IdentityFile ~/.ssh/id_ed25519
-      IdentitiesOnly yes
-      ServerAliveInterval 30
-      ServerAliveCountMax 3
-  ```
-- **执行步骤**：
+  - 不删改原有任何行（不改 `Port 22`、不改 `PasswordAuthentication`、不改 `PermitRootLogin`、不改 `ListenAddress`）
+  - 不改云厂商安全组（Task 3.1 才做）
+  - 不启用/禁用 ufw（若 inactive 保持 inactive）
+- **安全执行步骤（严格按序）**：
   ```bash
-  # 1. 备份
-  cp ~/.ssh/config ~/.ssh/config.bak.$(date +%Y%m%d_%H%M%S)
+  # 第 1 步：打开一个永不关闭的救命 Tailscale SSH session（另开终端）
+  tailscale ssh root@jp-node
+  # （保留此窗口至 Task 1.4-D 验证通过）
 
-  # 2. 确认无冲突
-  grep -E "^Host (jp|us|nas)\b" ~/.ssh/config && echo "CONFLICT!" || echo "OK"
+  # 以下步骤在救命 session 中执行：
 
-  # 3. 追加（用 cat <<EOF >> 或编辑器手动）
+  # 第 2 步：备份
+  cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak.$(date +%Y%m%d_%H%M%S)
+  ls -la /etc/ssh/sshd_config.bak.*
+
+  # 第 3 步：幂等追加 Port 2222
+  grep -qE '^Port 2222$' /etc/ssh/sshd_config || echo 'Port 2222' >> /etc/ssh/sshd_config
+  grep -nE '^Port ' /etc/ssh/sshd_config
+
+  # 第 4 步：语法预检（必做，失败立即回滚）
+  if sshd -t; then
+    echo SYNTAX_OK
+  else
+    echo SYNTAX_FAIL; cp /etc/ssh/sshd_config.bak.* /etc/ssh/sshd_config; exit 1
+  fi
+
+  # 第 5 步：若 ufw active，先放行 2222
+  if ufw status 2>/dev/null | grep -q "Status: active"; then
+    ufw allow in on tailscale0 to any port 2222 proto tcp
+    ufw status
+  else
+    echo "ufw inactive, skip"
+  fi
+
+  # 第 6 步：reload（不是 restart）
+  systemctl reload sshd && echo RELOADED
+
+  # 第 7 步：验证新端口已监听
+  ss -tlnp | grep -E ':(22|2222)\b'
   ```
 - **验收标准**：
-  - ✅ `ssh -G jp | grep -E "hostname|user|identityfile"` 输出预期值
-  - ✅ 备份文件存在
-  - ✅ 现有别名 `ssh -G sugon-hf` 输出未变化
-- **潜在风险**：低
-- **依赖**：Task 1.2 完成
+  - ✅ `sshd -t` 语法检查通过
+  - ✅ `systemctl reload sshd` 成功，救命 session 仍活着
+  - ✅ `ss -tlnp` 显示 sshd 同时监听 `:22` 和 `:2222`
+  - ✅ 备份文件 `sshd_config.bak.<ts>` 存在
+  - ✅ 若 ufw active，tailscale0:2222 已放行
+- **潜在风险（高）**：
+  - `sshd -t` 未查出运行时错误 → 救命 session 可随时 `cp` 备份回去再 reload
+  - reload 使 sshd 崩溃 → restart 欢迎效应，旧 session 仍能操作；严重时云控制台 VNC 兜底
+  - ufw 误操作 → 本 Task 仅做 `allow`，不做 `deny` 或 `enable/disable`
+- **回滚**：
+  ```bash
+  cp /etc/ssh/sshd_config.bak.<ts> /etc/ssh/sshd_config && sshd -t && systemctl reload sshd
+  # ufw 如需回滚：ufw delete allow in on tailscale0 to any port 2222 proto tcp
+  ```
+- **依赖**：Task 1.1、1.2、1.4-A 完成
 
-#### Task 1.4: 端到端验证 OpenSSH 通路（jp-node）
+#### Task 1.4-C: 本机 `ssh jp` 追加 `Port 2222` 并端到端验证 OpenSSH 通路
 
-- **目标**：确认 `ssh jp` 走 OpenSSH 公钥认证成功，不需要密码、不挂在 Tailscale SSH 上
-- **修改内容**：无
+- **目标**：确认 `ssh jp` 走 OpenSSH 公钥认证（而非 Tailscale SSH）
+- **修改内容**：
+  - 本机 `~/.ssh/config` 的 `Host jp` 段中插入一行 `Port 2222`
 - **执行步骤**：
   ```bash
-  # 1. 详细输出确认认证方式
-  ssh -vvv jp 'whoami; uname -a; date' 2>&1 | grep -E "Authenticated|Offering|Server accepts|Remote protocol"
+  # 1. 再备份（新一轮）
+  cp ~/.ssh/config ~/.ssh/config.bak.$(date +%Y%m%d_%H%M%S)
 
-  # 2. 简单连通性
-  ssh jp 'echo OK'
+  # 2. 编辑插入 Port 2222 到 Host jp 的 HostName 行之后
+  #    手动 vim/nano 最安全
 
-  # 3. scp 测试
-  echo "test $(date)" > /tmp/openssh-test.txt
+  # 3. 验证 alias 解析
+  ssh -G jp | grep -iE "^(hostname|port|user|identityfile)"
+
+  # 4. 新开窗口，不影响救命 session
+  ssh -o StrictHostKeyChecking=accept-new jp 'echo OK; whoami; hostname'
+
+  # 5. 验证认证方式和远端 banner
+  ssh -vvv jp 'echo done' 2>&1 | grep -E "Authenticated|Remote protocol|Connecting"
+
+  # 6. scp 双向测试
+  echo "openssh-test $(date)" > /tmp/openssh-test.txt
   scp /tmp/openssh-test.txt jp:/tmp/
   ssh jp 'cat /tmp/openssh-test.txt && rm /tmp/openssh-test.txt'
   rm /tmp/openssh-test.txt
   ```
 - **验收标准**：
-  - ✅ `ssh jp` 不挂起，5 秒内返回 prompt 或命令输出
-  - ✅ `-vvv` 输出含 `Authenticated to ... using "publickey"`
-  - ✅ `-vvv` 输出 `Remote protocol version` 显示 `OpenSSH_*`，**不是** `Tailscale`
+  - ✅ `ssh -G jp` 显示 `port 2222`
+  - ✅ `ssh jp 'echo OK'` 不挂起，5 秒内返回
+  - ✅ `-vvv` 显示 `Remote protocol version 2.0, remote software version OpenSSH_*`（**不是** `Tailscale`）
+  - ✅ `-vvv` 显示 `Authenticated to ... using "publickey"`
   - ✅ scp 双向传输成功
-  - ✅ `~/.ssh/known_hosts` 新增 `100.82.241.21` 条目
-- **潜在风险**：
-  - 若仍走到 Tailscale SSH（端口 22 未监听 sshd 进程）→ 检查远端 `ss -tlnp | grep :22` 确认是 sshd 在监听而不是 tailscaled
-  - 若挂起 → 远端可能没 sshd（罕见），回到 Task 1.1 重新确认
-- **依赖**：Task 1.2、Task 1.3 完成
+  - ✅ `~/.ssh/known_hosts` 新增 `[100.82.241.21]:2222` 条目
+- **潜在风险**：若连不上 → 在 Task 1.4-B 的救命 session 里 `ss -tlnp | grep 2222` 确认 sshd 确实在听；`ufw status` 确认放行；必要时回滚
+- **依赖**：Task 1.4-B 完成
 
-#### Task 1.5: jp-node 防火墙现状审计（不修改）
+#### Task 1.4-D: 验证 Tailscale SSH 后备仍可用 + 关闭救命 session
 
-- **目标**：搞清 jp-node 当前 22 端口对公网的暴露程度，为 Phase 3 决策提供依据
-- **修改内容**：无（只读审计）
+- **目标**：确认方案共存目标达成（两条路径都能走）
+- **执行步骤**：
+  ```bash
+  # 1. Tailscale SSH 仍然能用
+  tailscale ssh root@jp-node 'echo tailscale-ssh-still-works'
+
+  # 2. OpenSSH 仍然能用
+  ssh jp 'echo openssh-still-works'
+
+  # 3. 两者均成功后才 exit Task 1.4-B 的救命 session
+  ```
+- **验收标准**：
+  - ✅ 两个命令均成功
+  - ✅ 仅在确认后才关闭救命 session
+- **依赖**：Task 1.4-C 完成
+
+#### Task 1.5: jp-node 端口与防火墙现状审计（不修改）
+
+- **目标**：搞清 jp-node 当前 22/2222 端口对公网的暴露，**特别是 2222 是否意外暴露公网**
+- **修改内容**：无（只读审计，若发现 2222 公网暴露才立刻处置）
 - **执行步骤**：
   ```bash
   # 1. 远端本地视角
-  ssh jp 'ss -tlnp | grep :22; iptables -L INPUT -n -v | head -20; \
-          (ufw status 2>/dev/null || firewall-cmd --list-all 2>/dev/null || echo "no managed fw")'
+  ssh jp 'ss -tlnp | grep -E ":(22|2222)\b"; \
+          iptables -L INPUT -n -v | head -20; \
+          (ufw status verbose 2>/dev/null || firewall-cmd --list-all 2>/dev/null || echo "no managed fw")'
 
-  # 2. 公网视角（从本机走 clash 出去）
-  curl --connect-timeout 5 -sI telnet://47.245.32.3:22 2>&1 | head -5 || \
-    nc -zv -w 5 47.245.32.3 22 2>&1
+  # 2. **公网视角探测 2222（新开端口必核）**
+  nc -zv -w 5 47.245.32.3 2222 2>&1
+  nc -zv -w 5 47.245.32.3 22 2>&1
+
+  # 3. 若 2222 在公网可达 → 立刻上云控制台关掉安全组中的 2222 规则，或限制源 IP 为本机出口
   ```
 - **验收标准**：
-  - ✅ 记录：sshd 监听地址（`0.0.0.0:22` / `100.82.241.21:22` / 仅 `[::]:22`）
+  - ✅ 记录：sshd 监听地址（应为 `0.0.0.0:22` + `0.0.0.0:2222`）
   - ✅ 记录：现有防火墙规则
-  - ✅ 记录：22 端口公网是否可达
-  - ✅ 记录：云厂商安全组（需登录控制台查看，记入 Phase 3 输入）
-- **潜在风险**：无
-- **依赖**：Task 1.4 完成（确认 OpenSSH 通路后再审计）
+  - ✅ 记录：公网视角 22 和 2222 可达性
+  - ✅ 记录：云厂商安全组（需登录控制台手动查）
+  - ✅ **若 2222 已暴露公网，已在安全组层关闭或限源**
+- **潜在风险**：若云厂商安全组默认 open 所有端口，2222 会立即暴露 → 验收时立即处理
+- **依赖**：Task 1.4-D 完成
 
 ### Phase 2: 推广到 us-node 和 SynologyNAS923
 
@@ -300,31 +391,34 @@
 
 ### Phase 3: 安全加固（可选，每节点独立判断）
 
-#### Task 3.1: 云厂商安全组核查（jp-node、us-node）
+#### Task 3.1: 云厂商安全组核查 **+ 2222 端口公网核查**（jp-node、us-node）
 
-- **目标**：确认公网 IP 上 22 端口的暴露范围，决定是否收紧
-- **修改内容**：仅检查，不一定修改
+- **目标**：确认公网 IP 上 22 和 **2222** 端口的暴露范围，决定是否收紧
+- **修改内容**：核查为主；**若 2222 意外暴露公网则立即收紧**
 - **执行步骤**：
-  1. 登录 jp-node 所在云厂商控制台（阿里云/Vultr/etc.），查看安全组入站规则中 22 端口的源 IP 范围
+  1. 登录 jp-node 所在云厂商控制台，查看安全组入站规则中 22 和 2222 端口的源 IP 范围
   2. 同样检查 us-node
+  3. 若 2222 对 0.0.0.0/0 开放 → 立即限制到本机公网 IP，或完全关闭（依赖 Tailscale 入站即可）
 - **决策矩阵**：
-  | 现状 | 建议动作 |
-  |------|---------|
-  | 22 端口对 0.0.0.0/0 开放 | 改为限制到本人公网 IP；或彻底关闭，依赖 Tailscale 入站 |
-  | 22 端口仅对特定 IP | 维持，或改为彻底关闭依赖 Tailscale |
-  | 22 端口已关闭 | 保持，确认 OpenSSH 仅经 Tailscale 可达 |
+  | 端口 | 现状 | 建议动作 |
+  |------|------|---------|
+  | 22 | 对 0.0.0.0/0 开放 | 保持（Tailscale SSH 需要）或限源 |
+  | 22 | 已限源 | 保持 |
+  | **2222** | **对 0.0.0.0/0 开放** | **立即限制到本机公网 IP 或完全关闭** |
+  | 2222 | 已限源到本机 | 理想状态 |
+  | 2222 | 完全关闭（仅 Tailscale 可达） | 最安全 |
 - **验收标准**：
-  - ✅ 每个云节点的 22 端口暴露范围已记录
-  - ✅ 已做出"是否收紧"的明确决策
+  - ✅ 每个云节点的 22 和 2222 端口暴露范围已记录
+  - ✅ 2222 在公网层已达成"限源"或"关闭"
 - **潜在风险**：错误关闭安全组规则可能锁死自己；每次改动前确认 Tailscale 通路可用作为退路
 - **依赖**：Phase 1、Phase 2 完成
 
-#### Task 3.2: （可选）远端 sshd_config 加固
+#### Task 3.2: （可选）远端 sshd_config 进一步加固
 
 - **目标**：在确认 OpenSSH 公钥路径稳定后，禁用密码登录、限制 root 直接登录
 - **触发条件**：仅在以下都满足时才执行：
   - Phase 1/2 全部成功超过 7 天且每天都正常使用过
-  - 云厂商安全组已收紧或已确认 22 端口仅经 Tailscale 可达
+  - 云厂商安全组已收紧
   - 用户有时间应对锁死风险（不在出差/重要任务期间）
 - **修改内容**（每节点独立判断）：
   - `/etc/ssh/sshd_config`：
@@ -334,7 +428,7 @@
     PermitRootLogin prohibit-password   # 允许 root 但仅公钥
     ```
 - **修改边界**：
-  - 不改 `Port`（保持 22）
+  - 不改 `Port`（保持 22 + 2222）
   - 不改 `ListenAddress`（依赖防火墙隔离）
   - 不动 Match 段
 - **执行步骤（CRITICAL — 必须严格按序）**：
@@ -412,16 +506,18 @@
 
 ## 回归检查清单
 
-- [ ] `ssh jp 'echo ok'` 返回 ok（不挂起，不询问密码）
+- [ ] `ssh jp 'echo ok'` 返回 ok（不挂起，不询问密码，走 Port 2222 OpenSSH）
+- [ ] `ssh -vvv jp` 显示 `remote software version OpenSSH_*`（**不是** `Tailscale`）
 - [ ] `ssh us 'echo ok'` 返回 ok
 - [ ] `ssh nas 'echo ok'` 返回 ok
-- [ ] `ssh -G jp` 显示 IdentityFile = `~/.ssh/id_ed25519`，User = `root`
+- [ ] `ssh -G jp` 显示 `port 2222`, IdentityFile = `~/.ssh/id_ed25519`, User = `root`
 - [ ] 现有别名 `ssh -G sugon-hf` 输出与变更前一致（diff 应为空）
 - [ ] `tailscale status` 仍显示本机 online，所有目标 peer 直连或 DERP 可达
-- [ ] `tailscale ssh root@jp-node 'echo ok'` 仍能工作（应急后备未失效）
+- [ ] `tailscale ssh root@jp-node 'echo ok'` 仍能工作（22 端口后备未失效）
+- [ ] 远端 `ss -tlnp` 显示 sshd 同时监听 :22 和 :2222
 - [ ] 本机 `~/.ssh/config.bak.<timestamp>` 存在
 - [ ] 每个改过 sshd_config 的远端节点 `/etc/ssh/sshd_config.bak.<timestamp>` 存在
-- [ ] 公网视角 `nc -zv <public-ip> 22` 行为符合 Phase 3 决策（开放或关闭）
+- [ ] 公网视角 `nc -zv <public-ip> 2222` 行为符合 Phase 3 决策（理想为关闭）
 - [ ] Tailscale 健康警告（DNS）仍在排查列表中（本计划不解决，但记录）
 
 ## 已知局限
@@ -430,7 +526,8 @@
 - **Tailscale IP 变化**：peer 重装会导致 IP 变化，需手动更新 `~/.ssh/config`
 - **Magic DNS 仍未修复**：`tailscale ssh root@jp-node`（按主机名）受 DNS 警告影响；本方案改用 IP 直连规避此问题
 - **DSM 升级影响**：Synology DSM 大版本升级可能重置 sshd 配置，需在升级后回归测试 nas 别名
-- **Windows 客户端配置不在本计划**：Windows 上需要单独配置 OpenSSH client + `%USERPROFILE%\.ssh\config`，沿用本计划的别名命名约定即可
+- **Windows 客户端配置不在本计划**：Windows 上需要单独配置 OpenSSH client + `%USERPROFILE%\.ssh\config`，沿用本计划的别名命名约定并加 `Port 2222` 即可
+- **2222 端口选择可能与其他服务冲突**：若远端节点已有其他服务占用 2222，需换一个非 22 的端口（如 2200、2022 等），别名也需同步更新
 
 ## 审查日志
 
@@ -439,18 +536,19 @@
 | R1 | 结构完整性 | 2 | 2 | 0 |
 | R2 | 可执行性 | 3 | 3 | 0 |
 | R3 | 风险与边缘 | 4 | 4 | 0 |
+| **修订 R4** | **方案 B 重构（Tailscale 22 端口拦截实证）** | 3 | 3 | 0 |
 | **终止** | **T1 — 收敛终止** | | | **0** |
 
 ### Completion Summary
 
 | 维度 | 结果 |
 |------|------|
-| 背景与目标 | 完整（含非目标）|
-| 技术方案 | 完整（含 6 项关键决策）|
+| 背景与目标 | 完整（含非目标 + 方案 B 关键发现）|
+| 技术方案 | 完整（含 8 项关键决策，含端口策略）|
 | Error & Rescue Map | 9 条路径，2 条已知局限明示 |
-| 执行计划 | 4 Phase，11 Task |
-| 回归检查清单 | 10 项，含 Tailscale 健康基线 |
-| 已知局限 | 5 项明示 |
+| 执行计划 | 4 Phase，13 Task（含 1.4-A/B/C/D 四子任务）|
+| 回归检查清单 | 13 项，含 OpenSSH banner 验证 |
+| 已知局限 | 6 项明示 |
 
 ### R1 Issues
 - **Issue R1-1**: 初稿缺"非目标"段 → 补充明确不卸 Tailscale、不改 ACL ✅ 已修正
@@ -464,6 +562,11 @@
 ### R3 Issues
 - **Issue R3-1**: 未识别 DSM 特殊性（用户非 root、升级会重置 sshd_config）→ Task 2.2 详述 ✅ 已修正
 - **Issue R3-2**: Task 3.2 sshd reload 步骤缺"保留旧 session"指引，存在锁死风险 → 补充 7 步严格流程 ✅ 已修正
+
+### R4 Issues（方案 B 重构 — 2026-04-22 实测驱动）
+- **Issue R4-1**: 原假设 sshd 监听 22 + OpenSSH 可用。**实测 Tailscale `--ssh` 在 tailnet IP 的 22 端口做 userspace 拦截，sshd 收不到连接** → 拆为 Task 1.4-A/B/C/D，sshd 增开 2222 端口与 Tailscale SSH 共存 ✅ 已修正
+- **Issue R4-2**: 新端口 2222 可能被云安全组默认开放暴露公网 → Task 1.5 和 Task 3.1 新增"2222 公网可达性核查"，并在验收时若暴露立即处置 ✅ 已修正
+- **Issue R4-3**: `ListenAddress` 绑 Tailscale IP 风险高（接口漂移会锁死）→ 关键设计决策明示保持 `0.0.0.0` 监听 + 依赖防火墙/安全组控制暴露 ✅ 已修正
 - **Issue R3-3**: Task 3.3 防火墙顺序未强调"先 allow 再 enable" → 加错误/正确顺序对比 ✅ 已修正
 - **Issue R3-4**: 未涵盖云厂商安全组层面的暴露 → 新增 Task 3.1 云厂商核查 ✅ 已修正
 
