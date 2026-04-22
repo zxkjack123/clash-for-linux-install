@@ -153,7 +153,13 @@
   - 若 Tailscale SSH 挂起，使用 `tailscale file cp ~/.ssh/id_ed25519.pub jp-node:` 后通过云控制台 VNC 进入手动追加
 - **依赖**：Task 1.1 完成
 
-#### Task 1.3: 本机 ~/.ssh/config 添加 jp 别名
+#### ✅ Task 1.3: 本机 ~/.ssh/config 添加 jp 别名
+
+**执行结果 (2026-04-22)**：
+- 本机 `~/.ssh/config` 已追加 `Host jp` 段（未修改现有任何别名）
+- `ssh -G jp` 返回：root@100.82.241.21, identityfile=`~/.ssh/id_ed25519`
+- 备份 `~/.ssh/config.bak.20260422_142426` 已创建
+- 对 sugon-hf / github.com 等现有别名进行了回归验证，输出未变
 
 - **目标**：本机能用 `ssh jp` 走 OpenSSH 登录 jp-node
 - **修改内容**：
