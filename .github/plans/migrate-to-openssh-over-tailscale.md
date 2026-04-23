@@ -378,7 +378,33 @@ Host jp
 
 ### Phase 2: 推广到 us-node 和 SynologyNAS923
 
-#### Task 2.1: us-node 完整流程（重复 Task 1.1 → 1.5）
+#### ✅ Task 2.1: us-node 完整流程（重复 Task 1.1 → 1.5）
+
+**执行结果 (2026-04-23)**：
+
+- **关键差异（与 jp-node 不同）**：us-node 未启用 Tailscale `--ssh`（`tailscaled` 启动参数无 `--ssh`，`/etc/default/tailscaled` FLAGS 为空），banner 测试直接返回 `OpenSSH_9.2p1 Debian-2+deb12u2`。**因此无需添加 Port 2222**，直接通过 Tailscale IP 访问 OpenSSH 默认端口 22 即可。
+- **远端基线**：
+  - sshd: OpenSSH 9.2，监听 `0.0.0.0:22`（pid 639）
+  - 无 ufw，仅 iptables `ts-input`（Tailscale 管理）
+  - `~/.ssh/authorized_keys` 已含 gw-workstation 公钥（重复 2 行 → 已 awk 去重，备份 `~/.ssh/authorized_keys.bak.20260423_231417`）
+- **客户端配置**：`~/.ssh/config` 追加 `Host us` 段（HostName 100.92.101.61, Port 22, IdentityFile ~/.ssh/id_ed25519, IdentitiesOnly yes），备份 `~/.ssh/config.bak.20260423_231402`
+- **验收**：
+  - ✅ `ssh us 'whoami'` → `root`
+  - ✅ Auth：`Authenticated to 100.92.101.61:22 using "publickey"`，server `OpenSSH_9.2p1 Debian-2+deb12u2`
+  - ✅ scp 双向 round-trip 成功
+  - ✅ jp 别名无回归（`ssh jp 'echo JP_OK'` → JP_OK）
+  - ⚠️ Tailscale SSH fallback **N/A**（us-node 未启用 `--ssh`，无 fallback 路径）
+- **公网暴露记录（待 Task 3.1 处理）**：
+  | 端口 | 状态 |
+  |------|------|
+  | 22 | **⚠️ OPEN**（既有状态，非本任务引入；Aliyun 安全组未限源）|
+  | 2222 | BLOCKED |
+  | 80 / 443 | REFUSED（无服务）|
+- **未执行的子任务**：Port 2222 sshd 修改（不必要）、ufw 配置（无 ufw，不引入新依赖）
+
+---
+
+**原任务描述（保留供参考）**：
 
 - **目标**：us-node (`100.92.101.61`, 公网 `43.110.32.131`) 完成与 jp-node 相同的配置
 - **修改内容**：
