@@ -81,13 +81,14 @@ ZERO_XFER_CONSEC="${ZERO_XFER_CONSEC:-3}"
 RECOVER_COUNT="${RECOVER_COUNT:-2}"
 
 # ── 运行选项 ────────────────────────────────────────────────
-JSON=0; VERBOSE=0; DRY_RUN=0; RESET=0
+JSON=0; VERBOSE=0; DRY_RUN=0; RESET=0; NO_NOTIFY=0
 for arg in "$@"; do
     case "$arg" in
         --json)    JSON=1 ;;
         --verbose|-v) VERBOSE=1 ;;
         --dry-run) DRY_RUN=1 ;;
         --reset)   RESET=1 ;;
+        --no-notify) NO_NOTIFY=1 ;;
         -h|--help) grep -E '^#' "$0" | head -25 | sed 's/^# \?//'; exit 0 ;;
     esac
 done
@@ -324,8 +325,8 @@ pathlib.Path('$STATE_FILE').write_text(json.dumps(d, indent=2))
 "
 fi
 
-# ── 告警通知 (仅 WARN/CRIT) ────────────────────────────────
-if [[ "$OVERALL" != "OK" ]] && [[ -x "$ALERT_SCRIPT" ]] && [[ $DRY_RUN -eq 0 ]]; then
+# ── 告警通知 (仅 WARN/CRIT, 且未禁用通知) ────────────────────
+if [[ "$OVERALL" != "OK" ]] && [[ -x "$ALERT_SCRIPT" ]] && [[ $DRY_RUN -eq 0 ]] && [[ $NO_NOTIFY -eq 0 ]]; then
     # alert_notification.sh expects INFO/WARNING/CRITICAL, not OK/WARN/CRIT
     local_level="$OVERALL"
     [[ "$local_level" == "WARN" ]] && local_level="WARNING"

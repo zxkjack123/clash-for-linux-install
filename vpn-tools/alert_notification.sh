@@ -60,6 +60,9 @@ is_rate_limited() {
     local msg_key="$ALERT_MESSAGE"
     msg_key=${msg_key//$'\n'/ }
     msg_key=${msg_key//|/ }
+    # Strip dynamic numeric values so health-check messages share one rate-limit bucket
+    # e.g. "fails=52 zero=3" → "fails=N zero=N", "1847ms" → "Nms", "48/100" → "N/N"
+    msg_key=$(printf '%s' "$msg_key" | sed -E 's/[0-9]+/N/g')
 
     # Find the latest timestamp for this level+message.
     local last_time=""
@@ -103,6 +106,9 @@ send_desktop_notification() {
     
     local urgency="normal"
     local icon="dialog-information"
+    # Single replace-id (99900) for all levels: any new alert replaces the previous one,
+    # so rapid WARNING→CRITICAL→WARNING cycling won't pile up separate bubbles.
+    local replace_id=99900
     
     case "$ALERT_LEVEL" in
         CRITICAL)
@@ -120,8 +126,9 @@ send_desktop_notification() {
     esac
     
     # 尝试多种桌面通知方式
+    # -e (transient): GNOME auto-dismisses; -r: replace previous same-level notification
     if have notify-send; then
-        notify-send -t 15000 -u "$urgency" -i "$icon" "Clash 网络监控" "$ALERT_MESSAGE" 2>/dev/null || true
+        notify-send -e -r "$replace_id" -t 15000 -u "$urgency" -i "$icon" "Clash 网络监控" "$ALERT_MESSAGE" 2>/dev/null || true
     elif have zenity; then
         zenity --notification --text="[$ALERT_LEVEL] $ALERT_MESSAGE" 2>/dev/null || true
     elif have kdialog; then
