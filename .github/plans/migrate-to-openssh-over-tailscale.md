@@ -264,7 +264,17 @@ Host jp
   ```
 - **依赖**：Task 1.1、1.2、1.4-A 完成
 
-#### Task 1.4-C: 本机 `ssh jp` 追加 `Port 2222` 并端到端验证 OpenSSH 通路
+#### ✅ Task 1.4-C: 本机 `ssh jp` 追加 `Port 2222` 并端到端验证 OpenSSH 通路
+
+**执行结果 (2026-04-23)**：
+- 备份 `~/.ssh/config.bak.20260423_230058`
+- `Host jp` 段已加 `Port 2222`；other fields 未变
+- `ssh -G jp` 输出含 `port 2222`
+- `ssh -vvv jp` banner: `Remote protocol version 2.0, remote software version OpenSSH_9.2p1 Debian-2+deb12u7` — 确信走 OpenSSH
+- `Authenticated to 100.82.241.21 ([100.82.241.21]:2222) using "publickey"` — 公钥认证成功
+- `Server accepts key: ~/.ssh/id_ed25519 ED25519 SHA256:7KmDRv08JRf1WWD9jLdVjq3yDTzGF6b+/hi7qXK6fuI`
+- scp 双向传输成功（openssh-test 文件 round-trip OK）
+- `~/.ssh/known_hosts` 末尾新增 ed25519 + ecdsa 两条 hashed 宿主记录（对应 `[100.82.241.21]:2222`）
 
 - **目标**：确认 `ssh jp` 走 OpenSSH 公钥认证（而非 Tailscale SSH）
 - **修改内容**：
