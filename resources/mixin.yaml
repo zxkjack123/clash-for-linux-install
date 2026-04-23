@@ -13,6 +13,18 @@ rules:
   # on physical workstations; these always fail and pollute connection failure counts.
   - IP-CIDR,169.254.0.0/16,REJECT,no-resolve
 
+  # CAS / ASIPP intranet (force DIRECT, never via proxy)
+  # - 202.127.200.0/21  HFCASNET = Hefei Branch of CAS (含等离子体所 ASIPP, 如 202.127.204.49)
+  # - 159.226.0.0/16    CAS Beijing CNIC (含 www.ipp.cas.cn 159.226.242.225 等公网入口)
+  # Note: off-campus access still requires ASIPP VPN if the target site enforces source-IP allowlist;
+  #       these rules only ensure Clash itself does not divert traffic to a proxy egress.
+  - IP-CIDR,202.127.200.0/21,DIRECT,no-resolve
+  - IP-CIDR,159.226.0.0/16,DIRECT,no-resolve
+  - DOMAIN-SUFFIX,ipp.cas.cn,DIRECT
+  - DOMAIN-SUFFIX,cas.cn,DIRECT
+  - DOMAIN-SUFFIX,ipp.ac.cn,DIRECT
+  - DOMAIN-SUFFIX,hfcas.ac.cn,DIRECT
+
   # Wikipedia / Wikimedia family (force proxy; direct may be blocked or DNS-poisoned)
   - DOMAIN-SUFFIX,wikipedia.org,PROXY
   - DOMAIN-SUFFIX,wikimedia.org,PROXY

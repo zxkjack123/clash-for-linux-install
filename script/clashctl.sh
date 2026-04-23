@@ -180,7 +180,7 @@ _set_system_proxy() {
     #  2) tailscale MagicDNS 解析 & Funnel 域 统一走直连, 避免被 http_proxy 劫持到本地 127.0.0.1:PORT 造成连接失败
     #  3) 加入 100.100.100.100 (Tailscale 内部 DNS) 及 100.64.0.0/10 CGNAT 地址空间; 虽然多数工具不支持 CIDR 匹配, 但保留不影响
     #  4) 添加 0.0.0.0, *.local, .localhost 以确保所有本地服务（包括Docker容器、本地Web服务等）都能正常访问
-    local no_proxy_addr="localhost,127.0.0.1,::1,0.0.0.0,*.local,.localhost,.local,ts.net,.ts.net,tailscale.io,.tailscale.io,tailscale.com,.tailscale.com,controlplane.tailscale.com,100.100.100.100,100.64.0.0/10,scnet.cn,.scnet.cn,szai.scnet.cn,.szai.scnet.cn,qdai.scnet.cn,.qdai.scnet.cn"
+    local no_proxy_addr="localhost,127.0.0.1,::1,0.0.0.0,*.local,.localhost,.local,ts.net,.ts.net,tailscale.io,.tailscale.io,tailscale.com,.tailscale.com,controlplane.tailscale.com,100.100.100.100,100.64.0.0/10,scnet.cn,.scnet.cn,szai.scnet.cn,.szai.scnet.cn,qdai.scnet.cn,.qdai.scnet.cn,ipp.ac.cn,.ipp.ac.cn"
     # 动态探测 tailnet MagicDNSSuffix (tailscale status --json) 例: tail69c12a.ts.net
     if command -v tailscale >/dev/null 2>&1; then
         local ts_suffix
