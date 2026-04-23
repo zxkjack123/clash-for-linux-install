@@ -191,7 +191,16 @@ Host jp
 - 远端 `ss -tlnp` 确认 sshd 监听 `0.0.0.0:22`，但 tailscaled `--ssh` 在 tailnet 层拦截
 - **结论**：必须在 sshd 上增开非 22 端口方能旁路 Tailscale 拦截
 
-#### Task 1.4-B: jp-node sshd 追加 `Port 2222` 监听（**CRITICAL — 最高风险任务**）
+#### ✅ Task 1.4-B: jp-node sshd 追加 `Port 2222` 监听（**CRITICAL — 最高风险任务**）
+
+**执行结果 (2026-04-23)**：
+- 备份：`/etc/ssh/sshd_config.bak.20260423_235939`
+- 追加 `Port 2222`后发现 sshd 默认 Port 22 被隐式丢弃——**主动补上 `Port 22` 保持双端口**（这是 sshd 语义：一旦显式声明任何 `Port`，默认 22 不再生效）
+- 最终配置：`Port 22` 和 `Port 2222` 两行均存在
+- `sshd -t` 两轮均通过；`systemctl reload sshd` 成功
+- `ss -tlnp` 确认 sshd 同时监听 v4/v6 的 :22 和 :2222（同 pid 687）
+- ufw 现为 active，已追加 `2222/tcp on tailscale0 ALLOW`（v4+v6），现有 9000/80/443 规则未受影响
+- 救命 Tailscale SSH session 全程存活（`tailscale ssh` 是 userspace，不依赖 sshd:22）
 
 - **目标**：在 jp-node 上让 sshd 额外监听 2222 端口，保留 22 端口不动
 - **修改内容**：
