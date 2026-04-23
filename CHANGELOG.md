@@ -1,4 +1,22 @@
 # Changelog
+## [2.5.14] - 2026-04-23
+
+### ✨ New
+- **CAS / ASIPP intranet routing** (`resources/mixin.yaml`): force `IP-CIDR,202.127.200.0/21` (HFCASNET) and `IP-CIDR,159.226.0.0/16` (CAS Beijing CNIC) to `DIRECT`; add `DOMAIN-SUFFIX` rules for `ipp.cas.cn`, `cas.cn`, `ipp.ac.cn`, `hfcas.ac.cn`. Prevents Clash from diverting CAS/ASIPP intranet traffic to a proxy egress (off-campus access still requires ASIPP VPN if the target enforces source-IP allowlist).
+- **`script/clashctl.sh`**: add `ipp.ac.cn` / `.ipp.ac.cn` to `no_proxy_addr` so curl/wget bypass the local Clash proxy for ASIPP intranet hosts.
+- **`vpn-tools/network_health_check.sh`**: add `--no-notify` flag to suppress desktop alerts (useful for cron-driven probes that should only update state without spamming notifications).
+- **OpenSSH-over-Tailscale migration plan** (`.github/plans/migrate-to-openssh-over-tailscale.md`): full execution record migrating jp/us/SynologyNAS923 nodes from `tailscale --ssh` (userspace SSH on :22) to OpenSSH with publickey auth. Coexistence achieved on jp-node via `Port 22 + Port 2222`; us-node and NAS use OpenSSH on :22 (no Tailscale --ssh interception).
+
+### 🛠 Fixes
+- **`vpn-tools/alert_notification.sh`**: strip dynamic numeric values from rate-limit message keys (e.g. `fails=52 zero=3` → `fails=N zero=N`) so health alerts that differ only in counters share one suppression bucket; use single `notify-send` replace-id (99900) and `-e` (transient) so new alerts replace prior bubbles instead of stacking during WARN→CRIT cycling.
+
+### ✅ Verification
+- `bash -n $(git ls-files '*.sh')` — 0 syntax errors
+- `bash tests/run_tests.sh` — 69 passed, 0 failed
+- `bash script/run_static_gates.sh` — all gates passed (0 high / 0 medium / 0 low)
+- `ssh jp 'echo OK'` / `ssh us 'echo OK'` / `ssh nas 'echo OK'` — all return OK via publickey auth
+- `tailscale status` — jp/us direct paths, NAS via DERP-hkg (1 ms RTT)
+
 ## [2.5.13] - 2026-04-14
 
 ### ✨ New
