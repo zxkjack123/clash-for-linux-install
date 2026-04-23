@@ -420,7 +420,33 @@ Host jp
 - **潜在风险**：与 Task 1.x 同
 - **依赖**：Phase 1 全部完成（确认流程跑通）
 
-#### Task 2.2: SynologyNAS923 配置
+#### ✅ Task 2.2: SynologyNAS923 配置
+
+**执行结果 (2026-04-23)**：
+
+- **基线**：DSM 上 OpenSSH 8.2，监听 `0.0.0.0:22`；用户 `SynologyNAS`，HOME `/volume1/homes/SynologyNAS`
+- **公钥部署**：用 `ssh-copy-id -i ~/.ssh/id_ed25519_nas.pub` 通过密码认证一次性部署，成功添加 1 key
+- **DSM 权限陷阱**（关键经验）：DSM 默认 HOME 是 `drwxrwxrwx+`、`authorized_keys` 是 `-rwxrwxrwx+`，sshd `StrictModes` 拒绝。修复：
+  ```
+  chmod 755 /var/services/homes/SynologyNAS
+  chmod 700 ~/.ssh
+  chmod 600 ~/.ssh/authorized_keys
+  ```
+- **客户端配置**：
+  - 旧 `nas` 别名（LAN `169.254.79.54`）重命名为 `nas-lan`
+  - 新增 `Host nas`：HostName 100.82.177.76, Port 22, User SynologyNAS, IdentityFile ~/.ssh/id_ed25519_nas, IdentitiesOnly yes
+- **验收**：
+  - ✅ `ssh nas 'whoami'` → `SynologyNAS`，`hostname` → `SynologyNAS923`
+  - ✅ Auth: `Authenticated to 100.82.177.76:22 using "publickey"`，server `OpenSSH_8.2`
+  - ✅ jp/us 无回归
+  - ⚠️ 默认 `scp` 失败（DSM SFTP 子系统未启用），需用 `scp -O`（legacy/rcp 模式）；如需启用 SFTP 在 DSM Control Panel → File Services → SFTP 中开启
+- **DSM 升级注意**：sshd_config 会被 DSM 升级覆盖（**未修改**），但 `~/.ssh/authorized_keys` 保留 → 升级后只需重新 `chmod` 即可
+- **公网暴露**：未检查（NAS 通常仅 Tailscale + LAN 可达，无公网 IP）
+- **安全提醒**：本次部署中 NAS 密码在对话中明文出现 → **强烈建议尽快在 DSM 控制面板修改密码**
+
+---
+
+**原任务描述（保留供参考）**：
 
 - **目标**：NAS (`100.82.177.76`) 配置 OpenSSH 别名 `nas`
 - **修改内容**：
