@@ -312,7 +312,13 @@ Host jp
 - **潜在风险**：若连不上 → 在 Task 1.4-B 的救命 session 里 `ss -tlnp | grep 2222` 确认 sshd 确实在听；`ufw status` 确认放行；必要时回滚
 - **依赖**：Task 1.4-B 完成
 
-#### Task 1.4-D: 验证 Tailscale SSH 后备仍可用 + 关闭救命 session
+#### ✅ Task 1.4-D: 验证 Tailscale SSH 后备仍可用 + 关闭救命 session
+
+**执行结果 (2026-04-23)**：
+- `tailscale ssh root@jp-node 'echo TS_OK'` 返回 TS_OK（后备路径状态健康）
+- `ssh jp 'echo OPENSSH_OK'` 返回 OPENSSH_OK（主路径状态健康）
+- 两路径均确认后才关闭了 Task 1.4-B 保留的救命 Tailscale SSH session
+- **共存目标达成**：22 走 Tailscale SSH、2222 走 OpenSSH
 
 - **目标**：确认方案共存目标达成（两条路径都能走）
 - **执行步骤**：
