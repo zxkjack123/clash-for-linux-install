@@ -585,7 +585,13 @@ Host jp
 
 ### Phase 4: 文档与知识沉淀
 
-#### Task 4.1: 更新 user memory
+#### ✅ Task 4.1: 更新 user memory
+
+**执行结果 (2026-04-23)**：
+- 创建 `~/.config/Code/User/prompts/memories/environments.md`
+- 内容：SSH 别名约定（jp/us/nas/nas-lan + Port 2222 vs 22）、Tailscale `--ssh` 用户态拦截行为、sshd `Port` 指令陷阱、DSM 权限/SFTP/升级注意事项、本机网络（含 ICMP 公网被拦但 TCP 正常的事实）
+- 简洁项目符号风格，与现有 `debugging-patterns.md` 一致
+- ✅ 用户已通过 "Continue with Task 4.1" 显式确认
 
 - **目标**：将本次配置经验写入 `/memories/` 或 `/memories/repo/`
 - **修改内容**：
