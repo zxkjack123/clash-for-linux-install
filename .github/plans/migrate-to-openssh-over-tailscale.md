@@ -336,7 +336,21 @@ Host jp
   - ✅ 仅在确认后才关闭救命 session
 - **依赖**：Task 1.4-C 完成
 
-#### Task 1.5: jp-node 端口与防火墙现状审计（不修改）
+#### ✅ Task 1.5: jp-node 端口与防火墙现状审计（不修改）
+
+**执行结果 (2026-04-23)**：
+- sshd 监听：`0.0.0.0:22` + `0.0.0.0:2222`（v4 + v6，同 pid 687）
+- ufw 状态：active，default deny (incoming) / allow (outgoing)
+- ufw 规则：80/tcp、443/tcp、`9000/tcp on tailscale0`、`9000/udp on tailscale0`、`2222/tcp on tailscale0`（v4 和 v6各一份）
+- **公网视角探测结果**：
+  | 端口 | 状态 |
+  |------|------|
+  | 22 | ✅ BLOCKED |
+  | **2222** | **✅ BLOCKED — 未意外暴露公网** |
+  | 80 | OPEN（既有 HTTP 服务）|
+  | 443 | OPEN（既有 HTTPS 服务）|
+- 云厂商安全组推迟到 Task 3.1 手动核查（本 Task 不需控制台访问）
+- 本机网络状态健康：Tailscale 在线，ping jp-node 92ms RTT，Baidu HTTP 200 (60ms)，Google HTTP 200 (1.27s via Clash)；ICMP 公网被拦但 TCP 不受影响
 
 - **目标**：搞清 jp-node 当前 22/2222 端口对公网的暴露，**特别是 2222 是否意外暴露公网**
 - **修改内容**：无（只读审计，若发现 2222 公网暴露才立刻处置）
