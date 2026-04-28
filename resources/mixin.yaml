@@ -25,6 +25,123 @@ rules:
   - DOMAIN-SUFFIX,ipp.ac.cn,DIRECT
   - DOMAIN-SUFFIX,hfcas.ac.cn,DIRECT
 
+  # DeepSeek (Chinese AI service; routing via overseas proxy adds 5+s TLS handshake and frequent drops)
+  - DOMAIN-SUFFIX,deepseek.com,DIRECT
+
+  # ===== China domestic services (DIRECT) =====
+  # Routing these via overseas proxy adds 5+s TLS handshake, frequent drops, or 403 (geo-blocked).
+  # Government / public sector
+  - DOMAIN-SUFFIX,gov.cn,DIRECT
+  - DOMAIN-SUFFIX,12306.cn,DIRECT
+  - DOMAIN-SUFFIX,chinapost.com.cn,DIRECT
+  - DOMAIN-SUFFIX,sf-express.com,DIRECT
+  # Education (universities, CNKI, etc.)
+  - DOMAIN-SUFFIX,edu.cn,DIRECT
+  - DOMAIN-SUFFIX,cnki.net,DIRECT
+  - DOMAIN-SUFFIX,wanfangdata.com.cn,DIRECT
+  # Chinese Academy of Sciences (中科院)
+  - DOMAIN-SUFFIX,ac.cn,DIRECT
+  - DOMAIN-SUFFIX,csdb.cn,DIRECT
+  # Chinese AI vendors (LLM platforms / API endpoints)
+  - DOMAIN-SUFFIX,moonshot.cn,DIRECT
+  - DOMAIN-SUFFIX,kimi.com,DIRECT
+  - DOMAIN-SUFFIX,zhipuai.cn,DIRECT
+  - DOMAIN-SUFFIX,bigmodel.cn,DIRECT
+  - DOMAIN-SUFFIX,chatglm.cn,DIRECT
+  - DOMAIN-SUFFIX,baichuan-ai.com,DIRECT
+  - DOMAIN-SUFFIX,01.ai,DIRECT
+  - DOMAIN-SUFFIX,lingyiwanwu.com,DIRECT
+  - DOMAIN-SUFFIX,minimaxi.com,DIRECT
+  - DOMAIN-SUFFIX,minimax.chat,DIRECT
+  - DOMAIN-SUFFIX,stepfun.com,DIRECT
+  - DOMAIN-SUFFIX,sensetime.com,DIRECT
+  - DOMAIN-SUFFIX,sensenova.cn,DIRECT
+  - DOMAIN-SUFFIX,modelscope.cn,DIRECT
+  - DOMAIN-SUFFIX,doubao.com,DIRECT
+  - DOMAIN-SUFFIX,volces.com,DIRECT
+  - DOMAIN-SUFFIX,volcengine.com,DIRECT
+  - DOMAIN-SUFFIX,coze.cn,DIRECT
+  - DOMAIN-SUFFIX,bytedance.com,DIRECT
+  - DOMAIN-SUFFIX,tongyi.aliyun.com,DIRECT
+  - DOMAIN-SUFFIX,dashscope.aliyuncs.com,DIRECT
+  - DOMAIN-SUFFIX,aliyun.com,DIRECT
+  - DOMAIN-SUFFIX,aliyuncs.com,DIRECT
+  - DOMAIN-SUFFIX,qwen.ai,DIRECT
+  - DOMAIN-SUFFIX,baidu.com,DIRECT
+  - DOMAIN-SUFFIX,bcebos.com,DIRECT
+  - DOMAIN-SUFFIX,tencent.com,DIRECT
+  - DOMAIN-SUFFIX,qq.com,DIRECT
+  - DOMAIN-SUFFIX,xfyun.cn,DIRECT
+  - DOMAIN-SUFFIX,iflytek.com,DIRECT
+  - DOMAIN-SUFFIX,360.cn,DIRECT
+  - DOMAIN-SUFFIX,siliconflow.cn,DIRECT
+  - DOMAIN-SUFFIX,siliconflow.com,DIRECT
+
+  # Anthropic / Claude — overseas proxy egress IP is on Cloudflare's blocklist (returns 403),
+  # while direct connections succeed (302/200) via the local egress.
+  # Verified 2026-04-27: proxy=403, direct=302 ip=160.79.104.10.
+  - DOMAIN-SUFFIX,claude.ai,DIRECT
+  - DOMAIN-SUFFIX,anthropic.com,DIRECT
+
+  # ===== Academic publishers (force DIRECT) =====
+  # Institution-based access (IP allowlist / Shibboleth / EZproxy) requires the
+  # local/campus egress IP. Routing via overseas proxy makes the publisher
+  # treat the request as an unaffiliated user and demand a paywall fee.
+  # IOP Publishing (Nuclear Fusion, PPCF, NJP, JPhys series, etc.)
+  - DOMAIN-SUFFIX,iop.org,DIRECT
+  - DOMAIN-SUFFIX,iopscience.iop.org,DIRECT
+  - DOMAIN-SUFFIX,ioppublishing.org,DIRECT
+  # Elsevier (ScienceDirect, Fusion Engineering and Design, etc.)
+  - DOMAIN-SUFFIX,sciencedirect.com,DIRECT
+  - DOMAIN-SUFFIX,elsevier.com,DIRECT
+  - DOMAIN-SUFFIX,scopus.com,DIRECT
+  - DOMAIN-SUFFIX,ssrn.com,DIRECT
+  # Springer Nature
+  - DOMAIN-SUFFIX,springer.com,DIRECT
+  - DOMAIN-SUFFIX,springernature.com,DIRECT
+  - DOMAIN-SUFFIX,link.springer.com,DIRECT
+  - DOMAIN-SUFFIX,nature.com,DIRECT
+  - DOMAIN-SUFFIX,biomedcentral.com,DIRECT
+  # Wiley
+  - DOMAIN-SUFFIX,wiley.com,DIRECT
+  - DOMAIN-SUFFIX,onlinelibrary.wiley.com,DIRECT
+  # Taylor & Francis (Fusion Science and Technology, etc.)
+  - DOMAIN-SUFFIX,tandfonline.com,DIRECT
+  - DOMAIN-SUFFIX,taylorfrancis.com,DIRECT
+  # American Physical Society (PRL/PRA/.../Phys. Rev. series)
+  - DOMAIN-SUFFIX,aps.org,DIRECT
+  - DOMAIN-SUFFIX,journals.aps.org,DIRECT
+  # AIP / Physics of Plasmas / Review of Scientific Instruments
+  - DOMAIN-SUFFIX,aip.org,DIRECT
+  - DOMAIN-SUFFIX,scitation.org,DIRECT
+  - DOMAIN-SUFFIX,pubs.aip.org,DIRECT
+  # ACS / RSC / IEEE / SAGE / Cambridge / Oxford / Annual Reviews / ANS
+  - DOMAIN-SUFFIX,acs.org,DIRECT
+  - DOMAIN-SUFFIX,pubs.acs.org,DIRECT
+  - DOMAIN-SUFFIX,rsc.org,DIRECT
+  - DOMAIN-SUFFIX,pubs.rsc.org,DIRECT
+  - DOMAIN-SUFFIX,ieee.org,DIRECT
+  - DOMAIN-SUFFIX,ieeexplore.ieee.org,DIRECT
+  - DOMAIN-SUFFIX,sagepub.com,DIRECT
+  - DOMAIN-SUFFIX,cambridge.org,DIRECT
+  - DOMAIN-SUFFIX,oup.com,DIRECT
+  - DOMAIN-SUFFIX,oxfordjournals.org,DIRECT
+  - DOMAIN-SUFFIX,academic.oup.com,DIRECT
+  - DOMAIN-SUFFIX,annualreviews.org,DIRECT
+  - DOMAIN-SUFFIX,ans.org,DIRECT
+  # Discovery / metadata / OA aggregators (best DIRECT for institutional links)
+  - DOMAIN-SUFFIX,doi.org,DIRECT
+  - DOMAIN-SUFFIX,crossref.org,DIRECT
+  - DOMAIN-SUFFIX,orcid.org,DIRECT
+  - DOMAIN-SUFFIX,osti.gov,DIRECT
+  - DOMAIN-SUFFIX,arxiv.org,DIRECT
+  - DOMAIN-SUFFIX,iaea.org,DIRECT
+  - DOMAIN-SUFFIX,pubmed.ncbi.nlm.nih.gov,DIRECT
+  - DOMAIN-SUFFIX,ncbi.nlm.nih.gov,DIRECT
+  # Note: scholar.google.com / semanticscholar.org are intentionally NOT here —
+  # Google Scholar is unreachable from CN without proxy. Add per-need overrides
+  # below in the PROXY block if those are required.
+
   # Wikipedia / Wikimedia family (force proxy; direct may be blocked or DNS-poisoned)
   - DOMAIN-SUFFIX,wikipedia.org,PROXY
   - DOMAIN-SUFFIX,wikimedia.org,PROXY
@@ -52,3 +169,94 @@ rules:
   - DOMAIN-SUFFIX,huggingface.co,PROXY
   - DOMAIN-SUFFIX,hf.co,PROXY
   - DOMAIN-SUFFIX,huggingface.com,PROXY
+
+  # ===== Commonly blocked/geo-restricted services (force PROXY) =====
+  # Without these, the upstream MATCH,DIRECT catch-all causes silent failures
+  # (the local network cannot reach these domains directly).
+  # OpenAI / ChatGPT
+  - DOMAIN-SUFFIX,openai.com,PROXY
+  - DOMAIN-SUFFIX,oaistatic.com,PROXY
+  - DOMAIN-SUFFIX,oaiusercontent.com,PROXY
+  - DOMAIN-SUFFIX,chatgpt.com,PROXY
+  # Twitter / X
+  - DOMAIN-SUFFIX,twitter.com,PROXY
+  - DOMAIN-SUFFIX,x.com,PROXY
+  - DOMAIN-SUFFIX,twimg.com,PROXY
+  - DOMAIN-SUFFIX,t.co,PROXY
+  # YouTube / Google video
+  - DOMAIN-SUFFIX,youtube.com,PROXY
+  - DOMAIN-SUFFIX,youtu.be,PROXY
+  - DOMAIN-SUFFIX,ytimg.com,PROXY
+  - DOMAIN-SUFFIX,googlevideo.com,PROXY
+  - DOMAIN-SUFFIX,ggpht.com,PROXY
+  # Reddit
+  - DOMAIN-SUFFIX,reddit.com,PROXY
+  - DOMAIN-SUFFIX,redd.it,PROXY
+  - DOMAIN-SUFFIX,redditstatic.com,PROXY
+  - DOMAIN-SUFFIX,redditmedia.com,PROXY
+  # Telegram
+  - DOMAIN-SUFFIX,telegram.org,PROXY
+  - DOMAIN-SUFFIX,t.me,PROXY
+  - DOMAIN-SUFFIX,telegram.me,PROXY
+  - DOMAIN-SUFFIX,telesco.pe,PROXY
+  - DOMAIN-SUFFIX,cdn-telegram.org,PROXY
+  # Steam (store + content)
+  - DOMAIN-SUFFIX,steampowered.com,PROXY
+  - DOMAIN-SUFFIX,steamcommunity.com,PROXY
+  - DOMAIN-SUFFIX,steamcontent.com,PROXY
+  - DOMAIN-SUFFIX,steamstatic.com,PROXY
+  - DOMAIN-SUFFIX,steamusercontent.com,PROXY
+  # Discord / Slack-like
+  - DOMAIN-SUFFIX,discord.com,PROXY
+  - DOMAIN-SUFFIX,discordapp.com,PROXY
+  - DOMAIN-SUFFIX,discord.gg,PROXY
+  # Meta family (often unreachable directly)
+  - DOMAIN-SUFFIX,facebook.com,PROXY
+  - DOMAIN-SUFFIX,fbcdn.net,PROXY
+  - DOMAIN-SUFFIX,instagram.com,PROXY
+  - DOMAIN-SUFFIX,cdninstagram.com,PROXY
+  - DOMAIN-SUFFIX,whatsapp.com,PROXY
+  - DOMAIN-SUFFIX,whatsapp.net,PROXY
+
+# ============================================================================
+# Proxy groups override
+# ----------------------------------------------------------------------------
+# The merge logic (_merge_build_runtime) concatenates [mixin + raw + mixin] and
+# dedupes by name keeping the LAST occurrence, so any group defined here wins
+# over the subscription / raw template.
+#
+# IMPORTANT: mihomo persists the currently-selected member of every "select"
+# group in cache.db, so simply listing AUTO first does NOT guarantee AUTO is
+# active after a restart — it will restore whatever was selected last. To
+# really pin AUTO as the default, ALSO clear the selector cache on (re)start.
+# This is wired up via systemd ExecStartPre in mihomo.service.
+# ============================================================================
+proxy-groups:
+  # Auto-select lowest-latency node (tolerance 200ms to avoid flapping)
+  - name: "AUTO"
+    type: url-test
+    proxies:
+      - "JP-Tailscale"
+      - "US-Tailscale"
+    url: "https://www.gstatic.com/generate_204"
+    interval: 30
+    tolerance: 200
+
+  # Main upstream selector — AUTO listed first so a fresh cache.db picks it
+  - name: "PROXY"
+    type: select
+    proxies:
+      - "AUTO"
+      - "JP-Tailscale"
+      - "US-Tailscale"
+      - "DIRECT"
+
+  # Academic publishers — institution-based access (Shibboleth / IP allowlist /
+  # EZproxy) is bound to the local egress IP. Going through an overseas proxy
+  # makes the publisher classify the request as unaffiliated and demand a fee.
+  # DIRECT first so a fresh cache.db pins DIRECT.
+  - name: "ACADEMIC"
+    type: select
+    proxies:
+      - "DIRECT"
+      - "PROXY"
