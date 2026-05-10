@@ -77,6 +77,51 @@ rules:
   - DOMAIN-SUFFIX,siliconflow.cn,DIRECT
   - DOMAIN-SUFFIX,siliconflow.com,DIRECT
 
+  # Office / collaboration platforms (国内办公协作平台)
+  # Feishu / Lark (飞书)
+  - DOMAIN-SUFFIX,feishu.cn,DIRECT
+  - DOMAIN-SUFFIX,feishu.net,DIRECT
+  - DOMAIN-SUFFIX,larksuite.com,DIRECT
+  - DOMAIN-SUFFIX,larkoffice.com,DIRECT
+  # DingTalk (钉钉)
+  - DOMAIN-SUFFIX,dingtalk.com,DIRECT
+  - DOMAIN-SUFFIX,aliwork.com,DIRECT
+  # WPS / Kingsoft (金山办公)
+  - DOMAIN-SUFFIX,wps.cn,DIRECT
+  - DOMAIN-SUFFIX,wps.com,DIRECT
+  - DOMAIN-SUFFIX,kdocs.cn,DIRECT
+  - DOMAIN-SUFFIX,kingsoft.com,DIRECT
+  - DOMAIN-SUFFIX,ksyun.com,DIRECT
+  # WeChat Work / WeCom (企业微信)
+  - DOMAIN-SUFFIX,work.weixin.qq.com,DIRECT
+  - DOMAIN-SUFFIX,weixin.qq.com,DIRECT
+  - DOMAIN-SUFFIX,wechat.com,DIRECT
+  # Tencent Docs / Meeting (腾讯文档/会议)
+  - DOMAIN-SUFFIX,docs.qq.com,DIRECT
+  - DOMAIN-SUFFIX,meeting.tencent.com,DIRECT
+  - DOMAIN-SUFFIX,tencentcs.com,DIRECT
+  # Yuque (语雀) / Teambition
+  - DOMAIN-SUFFIX,yuque.com,DIRECT
+  - DOMAIN-SUFFIX,teambition.com,DIRECT
+  - DOMAIN-SUFFIX,teambition.net,DIRECT
+  # Zhihu (知乎)
+  - DOMAIN-SUFFIX,zhihu.com,DIRECT
+  - DOMAIN-SUFFIX,zhimg.com,DIRECT
+  # Notion-like domestic (Wolai 我来 / FlowUs)
+  - DOMAIN-SUFFIX,wolai.com,DIRECT
+  - DOMAIN-SUFFIX,flowus.cn,DIRECT
+  # Welink (华为云会议/WeLink)
+  - DOMAIN-SUFFIX,welink.huaweicloud.com,DIRECT
+  - DOMAIN-SUFFIX,huaweicloud.com,DIRECT
+  # Maimai (脉脉)
+  - DOMAIN-SUFFIX,maimai.cn,DIRECT
+  # 163 Mail / Netease (网易邮箱/有道)
+  - DOMAIN-SUFFIX,163.com,DIRECT
+  - DOMAIN-SUFFIX,126.com,DIRECT
+  - DOMAIN-SUFFIX,yeah.net,DIRECT
+  - DOMAIN-SUFFIX,youdao.com,DIRECT
+  - DOMAIN-SUFFIX,netease.com,DIRECT
+
   # Anthropic / Claude — overseas proxy egress IP is on Cloudflare's blocklist (returns 403),
   # while direct connections succeed (302/200) via the local egress.
   # Verified 2026-04-27: proxy=403, direct=302 ip=160.79.104.10.

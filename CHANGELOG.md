@@ -1,4 +1,15 @@
 # Changelog
+## [2.5.15] - 2026-05-10
+
+### ✨ New
+- **Domestic office/collaboration platforms DIRECT routing** (`resources/mixin.yaml`): add 34 `DOMAIN-SUFFIX` rules covering Feishu/Lark (飞书), DingTalk (钉钉), WPS/Kingsoft (金山办公), WeChat Work/WeCom (企业微信), Tencent Docs/Meeting (腾讯文档/会议), Yuque (语雀), Teambition, Zhihu (知乎), Wolai (我来), FlowUs, Huawei WeLink, Maimai (脉脉), and 163/Netease (网易邮箱/有道). Prevents proxy-induced latency spikes, TLS handshake delays, and geo-block 403s on domestic office services.
+
+### ✅ Verification
+- `bash -n $(git ls-files '*.sh')` — 0 syntax errors
+- `bash tests/run_tests.sh` — 69 passed, 0 failed
+- `bash script/run_static_gates.sh` — all gates passed (0 high / 0 medium / 0 low)
+- mihomo runtime rebuilt & restarted: all new domains confirmed `DomainSuffix → DIRECT` in logs
+
 ## [2.5.14] - 2026-04-23
 
 ### ✨ New
