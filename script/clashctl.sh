@@ -606,8 +606,8 @@ _merge_sanitize_restart() {
         #   - 将 wikipedia/wikimedia/wikidata 路由到目标分组（插入在 GEOIP 之前）
         #   - 追加 MATCH,<target> 作为最后一条规则
         if [ -x "$BIN_YQ" ]; then
-                local match_group="${CLASH_MATCH_GROUP:-PROXY}"
-                if CLASH_MATCH_GROUP="$match_group" "$BIN_YQ" -e '((.["proxy-groups"] // []) | map(.name) | contains([strenv(CLASH_MATCH_GROUP)]))' "$tmp_out" >/dev/null 2>&1; then
+                local match_group="${CLASH_MATCH_GROUP:-DIRECT}"
+                if [ "$match_group" = "DIRECT" ] || [ "$match_group" = "REJECT" ] || [ "$match_group" = "REJECT-DROP" ] || CLASH_MATCH_GROUP="$match_group" "$BIN_YQ" -e '((.["proxy-groups"] // []) | map(.name) | contains([strenv(CLASH_MATCH_GROUP)]))' "$tmp_out" >/dev/null 2>&1; then
                         CLASH_MATCH_GROUP="$match_group" "$BIN_YQ" -i '
                             .rules = (
                                 (.rules // []) as $rules |
@@ -617,18 +617,31 @@ _merge_sanitize_restart() {
                                                 | select(test("^MATCH,")|not)
                                                 | select(test("wikipedia\\.org|wikimedia\\.org|wikidata\\.org")|not)
                                         | select(test("microsoft\\.com|update\\.code\\.visualstudio\\.com|marketplace\\.visualstudio\\.com|gallery\\.vsassets\\.io")|not)
+                                        | select(test("google\\.com|googleapis\\.com|gstatic\\.com|googlevideo\\.com|youtube\\.com|ytimg\\.com|gmail\\.com|bbc\\.com|bbc\\.co\\.uk|reddit\\.com|redd\\.it|x\\.com|twitter\\.com|duckduckgo\\.com")|not)
                                         )
                                 ) as $base |
                                 ($base + [
                                     # VS Code / Microsoft endpoints:
                                     # 默认走 CLASH_MATCH_GROUP（通常为 PROXY）以避免在“直连受限”网络里出现大量超时。
-                                    "DOMAIN,update.code.visualstudio.com," + strenv(CLASH_MATCH_GROUP),
-                                    "DOMAIN,marketplace.visualstudio.com," + strenv(CLASH_MATCH_GROUP),
-                                    "DOMAIN-SUFFIX,gallery.vsassets.io," + strenv(CLASH_MATCH_GROUP),
-                                    "DOMAIN-SUFFIX,microsoft.com," + strenv(CLASH_MATCH_GROUP),
-                                        "DOMAIN-SUFFIX,wikipedia.org," + strenv(CLASH_MATCH_GROUP),
-                                        "DOMAIN-SUFFIX,wikimedia.org," + strenv(CLASH_MATCH_GROUP),
-                                        "DOMAIN-SUFFIX,wikidata.org," + strenv(CLASH_MATCH_GROUP)
+                                    "DOMAIN,update.code.visualstudio.com," + "PROXY",
+                                    "DOMAIN,marketplace.visualstudio.com," + "PROXY",
+                                    "DOMAIN-SUFFIX,gallery.vsassets.io," + "PROXY",
+                                    "DOMAIN-SUFFIX,microsoft.com," + "PROXY",
+                                        "DOMAIN-SUFFIX,wikipedia.org," + "PROXY",
+                                        "DOMAIN-SUFFIX,wikimedia.org," + "PROXY",
+                                        "DOMAIN-SUFFIX,wikidata.org," + "PROXY",
+                                    # Google / YouTube / commonly GFW-blocked sites:
+                                    # MATCH→DIRECT 后这些站点需要固定走 PROXY
+                                    "DOMAIN-SUFFIX,google.com," + "PROXY",
+                                    "DOMAIN-SUFFIX,googleapis.com," + "PROXY",
+                                    "DOMAIN-SUFFIX,gstatic.com," + "PROXY",
+                                    "DOMAIN-SUFFIX,youtube.com," + "PROXY",
+                                    "DOMAIN-SUFFIX,ytimg.com," + "PROXY",
+                                    "DOMAIN-SUFFIX,gmail.com," + "PROXY",
+                                    "DOMAIN-SUFFIX,bbc.com," + "PROXY",
+                                    "DOMAIN-SUFFIX,reddit.com," + "PROXY",
+                                    "DOMAIN-SUFFIX,x.com," + "PROXY",
+                                    "DOMAIN-SUFFIX,duckduckgo.com," + "PROXY"
                                     ] + $geos + [
                                         "MATCH," + strenv(CLASH_MATCH_GROUP)
                                     ])

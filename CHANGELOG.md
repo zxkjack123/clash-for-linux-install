@@ -1,4 +1,16 @@
 # Changelog
+## [2.5.16] - 2026-06-14
+
+### 🔀 Routing
+- **MATCH default flip: PROXY → DIRECT** (`script/clashctl.sh`): the fallback rule now defaults to `DIRECT` instead of `PROXY`, making domestic/intranet sites route directly without needing individual rules. Controlled via `CLASH_MATCH_GROUP` env var; DIRECT/REJECT/REJECT-DROP bypass the proxy-group existence check.
+- **GFW-blocked sites fixed PROXY rules**: added 9 `DOMAIN-SUFFIX` rules for `google.com`, `googleapis.com`, `gstatic.com`, `youtube.com`, `ytimg.com`, `gmail.com`, `bbc.com`, `reddit.com`, `x.com`, `duckduckgo.com` — now hard-coded to `PROXY` instead of relying on the old MATCH→PROXY default.
+- **Existing PROXY rules hardened**: Wikipedia/Wikimedia/Wikidata/Microsoft/VS Code rules also hard-coded to literal `"PROXY"` instead of `strenv(CLASH_MATCH_GROUP)` to survive the default flip.
+
+### ✅ Verification
+- `bash tests/run_tests.sh` — 69 passed, 0 failed
+- Full routing audit: 54 domains across 6 categories all verified ✅ (DIRECT for domestic/institutional/AI/collaboration, PROXY for GFW-blocked, dedicated groups for dev/academic)
+- `MATCH,DIRECT` confirmed live in runtime; all 9 new PROXY rules active
+
 ## [2.5.15] - 2026-05-10
 
 ### ✨ New
