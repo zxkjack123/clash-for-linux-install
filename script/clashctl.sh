@@ -617,7 +617,7 @@ _merge_sanitize_restart() {
                                                 | select(test("^MATCH,")|not)
                                                 | select(test("wikipedia\\.org|wikimedia\\.org|wikidata\\.org")|not)
                                         | select(test("microsoft\\.com|update\\.code\\.visualstudio\\.com|marketplace\\.visualstudio\\.com|gallery\\.vsassets\\.io")|not)
-                                        | select(test("google\\.com|googleapis\\.com|gstatic\\.com|googlevideo\\.com|youtube\\.com|ytimg\\.com|gmail\\.com|bbc\\.com|bbc\\.co\\.uk|reddit\\.com|redd\\.it|x\\.com|twitter\\.com|duckduckgo\\.com")|not)
+                                        | select(test("google\\.com|googleapis\\.com|gstatic\\.com|googlevideo\\.com|googleusercontent\\.com|youtube\\.com|ytimg\\.com|gmail\\.com|google\\.co\\.jp|bbc\\.com|bbc\\.co\\.uk|reddit\\.com|redd\\.it|x\\.com|twitter\\.com|duckduckgo\\.com")|not)
                                         )
                                 ) as $base |
                                 ($base + [
@@ -635,9 +635,12 @@ _merge_sanitize_restart() {
                                     "DOMAIN-SUFFIX,google.com," + "PROXY",
                                     "DOMAIN-SUFFIX,googleapis.com," + "PROXY",
                                     "DOMAIN-SUFFIX,gstatic.com," + "PROXY",
+                                    "DOMAIN-SUFFIX,googlevideo.com," + "PROXY",
+                                    "DOMAIN-SUFFIX,googleusercontent.com," + "PROXY",
                                     "DOMAIN-SUFFIX,youtube.com," + "PROXY",
                                     "DOMAIN-SUFFIX,ytimg.com," + "PROXY",
                                     "DOMAIN-SUFFIX,gmail.com," + "PROXY",
+                                    "DOMAIN-SUFFIX,google.co.jp," + "PROXY",
                                     "DOMAIN-SUFFIX,bbc.com," + "PROXY",
                                     "DOMAIN-SUFFIX,reddit.com," + "PROXY",
                                     "DOMAIN-SUFFIX,x.com," + "PROXY",
