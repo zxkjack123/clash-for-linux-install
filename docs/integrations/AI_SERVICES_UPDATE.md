@@ -12,7 +12,7 @@
 ### 修改前的AI服务列表
 ```
 ✅ ChatGPT (chat.openai.com)
-✅ UIUI-API (sg.uiuiapi.com)
+✅ UIUI-API (api.uiuihao.com)
 ❌ 硅基流动 (api.siliconflow.cn/) - 404错误
 ❌ Gemini (gemini.google.com) - 地域限制
 ```
@@ -21,7 +21,7 @@
 ### 修改后的AI服务列表
 ```
 ✅ ChatGPT (chat.openai.com)
-✅ UIUI-API (sg.uiuiapi.com)
+✅ UIUI-API (api.uiuihao.com)
 ✅ 硅基流动 (siliconflow.cn) - 官网首页
 ✅ Anthropic官网 (anthropic.com) - 官网首页
 ```
@@ -95,7 +95,7 @@ AI服务:    100% (4/4) | 1651ms
 # 修改前
 local services=(
     "https://chat.openai.com/|ChatGPT"
-    "https://sg.uiuiapi.com/|UIUI-API"
+    "https://api.uiuihao.com/|UIUI-API"
     "https://api.siliconflow.cn/|硅基流动"
     "https://gemini.google.com/|Gemini"
 )
@@ -103,7 +103,7 @@ local services=(
 # 修改后
 local services=(
     "https://chat.openai.com/|ChatGPT"
-    "https://sg.uiuiapi.com/|UIUI-API"
+    "https://api.uiuihao.com/|UIUI-API"
     "https://siliconflow.cn/|硅基流动"
     "https://www.anthropic.com/|Anthropic官网"
 )
@@ -116,7 +116,7 @@ local services=(
 - **用途**: 验证OpenAI服务可用性
 - **特点**: 308重定向，正常行为
 
-### 2. UIUI-API (sg.uiuiapi.com)
+### 2. UIUI-API (api.uiuihao.com)
 - **类型**: 用户常用的模型服务商
 - **节点**: 新加坡
 - **用途**: 验证主要AI服务商连通性

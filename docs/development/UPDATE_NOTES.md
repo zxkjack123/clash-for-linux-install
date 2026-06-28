@@ -48,7 +48,7 @@
 - ❌ Anthropic API (https://api.anthropic.com/)
 
 **新增**的服务（国内可访问的AI服务商）：
-- ✅ UIUI-API (https://sg.uiuiapi.com/) - 新加坡节点
+- ✅ UIUI-API (https://api.uiuihao.com/) - 新加坡节点
 - ✅ 硅基流动 (https://api.siliconflow.cn/) - 国内AI服务商
 - ✅ Gemini (https://gemini.google.com/) - Google AI
 
@@ -201,7 +201,7 @@ local services=(
 # 修改后
 local services=(
     "https://chat.openai.com/|ChatGPT"
-    "https://sg.uiuiapi.com/|UIUI-API"
+    "https://api.uiuihao.com/|UIUI-API"
     "https://api.siliconflow.cn/|硅基流动"
     "https://gemini.google.com/|Gemini"
 )

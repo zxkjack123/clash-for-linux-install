@@ -85,7 +85,7 @@ ENDPOINTS=(
   "latency1:https://www.gstatic.com/generate_204"
   "latency2:https://www.cloudflare.com/cdn-cgi/trace"
   "scnet:https://api.scnet.cn/api/llm/v1/chat/completions"
-  "uiui:https://sg.uiuiapi.com/"
+  "uiui:https://api.uiuihao.com/"
   "siliconflow:https://siliconflow.cn/"
   "openrouter:https://openrouter.ai/api/v1"
 )

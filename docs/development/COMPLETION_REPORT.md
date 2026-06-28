@@ -11,7 +11,7 @@
 根据您的需求，已成功完成网络监控系统的定制化调整，主要包括：
 
 1. ✅ **移除地域受限的AI服务** - OpenAI API、Claude、Anthropic等无法直连的服务
-2. ✅ **添加您常用的AI服务商** - UIUI-API (sg.uiuiapi.com) 和 硅基流动
+2. ✅ **添加您常用的AI服务商** - UIUI-API (api.uiuihao.com) 和 硅基流动
 3. ✅ **优化流媒体监控列表** - 移除Netflix，添加Google Meet
 4. ✅ **创建一键优化功能** - 可一键执行所有网络优化任务
 
@@ -33,7 +33,7 @@
 #### 修改后（4个服务）
 ```
 ✅ ChatGPT (chat.openai.com)                 - 保留
-✅ UIUI-API (sg.uiuiapi.com)                 - 您常用，新加坡节点
+✅ UIUI-API (api.uiuihao.com)                 - 您常用，新加坡节点
 ⚠️ 硅基流动 (api.siliconflow.cn)            - 您常用，需验证API地址
 ✅ Gemini (gemini.google.com)                - Google AI
 ```
@@ -402,7 +402,7 @@ crontab -e
 ```
 AI服务 (4个)
   ✅ ChatGPT (chat.openai.com)
-  ✅ UIUI-API (sg.uiuiapi.com)
+  ✅ UIUI-API (api.uiuihao.com)
   ⚠️ 硅基流动 (api.siliconflow.cn)
   ✅ Gemini (gemini.google.com)
 

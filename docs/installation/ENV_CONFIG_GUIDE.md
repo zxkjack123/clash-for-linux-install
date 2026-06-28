@@ -41,7 +41,7 @@ echo "API Key: ${SILICONFLOW_API_KEY:0:20}..."
 | 配置项                | 说明              | 是否必需 | 获取地址                                |
 | --------------------- | ----------------- | -------- | --------------------------------------- |
 | `SILICONFLOW_API_KEY` | 硅基流动 API 密钥 | 可选     | https://cloud.siliconflow.cn/account/ak |
-| `UIUI_API_KEY`        | UIUI API 密钥     | 可选     | https://sg.uiuiapi.com                  |
+| `UIUI_API_KEY`        | UIUI API 密钥     | 可选     | https://api.uiuihao.com                  |
 
 **注意**: 
 - 这些 API keys 仅用于测试服务连接性

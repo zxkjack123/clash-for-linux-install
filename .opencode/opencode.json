@@ -1,0 +1,41 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "shell": "/bin/bash",
+  "default_agent": "clash-admin",
+  "instructions": [
+    "scripts/clashctl.sh --help always shows the full CLI reference",
+    "Use bash for all shell commands — the entire toolchain is bash-based"
+  ],
+  "permission": {
+    "edit": "allow",
+    "bash": {
+      "git *": "allow",
+      "systemctl --user *": "allow",
+      "gsettings *": "allow",
+      "clashctl *": "allow",
+      "mihomoctl *": "allow",
+      "journalctl --user *": "allow",
+      "curl *": "allow",
+      "ss *": "allow",
+      "netstat *": "allow",
+      "tailscale *": "allow",
+      "/bin/sh /home/gw/opt/clash-for-linux-install/script/*": "allow",
+      "/bin/bash /home/gw/opt/clash-for-linux-install/script/*": "allow",
+      "/bin/bash /home/gw/opt/clash-for-linux-install/vpn-tools/*": "allow",
+      "ping *": "allow",
+      "notify-send *": "allow",
+      "kill *": "allow",
+      "mkdir -p /tmp/opencode*": "allow",
+      "rm -rf /tmp/opencode*": "allow",
+      "rm /tmp/opencode*": "allow",
+      "*": "ask"
+    }
+  },
+  "agent": {
+    "clash-admin": {
+      "description": "Clash proxy administration: network diagnostics, proxy on/off, node switching, rule management, subscription refresh, VPN toolkit operations, system proxy settings (GNOME/KDE/git/apt), service lifecycle (systemd), Docker proxy troubleshooting. Use for any clash-for-linux-install operations. 代理管理：网络诊断、代理开关、节点切换、规则管理、订阅更新、VPN工具箱、系统代理设置、服务启停、Docker代理排查。",
+      "mode": "primary",
+      "color": "#00B4D8"
+    }
+  }
+}

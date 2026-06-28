@@ -28,7 +28,7 @@
    用途: 验证OpenAI服务可用性
    测试: 308 (1382ms) [OK] ✅
 
-2. UIUI-API         https://sg.uiuiapi.com/
+2. UIUI-API         https://api.uiuihao.com/
    类型: 用户常用的模型服务商
    节点: 新加坡
    测试: 200 (1770ms) [OK] ✅
@@ -115,7 +115,7 @@ AI服务详情:
 ```bash
 local services=(
     "https://chat.openai.com/|ChatGPT"
-    "https://sg.uiuiapi.com/|UIUI-API"
+    "https://api.uiuihao.com/|UIUI-API"
     "https://siliconflow.cn/|硅基流动"
     "https://kimi.moonshot.cn/|Kimi"
 )
@@ -209,7 +209,7 @@ nano /path/to/clash-for-linux-install/vpn-tools/network_health_monitor.sh
 # 修改第106行，添加第5个服务：
 local services=(
     "https://chat.openai.com/|ChatGPT"
-    "https://sg.uiuiapi.com/|UIUI-API"
+    "https://api.uiuihao.com/|UIUI-API"
     "https://siliconflow.cn/|硅基流动"
     "https://kimi.moonshot.cn/|Kimi"
     "https://chatglm.cn/|智谱清言"

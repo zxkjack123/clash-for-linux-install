@@ -1,16 +1,16 @@
 # 🚀 一键优化快速参考
 
-## 最新更新 (2025-10-13)
+## 最新更新 (2026-06-28)
 
 ### ✅ 已完成的调整
 
 #### 1. AI服务监控 🤖
 ```
-移除：OpenAI API, Claude, Anthropic（地域限制）
-新增：UIUI-API (sg.uiuiapi.com)        ← 您常用
-新增：硅基流动 (api.siliconflow.cn)    ← 您常用
-新增：Gemini (gemini.google.com)
-保留：ChatGPT (chat.openai.com)
+可用：UIUI-API (api.uiuihao.com)        ← 新域名，走代理
+可用：硅基流动 (api.siliconflow.cn)    ← 您常用
+可用：Gemini (gemini.google.com)
+可用：ChatGPT (chat.openai.com)
+废弃：sg.uiuiapi.com                    ← 已不可达
 ```
 
 #### 2. 流媒体监控 📺

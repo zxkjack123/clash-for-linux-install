@@ -223,6 +223,8 @@ rules:
   - DOMAIN-SUFFIX,oaistatic.com,PROXY
   - DOMAIN-SUFFIX,oaiusercontent.com,PROXY
   - DOMAIN-SUFFIX,chatgpt.com,PROXY
+  # UIUIAPI (OpenAI-compatible provider — direct blocked, proxy required)
+  - DOMAIN-SUFFIX,uiuihao.com,PROXY
   # Twitter / X
   - DOMAIN-SUFFIX,twitter.com,PROXY
   - DOMAIN-SUFFIX,x.com,PROXY
@@ -262,6 +264,27 @@ rules:
   - DOMAIN-SUFFIX,cdninstagram.com,PROXY
   - DOMAIN-SUFFIX,whatsapp.com,PROXY
   - DOMAIN-SUFFIX,whatsapp.net,PROXY
+  # Lemon Squeezy (payment/tax platform; page hangs on DIRECT due to blocked
+  # third-party resources: hCaptcha, Stripe, Intercom, Quaderno, AWS RUM/Cognito)
+  - DOMAIN-SUFFIX,lemonsqueezy.com,PROXY
+  - DOMAIN-SUFFIX,hcaptcha.com,PROXY
+  - DOMAIN-SUFFIX,quadernoapp.com,PROXY
+  - DOMAIN-SUFFIX,stripe.com,PROXY
+  - DOMAIN-SUFFIX,stripecdn.com,PROXY
+  - DOMAIN-SUFFIX,stripe.network,PROXY
+  - DOMAIN-SUFFIX,paypal.com,PROXY
+  - DOMAIN-SUFFIX,paypalobjects.com,PROXY
+  - DOMAIN-SUFFIX,intercom.io,PROXY
+  - DOMAIN-SUFFIX,intercomcdn.com,PROXY
+  - DOMAIN-SUFFIX,pusher.com,PROXY
+  - DOMAIN-SUFFIX,taxid.pro,PROXY
+  - DOMAIN-SUFFIX,certcapture.com,PROXY
+  - DOMAIN-SUFFIX,amazonaws.com,PROXY
+  - DOMAIN-SUFFIX,getfernand.com,PROXY
+  - DOMAIN-SUFFIX,sumatra.ai,PROXY
+  # Sentry (error reporting; used by lemonsqueezy/page CDNs)
+  - DOMAIN-SUFFIX,sentry.io,PROXY
+  - DOMAIN-SUFFIX,sentry-cdn.com,PROXY
 
 # ============================================================================
 # Proxy groups override

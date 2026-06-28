@@ -232,7 +232,7 @@ nano network_health_monitor.sh
 # 在第107行附近，修改services数组为：
 local services=(
     "https://chat.openai.com/|ChatGPT"
-    "https://sg.uiuiapi.com/|UIUI-API"
+    "https://api.uiuihao.com/|UIUI-API"
     "https://siliconflow.cn/|硅基流动"
     "https://kimi.moonshot.cn/|Kimi"
 )

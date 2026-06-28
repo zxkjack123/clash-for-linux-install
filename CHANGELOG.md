@@ -1,4 +1,21 @@
 # Changelog
+## [2.5.17] - 2026-06-28
+
+### 🔀 Routing
+- **UIUIAPI domain migration** (`resources/mixin.yaml`): replaced deprecated `sg.uiuiapi.com` with `api.uiuihao.com`; added `DOMAIN-SUFFIX,uiuihao.com,PROXY` rule. The old domain is no longer reachable.
+- **Removed no_proxy bypass** for UIUIAPI: the new `api.uiuihao.com` domain routes correctly through Clash proxy, eliminating the shell-level bypass workaround.
+
+### 🛠 Fixes
+- **`vpn-tools/`**: updated all hardcoded `sg.uiuiapi.com` references in `test_ai_connectivity.sh`, `quick_ai_test.sh`, `network_connectivity_test.sh`, `network_health_monitor.sh` → `api.uiuihao.com`.
+
+### 🤖 Infrastructure
+- **`.opencode/`**: established project-level opencode configuration with dedicated `clash-admin` primary agent for clash proxy administration.
+
+### ✅ Verification
+- `bash tests/run_tests.sh` — 69 passed, 0 failed
+- `api.uiuihao.com` verified: HTTP 200 via proxy (PROXY[JP-Tailscale]), `/v1/models` API returns 300+ models
+- `sg.uiuiapi.com` confirmed unreachable (HTTP 000, timeout) — deprecated upstream
+
 ## [2.5.16] - 2026-06-14
 
 ### 🔀 Routing

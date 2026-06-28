@@ -152,7 +152,7 @@ check_ai_services() {
     local services=(
         $'https://api.githubcopilot.com/\tCopilot\t^(20[0-9]|40[0-9])$\tyes'
         $'https://api.scnet.cn/api/llm/v1/chat/completions\tSCNET\t^(20[0-9]|401|403|405)$\tdirect'
-        $'https://sg.uiuiapi.com/\tUIUI-API\t^(20[0-9]|30[12378])$\tyes'
+        $'https://api.uiuihao.com/\tUIUI-API\t^(20[0-9]|30[12378])$\tyes'
         "${SILICONFLOW_URL}"$'\t硅基流动\t^(20[0-9]|30[0-9])$\tdirect'
         $'https://openrouter.ai/api/v1\tOpenRouter\t^(20[0-9]|401|403)$\tyes'
     )

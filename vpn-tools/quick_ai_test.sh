@@ -32,7 +32,7 @@ declare -A targets=(
 	[github_api]="https://api.github.com/"
 	[copilot_edge]="https://api.githubcopilot.com/"
 	[scnet]="https://api.scnet.cn/api/llm/v1/chat/completions"
-	[uiui_api]="https://sg.uiuiapi.com/"
+	[uiui_api]="https://api.uiuihao.com/"
 	[siliconflow]="https://siliconflow.cn/"
 	[openrouter]="https://openrouter.ai/api/v1"
 )
