@@ -7,12 +7,17 @@
   - **Timeout fix**: `zoomsjcbm213zc.sjc.zoom.us`, `us02images.zoom.us`, `aw1pmcapi.zoom.us` — confirmed flapping on 2026-07-01 via `journalctl` analysis
   - Conservative approach: only 5 of 16 Zoom servers proxied; 11 remain DIRECT with sub-second latency
   - All rules use `DOMAIN` exact match to avoid broad `DOMAIN-SUFFIX,zoom.us` side effects
+- **Go ecosystem PROXY routing** (`resources/mixin.yaml`): routed `golang.org` / `proxy.golang.org` / `sum.golang.org` / `go.dev` / `godoc.org` through PROXY. These Google-hosted domains are unreachable from mainland China (TCP timeout / TLS SNI block), breaking `go build`, `go test`, `go mod download`.
+
+### 🆕 New
+- **`script/go-env.sh`**: Go environment setup script for mainland China. Sets `GOPROXY='https://goproxy.cn,direct'` (fast domestic mirror) with `GONOSUMCHECK=*` and `GONOSUMDB=*`. Two-layer approach: Clash proxy rules for import-path resolution + domestic mirror for module zip downloads. Source it with `source script/go-env.sh`.
 
 ### ✅ Verification
 - Full A/B latency test: 16 Zoom endpoints tested DIRECT vs PROXY(JP-Tailscale), 3-round sampling
 - Full proxy health suite: 13 critical services (GitHub, Google, OpenAI, DeepSeek, Docker, etc.) all ✅
 - Zoom stress test: 5-round stability sampling on worst-case endpoints, 0 TCP-layer failures
 - `journalctl` audit: 64 Zoom connections over test period, 0 errors/warnings/timeouts
+- Go: all 5 domains confirmed reachable via PROXY (golang.org 301, proxy.golang.org 200, sum.golang.org 200, go.dev 200, godoc.org 301), goproxy.cn verified 200
 
 ## [2.5.17] - 2026-06-28
 

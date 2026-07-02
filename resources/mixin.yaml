@@ -138,6 +138,17 @@ rules:
   - DOMAIN,us02images.zoom.us,PROXY
   - DOMAIN,aw1pmcapi.zoom.us,PROXY
 
+  # Go ecosystem (force PROXY — golang.org/proxy.golang.org/sum.golang.org blocked in CN)
+  # go.dev and godoc.org also unreachable without proxy.
+  # Note: GOPROXY='https://goproxy.cn,direct' is also recommended as a fallback
+  # (see script/go-env.sh); the proxy rules here cover go get/install import-path
+  # resolution and direct go mod fetch from upstream.
+  - DOMAIN-SUFFIX,golang.org,PROXY
+  - DOMAIN,proxy.golang.org,PROXY
+  - DOMAIN,sum.golang.org,PROXY
+  - DOMAIN,go.dev,PROXY
+  - DOMAIN-SUFFIX,godoc.org,PROXY
+
   # Anthropic / Claude — overseas proxy egress IP is on Cloudflare's blocklist (returns 403),
   # while direct connections succeed (302/200) via the local egress.
   # Verified 2026-04-27: proxy=403, direct=302 ip=160.79.104.10.
