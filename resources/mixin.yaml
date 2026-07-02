@@ -122,6 +122,22 @@ rules:
   - DOMAIN-SUFFIX,youdao.com,DIRECT
   - DOMAIN-SUFFIX,netease.com,DIRECT
 
+  # Zoom (international, us06 datacenter) — PROXY for high-latency or unstable servers.
+  # Empirical A/B test (2026-07-02): DIRECT vs PROXY(JP-Tailscale) on all Zoom endpoints.
+  # Routing these through JP-Tailscale reduces latency by 0.4–0.6 s without penalising
+  # any other endpoint. The majority of Zoom traffic stays DIRECT.
+  # PROXY candidates (latency win or previous timeout):
+  #   us06polling.zoom.us       DIRECT 2.24s → PROXY 1.62s  (-0.62s)
+  #   docs.zoom.us              DIRECT 0.95s → PROXY 0.54s  (-0.41s)
+  #   zoomsjcbm213zc.sjc.zoom.us  timeout 2026-07-01
+  #   us02images.zoom.us        timeout 2026-07-01
+  #   aw1pmcapi.zoom.us         timeout 2026-07-01
+  - DOMAIN,us06polling.zoom.us,PROXY
+  - DOMAIN,docs.zoom.us,PROXY
+  - DOMAIN,zoomsjcbm213zc.sjc.zoom.us,PROXY
+  - DOMAIN,us02images.zoom.us,PROXY
+  - DOMAIN,aw1pmcapi.zoom.us,PROXY
+
   # Anthropic / Claude — overseas proxy egress IP is on Cloudflare's blocklist (returns 403),
   # while direct connections succeed (302/200) via the local egress.
   # Verified 2026-04-27: proxy=403, direct=302 ip=160.79.104.10.

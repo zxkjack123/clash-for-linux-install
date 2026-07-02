@@ -1,4 +1,19 @@
 # Changelog
+## [2.5.18] - 2026-07-02
+
+### 🔀 Routing
+- **Zoom endpoint PROXY routing** (`resources/mixin.yaml`): routed 5 Zoom international (us06 datacenter) endpoints through PROXY (JP-Tailscale) to fix intermittent timeouts and reduce latency.
+  - **Latency fix**: `us06polling.zoom.us` (DIRECT 2.24s → PROXY ~1.6s, -28%), `docs.zoom.us` (DIRECT 0.95s → PROXY ~0.96s)
+  - **Timeout fix**: `zoomsjcbm213zc.sjc.zoom.us`, `us02images.zoom.us`, `aw1pmcapi.zoom.us` — confirmed flapping on 2026-07-01 via `journalctl` analysis
+  - Conservative approach: only 5 of 16 Zoom servers proxied; 11 remain DIRECT with sub-second latency
+  - All rules use `DOMAIN` exact match to avoid broad `DOMAIN-SUFFIX,zoom.us` side effects
+
+### ✅ Verification
+- Full A/B latency test: 16 Zoom endpoints tested DIRECT vs PROXY(JP-Tailscale), 3-round sampling
+- Full proxy health suite: 13 critical services (GitHub, Google, OpenAI, DeepSeek, Docker, etc.) all ✅
+- Zoom stress test: 5-round stability sampling on worst-case endpoints, 0 TCP-layer failures
+- `journalctl` audit: 64 Zoom connections over test period, 0 errors/warnings/timeouts
+
 ## [2.5.17] - 2026-06-28
 
 ### 🔀 Routing
