@@ -1,4 +1,20 @@
 # Changelog
+## [2.5.19] - 2026-07-04
+
+### 🔀 Routing
+- **Zoom SJC media signalling wildcard** (`resources/mixin.yaml`): added `DOMAIN-SUFFIX,sjc.zoom.us,PROXY` to cover all San Jose datacenter Zoom media-signalling servers with random hostnames (e.g. `zoomsjcbb24mmr`, `zoomsjcaa11mmr`).
+  - Root cause: `zoomsjcbb24mmr.sjc.zoom.us` (144.195.27.24:443) suffered 22 TCP i/o timeouts in 8 min during a meeting (2026-07-03 15:43–15:51), causing audio dropouts while video/screenshare remained unaffected.
+  - DNS scan confirmed `zoomsjc*.sjc.zoom.us` naming is unpredictable (random suffix); `DOMAIN-SUFFIX` wildcard is the only reliable forward-coverage.
+  - Also added explicit `DOMAIN,zoomsjcbb24mmr.sjc.zoom.us,PROXY` for the confirmed-offending host.
+
+### 🔧 System
+- **UDP buffer tuning** (`/etc/sysctl.d/90-zoom-udp.conf`): raised `net.core.rmem_{default,max}` and `net.core.wmem_{default,max}` from 208KB → 512KB to reduce `RcvbufErrors` on real-time Zoom UDP audio streams. 30-minute monitoring confirmed buffer errors stopped accumulating post-change.
+
+### ✅ Verification
+- 30-minute continuous Zoom network monitoring (57 rounds × 30s): 0 UDP interruptions, 0 audio dropouts, 0 mihomo errors, 0 PipeWire xruns.
+- Full DNS scan of Zoom naming patterns across 8 datacenters (sjc/nyc/ams/fra/nrt/sin/syd/gru/bom) and us01–us10 regional prefixes.
+- mihomo config test pass, runtime 267 rules, 8 proxy groups, all critical rules present.
+
 ## [2.5.18] - 2026-07-02
 
 ### 🔀 Routing

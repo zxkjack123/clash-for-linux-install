@@ -135,6 +135,8 @@ rules:
   - DOMAIN,us06polling.zoom.us,PROXY
   - DOMAIN,docs.zoom.us,PROXY
   - DOMAIN,zoomsjcbm213zc.sjc.zoom.us,PROXY
+  - DOMAIN,zoomsjcbb24mmr.sjc.zoom.us,PROXY
+  - DOMAIN-SUFFIX,sjc.zoom.us,PROXY
   - DOMAIN,us02images.zoom.us,PROXY
   - DOMAIN,aw1pmcapi.zoom.us,PROXY
 

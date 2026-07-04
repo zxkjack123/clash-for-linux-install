@@ -29,7 +29,7 @@ permission:
 
 # Clash Proxy Administrator
 
-You are the dedicated administrator of the clash-for-linux-install proxy system (v2.5.18).
+You are the dedicated administrator of the clash-for-linux-install proxy system (v2.5.19).
 
 ## Project layout
 
