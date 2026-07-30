@@ -12,7 +12,6 @@ rules:
   # Block link-local IMDS (169.254.169.254) — VS Code extensions probe cloud metadata
   # on physical workstations; these always fail and pollute connection failure counts.
   - IP-CIDR,169.254.0.0/16,REJECT,no-resolve
-
   # CAS / ASIPP intranet (force DIRECT, never via proxy)
   # - 202.127.200.0/21  HFCASNET = Hefei Branch of CAS (含等离子体所 ASIPP, 如 202.127.204.49)
   # - 159.226.0.0/16    CAS Beijing CNIC (含 www.ipp.cas.cn 159.226.242.225 等公网入口)
@@ -24,10 +23,8 @@ rules:
   - DOMAIN-SUFFIX,cas.cn,DIRECT
   - DOMAIN-SUFFIX,ipp.ac.cn,DIRECT
   - DOMAIN-SUFFIX,hfcas.ac.cn,DIRECT
-
   # DeepSeek (Chinese AI service; routing via overseas proxy adds 5+s TLS handshake and frequent drops)
   - DOMAIN-SUFFIX,deepseek.com,DIRECT
-
   # ===== China domestic services (DIRECT) =====
   # Routing these via overseas proxy adds 5+s TLS handshake, frequent drops, or 403 (geo-blocked).
   # Government / public sector
@@ -76,7 +73,6 @@ rules:
   - DOMAIN-SUFFIX,360.cn,DIRECT
   - DOMAIN-SUFFIX,siliconflow.cn,DIRECT
   - DOMAIN-SUFFIX,siliconflow.com,DIRECT
-
   # Office / collaboration platforms (国内办公协作平台)
   # Feishu / Lark (飞书)
   - DOMAIN-SUFFIX,feishu.cn,DIRECT
@@ -121,7 +117,6 @@ rules:
   - DOMAIN-SUFFIX,yeah.net,DIRECT
   - DOMAIN-SUFFIX,youdao.com,DIRECT
   - DOMAIN-SUFFIX,netease.com,DIRECT
-
   # Zoom (international, us06 datacenter) — PROXY for high-latency or unstable servers.
   # Empirical A/B test (2026-07-02): DIRECT vs PROXY(JP-Tailscale) on all Zoom endpoints.
   # Routing these through JP-Tailscale reduces latency by 0.4–0.6 s without penalising
@@ -139,7 +134,6 @@ rules:
   - DOMAIN-SUFFIX,sjc.zoom.us,PROXY
   - DOMAIN,us02images.zoom.us,PROXY
   - DOMAIN,aw1pmcapi.zoom.us,PROXY
-
   # Go ecosystem (force PROXY — golang.org/proxy.golang.org/sum.golang.org blocked in CN)
   # go.dev and godoc.org also unreachable without proxy.
   # Note: GOPROXY='https://goproxy.cn,direct' is also recommended as a fallback
@@ -150,13 +144,11 @@ rules:
   - DOMAIN,sum.golang.org,PROXY
   - DOMAIN,go.dev,PROXY
   - DOMAIN-SUFFIX,godoc.org,PROXY
-
   # Anthropic / Claude — overseas proxy egress IP is on Cloudflare's blocklist (returns 403),
   # while direct connections succeed (302/200) via the local egress.
   # Verified 2026-04-27: proxy=403, direct=302 ip=160.79.104.10.
   - DOMAIN-SUFFIX,claude.ai,DIRECT
   - DOMAIN-SUFFIX,anthropic.com,DIRECT
-
   # ===== Academic publishers (force DIRECT) =====
   # Institution-based access (IP allowlist / Shibboleth / EZproxy) requires the
   # local/campus egress IP. Routing via overseas proxy makes the publisher
@@ -228,7 +220,6 @@ rules:
   - DOMAIN-SUFFIX,wikinews.org,PROXY
   - DOMAIN-SUFFIX,wikiversity.org,PROXY
   - DOMAIN-SUFFIX,w.wiki,PROXY
-
   # Amazon family (direct from China triggers anti-bot 503 or SSL timeout)
   - DOMAIN-SUFFIX,amazon.com,PROXY
   - DOMAIN-SUFFIX,amazon.co.jp,PROXY
@@ -238,12 +229,78 @@ rules:
   - DOMAIN-SUFFIX,media-amazon.com,PROXY
   - DOMAIN-SUFFIX,images-amazon.com,PROXY
   - DOMAIN-SUFFIX,amazonaw.com,PROXY
-
   # HuggingFace (direct from China triggers connection reset / ERR_CONNECTION_CLOSED)
   - DOMAIN-SUFFIX,huggingface.co,PROXY
   - DOMAIN-SUFFIX,hf.co,PROXY
   - DOMAIN-SUFFIX,huggingface.com,PROXY
+  # ===== Microsoft / Office 365 (force PROXY) =====
+  # Microsoft services are heavily throttled or blocked on Chinese networks
+  # (GFW SNI-based interference on non-microsoft.com domains).
+  # Only microsoft.com is covered by the upstream subscription rules;
+  # these additional domains are required for Outlook/Thunderbird, Teams,
+  # OneDrive, SharePoint, Azure AD auth, and Windows services to work.
+  #
+  # Office 365 / Exchange (Outlook, Thunderbird)
+  - DOMAIN-SUFFIX,office365.com,PROXY
+  - DOMAIN-SUFFIX,office.com,PROXY
+  - DOMAIN-SUFFIX,office.net,PROXY
+  - DOMAIN-SUFFIX,officeapps.live.com,PROXY
+  # Microsoft account / Outlook.com / Hotmail
+  - DOMAIN-SUFFIX,live.com,PROXY
+  - DOMAIN-SUFFIX,live.net,PROXY
+  - DOMAIN-SUFFIX,outlook.com,PROXY
+  - DOMAIN-SUFFIX,hotmail.com,PROXY
+  # Microsoft authentication / Azure AD (Entra ID)
+  - DOMAIN-SUFFIX,msauth.net,PROXY
+  - DOMAIN-SUFFIX,msft.net,PROXY
+  - DOMAIN-SUFFIX,msidentity.com,PROXY
+  - DOMAIN-SUFFIX,microsoftonline.com,PROXY
+  - DOMAIN-SUFFIX,azure.com,PROXY
+  - DOMAIN-SUFFIX,azure.net,PROXY
+  - DOMAIN-SUFFIX,azureedge.net,PROXY
+  # SharePoint / OneDrive / OneNote
+  - DOMAIN-SUFFIX,sharepoint.com,PROXY
+  - DOMAIN-SUFFIX,sharepointonline.com,PROXY
+  - DOMAIN-SUFFIX,onedrive.com,PROXY
+  - DOMAIN-SUFFIX,onenote.com,PROXY
+  - DOMAIN-SUFFIX,onenote.net,PROXY
+  # Skype / Teams auxiliary
+  - DOMAIN-SUFFIX,skype.com,PROXY
+  - DOMAIN-SUFFIX,skype.net,PROXY
+  # Windows services (WNS, update, activation)
+  - DOMAIN-SUFFIX,windows.com,PROXY
+  - DOMAIN-SUFFIX,windows.net,PROXY
+  - DOMAIN-SUFFIX,windowsupdate.com,PROXY
+  - DOMAIN-SUFFIX,xboxlive.com,PROXY
+  # Bing / Cortana
+  - DOMAIN-SUFFIX,bing.com,PROXY
+  - DOMAIN-SUFFIX,bing.net,PROXY
+  - DOMAIN-SUFFIX,cortana.ai,PROXY
+  # Power BI / Power Apps / Flow
+  - DOMAIN-SUFFIX,powerbi.com,PROXY
+  - DOMAIN-SUFFIX,powerapps.com,PROXY
+  # NuGet / MSDN
+  - DOMAIN-SUFFIX,nuget.org,PROXY
+  - DOMAIN-SUFFIX,msdn.com,PROXY
+  # GitHub (already handled by DEV group, but as a fallback)
+  # Visual Studio (already handled by VSCODE group, but as a fallback)
 
+  # ===== Stack Exchange network (force PROXY) =====
+  # Stack Exchange blocks/highly-restricts account creation from Chinese IPs:
+  # "Account creation failed due to issues with your IP address."
+  # Routing through overseas nodes resolves the IP reputation issue.
+  - DOMAIN-SUFFIX,stackexchange.com,PROXY
+  - DOMAIN-SUFFIX,stackoverflow.com,PROXY
+  - DOMAIN-SUFFIX,stackapps.com,PROXY
+  - DOMAIN-SUFFIX,askubuntu.com,PROXY
+  - DOMAIN-SUFFIX,superuser.com,PROXY
+  - DOMAIN-SUFFIX,serverfault.com,PROXY
+  - DOMAIN-SUFFIX,mathoverflow.net,PROXY
+  - DOMAIN-SUFFIX,stackoverflow.blog,PROXY
+  - DOMAIN-SUFFIX,stackoverflow.email,PROXY
+  - DOMAIN-SUFFIX,stackoverflow.co,PROXY
+  - DOMAIN-SUFFIX,theoverflow.com,PROXY
+  - DOMAIN-SUFFIX,sstatic.net,PROXY
   # ===== Commonly blocked/geo-restricted services (force PROXY) =====
   # Without these, the upstream MATCH,DIRECT catch-all causes silent failures
   # (the local network cannot reach these domains directly).
@@ -252,8 +309,11 @@ rules:
   - DOMAIN-SUFFIX,oaistatic.com,PROXY
   - DOMAIN-SUFFIX,oaiusercontent.com,PROXY
   - DOMAIN-SUFFIX,chatgpt.com,PROXY
-  # UIUIAPI (OpenAI-compatible provider — direct blocked, proxy required)
-  - DOMAIN-SUFFIX,uiuihao.com,PROXY
+  # UIUIAPI (OpenAI-compatible provider — was routed through PROXY, but direct
+  # connectivity confirmed working (2026-07-30: 0.59s direct, 401=OK).
+  # Switch to DIRECT to save ~0.3s Tailscale overhead per LLM API call.
+  # Revert to PROXY if direct becomes unstable or blocked.
+  - DOMAIN-SUFFIX,uiuihao.com,DIRECT
   # Twitter / X
   - DOMAIN-SUFFIX,twitter.com,PROXY
   - DOMAIN-SUFFIX,x.com,PROXY
@@ -314,7 +374,13 @@ rules:
   # Sentry (error reporting; used by lemonsqueezy/page CDNs)
   - DOMAIN-SUFFIX,sentry.io,PROXY
   - DOMAIN-SUFFIX,sentry-cdn.com,PROXY
-
+  # WXIAI (OpenAI-compatible provider used by OpenCode; direct unreachable in CN —
+  # TCP TLS handshake fails, PROXY required. Confirmed 2026-07-30)
+  - DOMAIN-SUFFIX,wxiai.com,PROXY
+  # Dify cloud platform (unreachable direct in CN; PROXY required)
+  - DOMAIN-SUFFIX,dify.ai,PROXY
+  # arXiv (CDN IPs blocked on some CN network paths; route through PROXY as fallback)
+  - DOMAIN-SUFFIX,arxiv.org,PROXY
 # ============================================================================
 # Proxy groups override
 # ----------------------------------------------------------------------------
@@ -338,7 +404,6 @@ proxy-groups:
     url: "https://www.gstatic.com/generate_204"
     interval: 30
     tolerance: 200
-
   # Main upstream selector — AUTO listed first so a fresh cache.db picks it
   - name: "PROXY"
     type: select
@@ -347,7 +412,6 @@ proxy-groups:
       - "JP-Tailscale"
       - "US-Tailscale"
       - "DIRECT"
-
   # Academic publishers — institution-based access (Shibboleth / IP allowlist /
   # EZproxy) is bound to the local egress IP. Going through an overseas proxy
   # makes the publisher classify the request as unaffiliated and demand a fee.
@@ -357,3 +421,5 @@ proxy-groups:
     proxies:
       - "DIRECT"
       - "PROXY"
+system-proxy:
+  enable: true

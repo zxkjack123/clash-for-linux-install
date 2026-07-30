@@ -1,4 +1,18 @@
 # Changelog
+## [2.5.20] - 2026-07-30
+
+### 🔀 Routing
+- **uiuihao.com → DIRECT** (`resources/mixin.yaml`): switched `DOMAIN-SUFFIX,uiuihao.com` from PROXY to DIRECT after confirming stable direct connectivity (HTTP 401, 0.37s vs 0.88s through JP-Tailscale). Saves ~0.3–0.5s per LLM API call when using `OPENAI_BASE_URL=https://api.uiuihao.com/v1` as the primary OpenCode provider. Revert to PROXY if direct connectivity becomes unstable.
+
+### 🛡️ System
+- **ALL_PROXY protocol fix** (`~/.bashrc`): GNOME session constructs `ALL_PROXY=socks://127.0.0.1:7891/` from gsettings, which does not resolve DNS through the proxy. Added lightweight bashrc snippet that reads clashctl's state files and overrides with `socks5h://127.0.0.1:7891` (DNS-through-SOCKS5). This is the protocol the clashctl script already uses internally — the bashrc fix ensures interactive terminal sessions consistently get the correct format.
+- **Login shell proxy inheritance** (`~/.profile`): added standard Ubuntu bashrc-sourcing guard so login shells also receive the corrected proxy environment variables.
+
+### 📊 Verification
+- Full LLM API endpoint connectivity test (8 endpoints): all critical endpoints reachable (DeepSeek 0.12s, UIUIAPI 0.37s DIRECT, SCNET 0.12s, Anthropic 0.21s, OpenAI 1.15s via PROXY, OpenRouter 0.38s, PySDO 0.67s).
+- Infrastructure endpoint test (10 endpoints): GitHub, Docker Hub, HuggingFace, PyPI, npm, Zotero, Semantic Scholar all reachable.
+- Known issues pre-existing (not regressions): `cn-api.wxiai.com` TCP timeout (unreachable even through proxy), `arxiv.org` CDN IP blocked on current network path, `cloud.dify.ai` unreachable.
+
 ## [2.5.19] - 2026-07-04
 
 ### 🔀 Routing
