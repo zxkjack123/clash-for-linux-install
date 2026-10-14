@@ -191,10 +191,11 @@ _set_system_proxy() {
     #  7) 添加 bing 中国 CDN 子域 www.bing.com / cn.bing.com (实测直连 0.15-0.18s, 代理 1.1-3.0s, 快 6-20 倍)。
     #     ⚠️ 仅子域: 裸域 bing.com 直连超时(8s) -> 仍走 PROXY; 故按精确主机添加, 不写 bing.com 后缀。
     local no_proxy_addr="localhost,127.0.0.1,::1,0.0.0.0,*.local,.localhost,.local,ts.net,.ts.net,tailscale.io,.tailscale.io,tailscale.com,.tailscale.com,controlplane.tailscale.com,100.100.100.100,100.64.0.0/10,scnet.cn,.scnet.cn,szai.scnet.cn,.szai.scnet.cn,qdai.scnet.cn,.qdai.scnet.cn,ipp.ac.cn,.ipp.ac.cn,api.deepseek.com,.deepseek.com,www.smaragents.com,smaragents.com,.smaragents.com,www.bing.com,cn.bing.com"
-    # 动态探测 tailnet MagicDNSSuffix (tailscale status --json) 例: tail69c12a.ts.net
+    # 动态探测 tailnet MagicDNSSuffix (tailscale status --json), 例: tail69c12a.ts.net
+    # 用 python3 json 解析 (替代易受输出格式漂移影响的 grep/sed), 确保 ts.net 直连规则不丢失。
     if command -v tailscale >/dev/null 2>&1; then
         local ts_suffix
-        ts_suffix=$(tailscale status --json 2>/dev/null | grep -o '"MagicDNSSuffix"[^"]*"[^"]*"' | sed -E 's/.*"MagicDNSSuffix" *: *"([^"]+)"/\1/' | head -n1 || true)
+        ts_suffix=$(tailscale status --json 2>/dev/null | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get(\"MagicDNSSuffix\", \"\") or \"\")' 2>/dev/null || true)
         if [ -z "$ts_suffix" ]; then
             ts_suffix=$(tailscale status 2>/dev/null | grep -o 'tail[0-9a-f]*\.ts\.net' | head -n1 || true)
         fi
