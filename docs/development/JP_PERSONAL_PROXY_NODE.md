@@ -223,7 +223,13 @@ tailscale status
 
 ### 3.2 修改 Clash 配置
 
-编辑本项目中的 `resources/mixin.yaml`，添加自定义节点。
+编辑**运行时读取的** `~/.local/share/clash/mixin.yaml`，添加自定义节点（推荐用 `clashctl mixin -e` 直接编辑该文件）。
+
+> ⚠️ **两个 `mixin.yaml` 不是同一个文件**：仓库里的 `resources/mixin.yaml` 只是安装时的**源文件**——`install.sh` 会把它一次性拷贝到 `~/.local/share/clash/mixin.yaml`，此后**不再自动同步**。若习惯在仓库内编辑，改完必须手动同步，否则运行时不会生效：
+>
+> ```bash
+> cp resources/mixin.yaml ~/.local/share/clash/mixin.yaml
+> ```
 
 ```yaml
 proxies:
@@ -261,14 +267,16 @@ yamllint resources/mixin.yaml  # 若未安装，可通过 apt/pip 安装 yamllin
 
 ### 3.3 应用配置
 
-运行脚本重新生成配置：
+用 `clashctl mixin -e` 编辑并保存后，会**自动重建 `runtime.yaml` 并重启内核**：
 
 ```bash
-./clashctl.sh mixin
-./clashctl.sh restart
-# 验证明细
-./clashctl.sh status
+clashctl mixin -e     # vim 编辑运行时 mixin；保存退出后自动重建 runtime + 重启内核
+clashctl status       # 验证明细
 ```
+
+> - 重建会短暂重启内核（约 1–2 秒），期间代理中断。
+> - 若你改的是仓库副本，请先执行 §3.2 的 `cp` 同步，再触发上面的重建。
+> - `clashctl` 没有独立的 `rebuild` 命令；重建统一走 `mixin -e` 保存或 `tun on/off` 触发的合并流程。
 
 ## 4. 验证与测试
 

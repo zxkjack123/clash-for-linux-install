@@ -1,4 +1,20 @@
 # Changelog
+## [2.5.22] - 2026-10-14
+
+### 🔀 Routing
+- **smaragents.com → 显式 DIRECT 固定**（`resources/mixin.yaml`）：在 `deepseek.com` 规则旁新增 `DOMAIN-SUFFIX,smaragents.com,DIRECT`，与 DeepSeek 对齐。
+  - 背景：`2.5.21` 已把 `smaragents.com` 加入客户端 `no_proxy` 直连；Clash 侧此前**无显式规则**，靠末尾兜底 `MATCH,DIRECT` 落到直连。
+  - 本次显式固定，防止后续订阅把 MATCH 目标改成 PROXY、或引入 GEOSITE 规则时被静默改道出国。
+  - 实测：`www.smaragents.com` 直连 200 / ~0.84s、0% 丢包（代理 ~0.93s）；`api.deepseek.com` 401（可达）/ ~0.13s。
+
+### 📝 Docs
+- **`mixin.yaml` 双路径澄清**（`README.md`、`docs/development/JP_PERSONAL_PROXY_NODE.md`）：明确运行时读取的是安装目录副本 `~/.local/share/clash/mixin.yaml`（`clashctl mixin -e` 编辑的也是它），而仓库 `resources/mixin.yaml` 仅为安装时源文件、此后**不自动同步**——只改仓库路径将不生效，必须先 `cp` 同步再重建。
+- 补正 JP 个人节点文档中已失效的应用命令（`./clashctl.sh restart` 不存在；`./clashctl.sh mixin` 只读不写）为 `clashctl mixin -e`。
+
+### 📊 Verification
+- `runtime.yaml` 重建后规则 317 条（+1）；`mixin_sha` 由 `f0707712` → `34f510c9`；内核重启 `active`，日志无错误。
+- mihomo 日志确证命中新规则：`www.smaragents.com:443 match DomainSuffix(smaragents.com) using DIRECT`（改动前为 `match Match using DIRECT`）。
+
 ## [2.5.21] - 2026-10-14
 
 ### ⚡ no_proxy 直连（客户端绕过本地 Clash 一跳）

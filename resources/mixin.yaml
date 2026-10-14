@@ -25,6 +25,12 @@ rules:
   - DOMAIN-SUFFIX,hfcas.ac.cn,DIRECT
   # DeepSeek (Chinese AI service; routing via overseas proxy adds 5+s TLS handshake and frequent drops)
   - DOMAIN-SUFFIX,deepseek.com,DIRECT
+  # smaragents (OpenCode sub2api / sub2api-demostic relay host, US San Jose).
+  # Currently already DIRECT via the trailing MATCH,DIRECT fallthrough (verified 2026-10-14:
+  # direct ~840ms / 0% loss, proxy ~914ms), but pin it explicitly so a future MATCH-target
+  # or GEOSITE change cannot silently reroute it overseas, and so it stays aligned with the
+  # client-side no_proxy bypass list (www.smaragents.com / smaragents.com / .smaragents.com).
+  - DOMAIN-SUFFIX,smaragents.com,DIRECT
   # ===== China domestic services (DIRECT) =====
   # Routing these via overseas proxy adds 5+s TLS handshake, frequent drops, or 403 (geo-blocked).
   # Government / public sector

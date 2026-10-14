@@ -345,6 +345,17 @@ $ clashctl mixin -r
 - 运行时配置是订阅配置和 `Mixin` 配置的并集。
 - 相同配置项优先级：`Mixin` 配置 > 订阅配置。
 
+> ⚠️ **注意：仓库里的 `resources/mixin.yaml` 与运行时读取的 `mixin.yaml` 不是同一个文件（易踩坑）。**
+>
+> - **运行时读取**：`~/.local/share/clash/mixin.yaml` —— `clashctl mixin -e` 编辑的也是它，保存后自动重建 `runtime.yaml` 并重启内核。
+> - **仓库源文件**：`resources/mixin.yaml` —— 仅在 `install.sh` 安装时**一次性拷贝**到安装目录，之后**不再自动同步**。
+> - 因此：只想改配置时用 `clashctl mixin -e` 即可**立即生效**；若习惯在仓库内编辑 `resources/mixin.yaml`，改完**必须手动同步**，否则运行时不会生效：
+>
+>   ```bash
+>   cp resources/mixin.yaml ~/.local/share/clash/mixin.yaml
+>   # 再触发合并重建（见 clashctl mixin -e 的保存流程），否则改动不会进入 runtime.yaml
+>   ```
+
 ### 卸载
 
 ```bash
