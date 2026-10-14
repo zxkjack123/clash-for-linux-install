@@ -233,6 +233,11 @@ rules:
   - DOMAIN-SUFFIX,huggingface.co,PROXY
   - DOMAIN-SUFFIX,hf.co,PROXY
   - DOMAIN-SUFFIX,huggingface.com,PROXY
+  # Astral (uv/ruff) — releases.astral.sh 走 Cloudflare, 国内直连极不稳定:
+  #   实测同一时段 0.85s ↔ 21s 抖动; anycast IP 104.26.13.77 会整段 25s 超时。
+  #   走代理稳定 ~0.3-0.6s (astral.sh 337ms / releases.astral.sh 563ms) → 强制 PROXY。
+  #   ⚠️ 注意: 本域**不要**加入 no_proxy (会让客户端退回不稳定的直连)。
+  - DOMAIN-SUFFIX,astral.sh,PROXY
   # ===== Microsoft / Office 365 (force PROXY) =====
   # Microsoft services are heavily throttled or blocked on Chinese networks
   # (GFW SNI-based interference on non-microsoft.com domains).

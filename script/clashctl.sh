@@ -44,6 +44,9 @@ _gnome_build_ignore_hosts() {
         "10.0.0.0/8" "172.16.0.0/12" "192.168.0.0/16"
         "ts.net" ".ts.net" "tailscale.io" ".tailscale.io" "tailscale.com" ".tailscale.com" "controlplane.tailscale.com" "100.100.100.100" "100.64.0.0/10"
         "scnet.cn" ".scnet.cn" "szai.scnet.cn" ".szai.scnet.cn" "qdai.scnet.cn" ".qdai.scnet.cn"
+        "api.deepseek.com" "deepseek.com" ".deepseek.com"
+        "www.smaragents.com" "smaragents.com" ".smaragents.com"
+        "www.bing.com" "cn.bing.com"
     )
     if [ -n "$ts_suffix" ]; then
         base+=("$ts_suffix" ".${ts_suffix}")
@@ -180,7 +183,14 @@ _set_system_proxy() {
     #  2) tailscale MagicDNS 解析 & Funnel 域 统一走直连, 避免被 http_proxy 劫持到本地 127.0.0.1:PORT 造成连接失败
     #  3) 加入 100.100.100.100 (Tailscale 内部 DNS) 及 100.64.0.0/10 CGNAT 地址空间; 虽然多数工具不支持 CIDR 匹配, 但保留不影响
     #  4) 添加 0.0.0.0, *.local, .localhost 以确保所有本地服务（包括Docker容器、本地Web服务等）都能正常访问
-    local no_proxy_addr="localhost,127.0.0.1,::1,0.0.0.0,*.local,.localhost,.local,ts.net,.ts.net,tailscale.io,.tailscale.io,tailscale.com,.tailscale.com,controlplane.tailscale.com,100.100.100.100,100.64.0.0/10,scnet.cn,.scnet.cn,szai.scnet.cn,.szai.scnet.cn,qdai.scnet.cn,.qdai.scnet.cn,ipp.ac.cn,.ipp.ac.cn"
+    #  5) 添加 api.deepseek.com / .deepseek.com: DeepSeek 国内可达, 走本地 Clash (127.0.0.1:7890) 只是多一跳
+    #     本地回环开销 (mixin 已将该域 DIRECT 路由, 不会出国); 客户端直接绕过代理更快, 且不占用连接/失败计数。
+    #  6) 添加 smaragents.com (opencode sub2api / sub2api-demostic 中转 host, US San Jose):
+    #     实测直连 ~600ms, 代理组 AUTO ~596ms / PROXY ~750ms; Clash 无显式规则 -> 落到 Match->DIRECT 已直连。
+    #     no_proxy 让客户端直接出站, 去掉本地中继一跳 (SSE 流式响应路径更干净), 不改变 TTFB。
+    #  7) 添加 bing 中国 CDN 子域 www.bing.com / cn.bing.com (实测直连 0.15-0.18s, 代理 1.1-3.0s, 快 6-20 倍)。
+    #     ⚠️ 仅子域: 裸域 bing.com 直连超时(8s) -> 仍走 PROXY; 故按精确主机添加, 不写 bing.com 后缀。
+    local no_proxy_addr="localhost,127.0.0.1,::1,0.0.0.0,*.local,.localhost,.local,ts.net,.ts.net,tailscale.io,.tailscale.io,tailscale.com,.tailscale.com,controlplane.tailscale.com,100.100.100.100,100.64.0.0/10,scnet.cn,.scnet.cn,szai.scnet.cn,.szai.scnet.cn,qdai.scnet.cn,.qdai.scnet.cn,ipp.ac.cn,.ipp.ac.cn,api.deepseek.com,.deepseek.com,www.smaragents.com,smaragents.com,.smaragents.com,www.bing.com,cn.bing.com"
     # 动态探测 tailnet MagicDNSSuffix (tailscale status --json) 例: tail69c12a.ts.net
     if command -v tailscale >/dev/null 2>&1; then
         local ts_suffix
