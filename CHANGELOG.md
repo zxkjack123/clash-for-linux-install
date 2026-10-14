@@ -1,4 +1,24 @@
 # Changelog
+## [2.5.21] - 2026-10-14
+
+### ⚡ no_proxy 直连（客户端绕过本地 Clash 一跳）
+`script/clashctl.sh` — 在 `_set_system_proxy` 的 `no_proxy` 环境变量与 GNOME `ignore-hosts` 两处同步新增（两处必须同改：CLI 读 env，GUI/Electron 读 gsettings）：
+- **DeepSeek**（`api.deepseek.com`, `.deepseek.com`）：国内可达（mixin 已 `deepseek.com → DIRECT`）。经本地 Clash（127.0.0.1:7890）只是多一跳回环，客户端直连更省延迟、且不占 Clash 连接/失败计数。
+- **smaragents.com**（`www.smaragents.com`, `.smaragents.com`）：OpenCode `sub2api` / `sub2api-demostic` 中转 host（US San Jose）。实测直连 ~600ms，代理组 AUTO ~596ms / PROXY ~750ms；Clash 无显式规则 → 已落 `Match→DIRECT`。`no_proxy` 去掉本地中继一跳（SSE 流式响应路径更干净），不改变 TTFB。
+- **bing 中国 CDN 子域**（`www.bing.com`, `cn.bing.com`）：直连 0.15–0.18s vs 代理 1.1–3.0s（快 6–20×）。**仅子域**——裸域 `bing.com` 直连超时（8s），保持 PROXY，故按精确主机添加而非 `bing.com` 后缀。
+
+### 🔀 Routing
+- **astral.sh → PROXY**（`resources/mixin.yaml`）：`releases.astral.sh`（uv/ruff，Cloudflare）国内直连极不稳定——实测同一时段 0.85s↔21s 抖动，anycast IP `104.26.13.77` 会整段 25s 超时；走代理稳定 ~0.6s（`astral.sh` 337ms / `releases.astral.sh` 563ms）。
+  - ⚠️ 这是 `no_proxy` 的**反例**：切勿把 `astral.sh` 加入 `no_proxy`（会把客户端按回不稳定的直连）。`tests/test_no_proxy_routing.sh` 已加守卫断言。
+
+### 🛡️ System
+- **Tailscale MagicDNSSuffix 解析加固**（`script/clashctl.sh`）：`tailscale status --json` 的 MagicDNS 后缀提取从脆弱的 `grep -o`+`sed` 改为 `python3`+`json`，避免输出转义/格式漂移导致后缀丢失（进而漏掉 `tail*.ts.net` 直连规则）。
+
+### 📊 Verification
+- 全量测试 `bash tests/run_tests.sh`：**81 passed / 0 failed**（新增 `tests/test_no_proxy_routing.sh`，12 项静态回归守卫，含"astral 不得入 no_proxy""bing 裸域不得入 no_proxy"两条负向断言）。
+- 连通性实测（客户端绕过代理 → 真实 IP）：`api.deepseek.com` 直连 0.14s（123.125.246.121）；`www.smaragents.com` 直连 0.95s（108.186.222.22）；`www.bing.com` 0.32s / `cn.bing.com` 0.17s（202.89.233.x）；`releases.astral.sh` 走 PROXY 0.65s（此前直连中位 ~15s）。
+- `bash -n script/clashctl.sh` 通过；`resources/mixin.yaml` YAML 校验通过；合并构建 runtime 规则 310 条；`_valid_config` 通过。
+
 ## [2.5.20] - 2026-07-30
 
 ### 🔀 Routing
